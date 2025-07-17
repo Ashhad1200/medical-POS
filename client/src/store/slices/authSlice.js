@@ -7,23 +7,28 @@ export const loginUser = createAsyncThunk(
   async ({ email, password }, { rejectWithValue }) => {
     try {
       const response = await api.post("/auth/login", { email, password });
-      const { token, user } = response.data.data;
+      const { session, user } = response.data.data;
 
-      // Store token in localStorage
-      localStorage.setItem("token", token);
+      // Set Supabase session
+      const { error } = await supabase.auth.setSession(session);
+      if (error) throw error;
 
-      return { token, user };
+      return { user };
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || "Login failed");
+      return rejectWithValue(error.message || "Login failed");
     }
   }
 );
 
 export const logoutUser = createAsyncThunk(
   "auth/logout",
-  async (_, { dispatch }) => {
-    localStorage.removeItem("token");
-    return null;
+  async (_, { rejectWithValue }) => {
+    try {
+      localStorage.removeItem("token");
+      return null;
+    } catch (error) {
+      return rejectWithValue("Logout failed");
+    }
   }
 );
 
@@ -53,98 +58,23 @@ const token =
 
 const initialState = {
   user: null,
-  token: token,
-  isLoading: false, // Don't start with loading true
-  isAuthenticated: false,
-  error: null,
-  initialized: false, // Always start uninitialized
+  profile: null,
 };
 
 const authSlice = createSlice({
   name: "auth",
   initialState,
   reducers: {
-    clearError: (state) => {
-      state.error = null;
+    setUserProfile: (state, action) => {
+      state.user = action.payload.user;
+      state.profile = action.payload.profile;
     },
-    setCredentials: (state, action) => {
-      const { user, token } = action.payload;
-      state.user = user;
-      state.token = token;
-      state.isAuthenticated = true;
-      state.initialized = true;
-      state.isLoading = false;
-      state.error = null;
+    clearUserProfile: (state) => {
+      state.user = null;
+      state.profile = null;
     },
-    setInitialized: (state) => {
-      state.initialized = true;
-      state.isLoading = false;
-    },
-    startInitialization: (state) => {
-      state.isLoading = true;
-      state.initialized = false;
-    },
-  },
-  extraReducers: (builder) => {
-    builder
-      // Login
-      .addCase(loginUser.pending, (state) => {
-        state.isLoading = true;
-        state.error = null;
-      })
-      .addCase(loginUser.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.user = action.payload.user;
-        state.token = action.payload.token;
-        state.isAuthenticated = true;
-        state.error = null;
-        state.initialized = true;
-      })
-      .addCase(loginUser.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload;
-        state.isAuthenticated = false;
-        state.initialized = true;
-        state.user = null;
-        state.token = null;
-      })
-
-      // Logout
-      .addCase(logoutUser.fulfilled, (state) => {
-        state.user = null;
-        state.token = null;
-        state.isAuthenticated = false;
-        state.error = null;
-        state.initialized = true;
-        state.isLoading = false;
-      })
-
-      // Get current user
-      .addCase(getCurrentUser.pending, (state) => {
-        state.isLoading = true;
-      })
-      .addCase(getCurrentUser.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.user = action.payload;
-        state.isAuthenticated = true;
-        state.error = null;
-        state.initialized = true;
-      })
-      .addCase(getCurrentUser.rejected, (state, action) => {
-        state.isLoading = false;
-        state.user = null;
-        state.token = null;
-        state.isAuthenticated = false;
-        state.error = action.payload;
-        state.initialized = true;
-      });
   },
 });
 
-export const {
-  clearError,
-  setCredentials,
-  setInitialized,
-  startInitialization,
-} = authSlice.actions;
+export const { setUserProfile, clearUserProfile } = authSlice.actions;
 export default authSlice.reducer;

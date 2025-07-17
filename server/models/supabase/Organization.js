@@ -9,12 +9,19 @@ class Organization {
     this.address = data.address;
     this.phone = data.phone;
     this.email = data.email;
-    this.isActive = data.isActive !== false;
-    this.subscriptionTier = data.subscriptionTier || "basic";
-    this.maxUsers = data.maxUsers || 5;
-    this.currentUsers = data.currentUsers || 0;
-    this.createdAt = data.createdAt || new Date().toISOString();
-    this.updatedAt = data.updatedAt || new Date().toISOString();
+    this.website = data.website;
+    this.logo_url = data.logo_url;
+    this.is_active = data.is_active !== false;
+    this.subscription_tier = data.subscription_tier || "basic";
+    this.max_users = data.max_users || 5;
+    this.current_users = data.current_users || 0;
+    this.trial_ends_at = data.trial_ends_at;
+    this.billing_email = data.billing_email;
+    this.tax_id = data.tax_id;
+    this.currency = data.currency || "USD";
+    this.timezone = data.timezone || "UTC";
+    this.created_at = data.created_at || new Date().toISOString();
+    this.updated_at = data.updated_at || new Date().toISOString();
   }
 
   // Static methods for database operations
@@ -55,11 +62,11 @@ class Organization {
       let query = supabase.from("organizations").select("*");
 
       if (options.isActive !== undefined) {
-        query = query.eq("isActive", options.isActive);
+        query = query.eq("is_active", options.isActive);
       }
 
       if (options.subscriptionTier) {
-        query = query.eq("subscriptionTier", options.subscriptionTier);
+        query = query.eq("subscription_tier", options.subscriptionTier);
       }
 
       if (options.search) {
@@ -76,7 +83,7 @@ class Organization {
         const sortOrder = options.sortOrder || "asc";
         query = query.order(options.sortBy, { ascending: sortOrder === "asc" });
       } else {
-        query = query.order("createdAt", { ascending: false });
+        query = query.order("created_at", { ascending: false });
       }
 
       // Pagination
@@ -126,7 +133,7 @@ class Organization {
 
   async save() {
     try {
-      this.updatedAt = new Date().toISOString();
+      this.updated_at = new Date().toISOString();
 
       if (this.id) {
         // Update existing organization
@@ -155,19 +162,19 @@ class Organization {
       const { count, error } = await supabase
         .from("users")
         .select("*", { count: "exact", head: true })
-        .eq("organizationId", this.id)
-        .eq("isActive", true);
+        .eq("organization_id", this.id)
+        .eq("is_active", true);
 
       if (error) throw error;
 
-      this.currentUsers = count || 0;
-      this.updatedAt = new Date().toISOString();
+      this.current_users = count || 0;
+      this.updated_at = new Date().toISOString();
 
       const { data, updateError } = await supabase
         .from("organizations")
         .update({
-          currentUsers: this.currentUsers,
-          updatedAt: this.updatedAt,
+          current_users: this.current_users,
+          updated_at: this.updated_at,
         })
         .eq("id", this.id)
         .select()
@@ -184,7 +191,7 @@ class Organization {
 
   async checkUserLimit() {
     await this.updateUserCount();
-    return this.currentUsers < this.maxUsers;
+    return this.current_users < this.max_users;
   }
 
   async canAddUser() {
@@ -237,8 +244,8 @@ class Organization {
       const { count: userCount, error: userError } = await supabase
         .from("users")
         .select("*", { count: "exact", head: true })
-        .eq("organizationId", organizationId)
-        .eq("isActive", true);
+        .eq("organization_id", organizationId)
+        .eq("is_active", true);
 
       if (userError) throw userError;
 
@@ -246,8 +253,8 @@ class Organization {
       const { count: medicineCount, error: medicineError } = await supabase
         .from("medicines")
         .select("*", { count: "exact", head: true })
-        .eq("organizationId", organizationId)
-        .eq("isActive", true);
+        .eq("organization_id", organizationId)
+        .eq("is_active", true);
 
       if (medicineError) throw medicineError;
 
@@ -255,7 +262,7 @@ class Organization {
       const { count: orderCount, error: orderError } = await supabase
         .from("orders")
         .select("*", { count: "exact", head: true })
-        .eq("organizationId", organizationId);
+        .eq("organization_id", organizationId);
 
       if (orderError) throw orderError;
 
@@ -263,8 +270,8 @@ class Organization {
       const { count: supplierCount, error: supplierError } = await supabase
         .from("suppliers")
         .select("*", { count: "exact", head: true })
-        .eq("organizationId", organizationId)
-        .eq("isActive", true);
+        .eq("organization_id", organizationId)
+        .eq("is_active", true);
 
       if (supplierError) throw supplierError;
 
@@ -305,11 +312,11 @@ class Organization {
         .select("*", { count: "exact", head: true });
 
       if (options.isActive !== undefined) {
-        query = query.eq("isActive", options.isActive);
+        query = query.eq("is_active", options.isActive);
       }
 
       if (options.subscriptionTier) {
-        query = query.eq("subscriptionTier", options.subscriptionTier);
+        query = query.eq("subscription_tier", options.subscriptionTier);
       }
 
       const { count, error } = await query;
@@ -331,12 +338,19 @@ class Organization {
       address: this.address,
       phone: this.phone,
       email: this.email,
-      isActive: this.isActive,
-      subscriptionTier: this.subscriptionTier,
-      maxUsers: this.maxUsers,
-      currentUsers: this.currentUsers,
-      createdAt: this.createdAt,
-      updatedAt: this.updatedAt,
+      website: this.website,
+      logo_url: this.logo_url,
+      is_active: this.is_active,
+      subscription_tier: this.subscription_tier,
+      max_users: this.max_users,
+      current_users: this.current_users,
+      trial_ends_at: this.trial_ends_at,
+      billing_email: this.billing_email,
+      tax_id: this.tax_id,
+      currency: this.currency,
+      timezone: this.timezone,
+      created_at: this.created_at,
+      updated_at: this.updated_at,
     };
   }
 }

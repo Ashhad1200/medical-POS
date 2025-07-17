@@ -73,7 +73,7 @@ const login = async (req, res) => {
           organizationId: profile.organization_id,
           permissions: profile.permissions || [],
         },
-        token: data.session.access_token,
+        session: data.session,  // Changed from token to full session
       },
     });
   } catch (error) {
@@ -140,6 +140,7 @@ const register = async (req, res) => {
         email,
         full_name: fullName,
         role: role || "user",
+        role_in_pos: role === "admin" ? "admin" : "counter", // Set default POS role
         organization_id: organizationId,
         is_active: true,
         permissions:

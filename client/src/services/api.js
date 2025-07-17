@@ -1,8 +1,9 @@
 import axios from "axios";
+import { supabase } from "../config/supabase";
 
 // Use the environment variable if available, otherwise use the proxy path in dev mode
 const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:3002/api";
+  import.meta.env.VITE_API_URL || "http://localhost:3001/api";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -14,10 +15,10 @@ const api = axios.create({
 
 // Request interceptor to add auth token
 api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+  async (config) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      config.headers.Authorization = `Bearer ${session.access_token}`;
     }
     return config;
   },
@@ -65,6 +66,11 @@ export const authServices = {
   login: (credentials) => api.post("/auth/login", credentials),
   register: (userData) => api.post("/auth/register", userData),
   getProfile: () => api.get("/auth/profile"),
+  updateProfile: (data) => api.put("/auth/profile", data),
+  logout: () => api.post("/auth/logout"),
+  refresh: () => api.post("/auth/refresh"),
+  changePassword: (data) => api.put("/auth/change-password", data),
+  getStatus: () => api.get("/auth/status"),
 };
 
 // ===================== MEDICINE SERVICES =====================
@@ -74,8 +80,17 @@ export const medicineServices = {
   create: (data) => api.post("/medicines", data),
   update: (id, data) => api.put(`/medicines/${id}`, data),
   delete: (id) => api.delete(`/medicines/${id}`),
-  search: (q, limit = 10) =>
-    api.get(`/medicines/search`, { params: { q, limit } }),
+  search: (params = {}) => api.get("/medicines/search", { params }),
+  getStats: () => api.get("/medicines/stats"),
+  getLowStock: () => api.get("/medicines/low-stock"),
+  getExpired: () => api.get("/medicines/expired"),
+  getExpiringSoon: () => api.get("/medicines/expiring-soon"),
+  updateStock: (id, data) => api.patch(`/medicines/${id}/stock`, data),
+  bulkImport: (formData) => api.post("/medicines/bulk-import", formData, {
+    headers: { "Content-Type": "multipart/form-data" }
+  }),
+  exportInventory: () => api.get("/medicines/export", { responseType: "blob" }),
+  test: () => api.get("/medicines/test"),
 };
 
 // ===================== ORDER SERVICES =====================
@@ -85,8 +100,7 @@ export const orderServices = {
   create: (data) => api.post("/orders", data),
   update: (id, data) => api.put(`/orders/${id}`, data),
   delete: (id) => api.delete(`/orders/${id}`),
-  getDashboardData: (params = {}) =>
-    api.get("/orders/dashboard", { params }),
+  getDashboardData: (params = {}) => api.get("/orders/dashboard", { params }),
   getSalesChartData: () => api.get("/orders/sales-chart"),
   getPdf: (id) => api.get(`/orders/${id}/receipt`, { responseType: "blob" }),
   getByDateRange: (date) => api.get("/orders", { params: { date } }),
@@ -99,7 +113,10 @@ export const supplierServices = {
   create: (data) => api.post("/suppliers", data),
   update: (id, data) => api.put(`/suppliers/${id}`, data),
   delete: (id) => api.delete(`/suppliers/${id}`),
-  search: (search) => api.get("/suppliers", { params: { search } }),
+  search: (params = {}) => api.get("/suppliers/search", { params }),
+  getStats: () => api.get("/suppliers/stats"),
+  getByCity: (city) => api.get(`/suppliers/city/${city}`),
+  toggleStatus: (id) => api.patch(`/suppliers/${id}/toggle-status`),
 };
 
 // ===================== PURCHASE ORDER SERVICES =====================
@@ -123,8 +140,7 @@ export const userServices = {
   create: (data) => api.post("/users", data),
   update: (id, data) => api.put(`/users/${id}`, data),
   delete: (id) => api.delete(`/users/${id}`),
-  updateRole: (id, role) => api.patch(`/users/${id}/role`, { role }),
-  toggleStatus: (id) => api.patch(`/users/${id}/toggle-status`),
+  updateStatus: (id) => api.patch(`/users/${id}/status`),
 };
 
 // ===================== DASHBOARD SERVICES =====================
@@ -135,19 +151,16 @@ export const dashboardServices = {
 };
 
 // ===================== INVENTORY SERVICES =====================
+// Note: Most inventory operations are handled by medicineServices
 export const inventoryServices = {
-  getAll: (params = {}) => api.get("/medicines", { params }),
-  getLowStock: () => api.get("/medicines/low-stock"),
-  getExpired: () => api.get("/medicines/expired"),
-  updateStock: (id, quantity) =>
-    api.patch(`/medicines/${id}/stock`, { quantity }),
-  bulkImport: (formData) =>
-    api.post("/medicines/bulk-import", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    }),
-  exportData: () => api.get("/medicines/export", { responseType: "blob" }),
+  // Placeholder for future inventory-specific routes
+  getStatus: () => api.get("/inventory"),
+};
+
+// ===================== REPORTS SERVICES =====================
+export const reportServices = {
+  // Placeholder for future report routes
+  getAll: () => api.get("/reports"),
 };
 
 export default api;

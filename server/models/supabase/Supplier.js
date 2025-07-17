@@ -4,14 +4,23 @@ class Supplier {
   constructor(data = {}) {
     this.id = data.id;
     this.name = data.name;
-    this.contactPerson = data.contactPerson;
+    this.contact_person = data.contact_person;
     this.phone = data.phone;
     this.email = data.email;
     this.address = data.address;
-    this.isActive = data.isActive !== false;
-    this.organizationId = data.organizationId;
-    this.createdAt = data.createdAt || new Date().toISOString();
-    this.updatedAt = data.updatedAt || new Date().toISOString();
+    this.city = data.city;
+    this.state = data.state;
+    this.country = data.country;
+    this.postal_code = data.postal_code;
+    this.tax_id = data.tax_id;
+    this.payment_terms = data.payment_terms;
+    this.credit_limit = data.credit_limit || 0;
+    this.current_balance = data.current_balance || 0;
+    this.is_active = data.is_active !== false;
+    this.organization_id = data.organization_id;
+    this.created_by = data.created_by;
+    this.created_at = data.created_at || new Date().toISOString();
+    this.updated_at = data.updated_at || new Date().toISOString();
   }
 
   // Static methods for database operations
@@ -36,17 +45,17 @@ class Supplier {
       let query = supabase
         .from("suppliers")
         .select("*")
-        .eq("organizationId", organizationId);
+        .eq("organization_id", organizationId);
 
       if (options.isActive !== undefined) {
-        query = query.eq("isActive", options.isActive);
+        query = query.eq("is_active", options.isActive);
       }
 
       if (options.search) {
         const searchTerm = options.search.toLowerCase();
         query = query.or(`
           name.ilike.%${searchTerm}%,
-          contactPerson.ilike.%${searchTerm}%,
+          contact_person.ilike.%${searchTerm}%,
           email.ilike.%${searchTerm}%,
           phone.ilike.%${searchTerm}%
         `);
@@ -87,12 +96,12 @@ class Supplier {
       const { data, error } = await supabase
         .from("suppliers")
         .select("*")
-        .eq("organizationId", organizationId)
-        .eq("isActive", true)
+        .eq("organization_id", organizationId)
+        .eq("is_active", true)
         .or(
           `
           name.ilike.%${searchTerm}%,
-          contactPerson.ilike.%${searchTerm}%,
+          contact_person.ilike.%${searchTerm}%,
           email.ilike.%${searchTerm}%,
           phone.ilike.%${searchTerm}%
         `
@@ -125,7 +134,7 @@ class Supplier {
 
   async save() {
     try {
-      this.updatedAt = new Date().toISOString();
+      this.updated_at = new Date().toISOString();
 
       if (this.id) {
         // Update existing supplier
@@ -169,8 +178,8 @@ class Supplier {
       const { count, error } = await supabase
         .from("suppliers")
         .select("*", { count: "exact", head: true })
-        .eq("organizationId", organizationId)
-        .eq("isActive", true);
+        .eq("organization_id", organizationId)
+        .eq("is_active", true);
 
       if (error) throw error;
       return count || 0;
@@ -193,8 +202,8 @@ class Supplier {
           )
         `
         )
-        .eq("organizationId", organizationId)
-        .eq("isActive", true);
+        .eq("organization_id", organizationId)
+        .eq("is_active", true);
 
       if (error) throw error;
 
@@ -212,14 +221,23 @@ class Supplier {
     return {
       id: this.id,
       name: this.name,
-      contactPerson: this.contactPerson,
+      contact_person: this.contact_person,
       phone: this.phone,
       email: this.email,
       address: this.address,
-      isActive: this.isActive,
-      organizationId: this.organizationId,
-      createdAt: this.createdAt,
-      updatedAt: this.updatedAt,
+      city: this.city,
+      state: this.state,
+      country: this.country,
+      postal_code: this.postal_code,
+      tax_id: this.tax_id,
+      payment_terms: this.payment_terms,
+      credit_limit: this.credit_limit,
+      current_balance: this.current_balance,
+      is_active: this.is_active,
+      organization_id: this.organization_id,
+      created_by: this.created_by,
+      created_at: this.created_at,
+      updated_at: this.updated_at,
     };
   }
 }

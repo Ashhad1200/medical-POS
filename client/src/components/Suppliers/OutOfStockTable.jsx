@@ -92,11 +92,11 @@ const OutOfStockTable = ({
 
   // Check if item is in cart
   const isInCart = (medicineId) => {
-    return orderCart.some((item) => item.medicineId === medicineId);
+    return orderCart?.some((item) => item.medicineId === medicineId) || false;
   };
 
   const getCartItem = (medicineId) => {
-    return orderCart.find((item) => item.medicineId === medicineId);
+    return orderCart?.find((item) => item.medicineId === medicineId);
   };
 
   // Pagination component
@@ -313,12 +313,12 @@ const OutOfStockTable = ({
       <div className="divide-y divide-gray-200">
         {medicines.map((medicine) => {
           const stockStatus = getStockStatus(medicine);
-          const cartItem = getCartItem(medicine._id);
-          const inCart = isInCart(medicine._id);
+          const cartItem = getCartItem(medicine.id);
+          const inCart = isInCart(medicine.id);
 
           return (
             <div
-              key={medicine._id}
+              key={medicine.id}
               className={`p-6 hover:bg-gray-50 transition-colors ${
                 inCart ? "bg-blue-50 border-l-4 border-l-blue-500" : ""
               }`}
@@ -395,7 +395,7 @@ const OutOfStockTable = ({
                           Edit Quantity
                         </button>
                         <button
-                          onClick={() => onRemoveFromCart(medicine._id)}
+                          onClick={() => onRemoveFromCart(medicine.id)}
                           className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
                         >
                           Remove

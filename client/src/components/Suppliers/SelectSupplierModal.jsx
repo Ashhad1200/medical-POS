@@ -27,7 +27,7 @@ const SelectSupplierModal = ({
   );
 
   const handleSelect = () => {
-    const supplier = suppliers.find((s) => s._id === selectedSupplierId);
+    const supplier = suppliers.find((s) => s.id === selectedSupplierId);
     if (supplier) {
       // Save order to history before proceeding
       saveOrderToHistory(supplier);
@@ -43,7 +43,7 @@ const SelectSupplierModal = ({
       return;
     }
 
-    const supplier = suppliers.find((s) => s._id === selectedSupplierId);
+    const supplier = suppliers.find((s) => s.id === selectedSupplierId);
 
     if (onFinalize) {
       onFinalize(supplier);
@@ -117,7 +117,7 @@ const SelectSupplierModal = ({
       return;
     }
 
-    const supplier = suppliers.find((s) => s._id === selectedSupplierId);
+    const supplier = suppliers.find((s) => s.id === selectedSupplierId);
     const printContent = generateReceiptHTML(supplier);
 
     const printWindow = window.open("", "_blank");
@@ -134,7 +134,7 @@ const SelectSupplierModal = ({
       return;
     }
 
-    const supplier = suppliers.find((s) => s._id === selectedSupplierId);
+    const supplier = suppliers.find((s) => s.id === selectedSupplierId);
     const slipContent = generateSlipContent(supplier);
 
     const blob = new Blob([slipContent], { type: "text/plain" });
@@ -497,10 +497,10 @@ ${formatDate(new Date())} ${new Date().toLocaleTimeString()}
                 <div className="divide-y divide-gray-200">
                   {filteredSuppliers.map((supplier) => (
                     <div
-                      key={supplier._id}
-                      onClick={() => setSelectedSupplierId(supplier._id)}
+                      key={supplier.id}
+                      onClick={() => setSelectedSupplierId(supplier.id)}
                       className={`p-4 cursor-pointer transition-colors ${
-                        selectedSupplierId === supplier._id
+                        selectedSupplierId === supplier.id
                           ? "bg-blue-50 border-r-4 border-r-blue-500"
                           : "hover:bg-gray-50"
                       }`}
@@ -538,7 +538,7 @@ ${formatDate(new Date())} ${new Date().toLocaleTimeString()}
                           </div>
                         </div>
                         <div className="ml-4">
-                          {selectedSupplierId === supplier._id && (
+                          {selectedSupplierId === supplier.id && (
                             <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center">
                               <svg
                                 className="w-3 h-3 text-white"
@@ -630,7 +630,7 @@ ${formatDate(new Date())} ${new Date().toLocaleTimeString()}
                 </h4>
                 {(() => {
                   const supplier = suppliers.find(
-                    (s) => s._id === selectedSupplierId
+                    (s) => s.id === selectedSupplierId
                   );
                   return supplier ? (
                     <div className="bg-blue-50 rounded-lg p-3">

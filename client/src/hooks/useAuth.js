@@ -57,15 +57,15 @@ export const useAuth = () => {
         }
       } catch (error) {
         console.error("Auth initialization error:", error);
-      setError(error.message);
-    } finally {
-      setIsLoading(false);
-      setInitialized(true); // Set initialized to true after initial check
-    }
+        setError(error.message);
+      } finally {
+        setIsLoading(false);
+        setInitialized(true); // Set initialized to true after initial check
+      }
     };
 
     initializeAuth();
-  }, [fetchUserProfile]);
+  }, []); // Remove fetchUserProfile dependency
 
   // Listen for auth state changes
   useEffect(() => {
@@ -109,7 +109,7 @@ export const useAuth = () => {
     return () => {
       subscription.unsubscribe();
     };
-  }, [fetchUserProfile]);
+  }, []); // Remove fetchUserProfile dependency
 
   // Sign in function
   const signIn = useCallback(async (email, password) => {
@@ -170,7 +170,7 @@ export const useAuth = () => {
   // Check if user can access specific role
   const canUserAccessRole = useCallback(
     (requiredRole) => {
-      return canAccessRole(profile?.roleInPos, requiredRole);
+      return canAccessRole(profile?.role_in_pos, requiredRole);
     },
     [profile]
   );
@@ -184,7 +184,7 @@ export const useAuth = () => {
       warehouse: 1,
     };
 
-    return roleHierarchy[profile?.roleInPos] || 0;
+    return roleHierarchy[profile?.role_in_pos] || 0;
   }, [profile]);
 
   // Refresh user profile

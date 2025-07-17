@@ -30,28 +30,6 @@ app.use(
   })
 );
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: {
-    success: false,
-    message: "Too many requests from this IP, please try again later.",
-  },
-});
-app.use("/api/", limiter);
-
-// Stricter rate limiting for auth routes
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === "development" ? 100 : 5, // More lenient in development
-  message: {
-    success: false,
-    message: "Too many authentication attempts, please try again later.",
-  },
-});
-app.use("/api/auth/login", authLimiter);
-
 // Body parsing middleware
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
@@ -131,6 +109,28 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: {
+    success: false,
+    message: "Too many requests from this IP, please try again later.",
+  },
+});
+app.use("/api/", limiter);
+
+// Stricter rate limiting for auth routes
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // Temporarily increased for testing
+  message: {
+    success: false,
+    message: "Too many authentication attempts, please try again later.",
+  },
+});
+app.use("/api/auth/login", authLimiter);
+
 // Logging middleware
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
@@ -198,7 +198,7 @@ app.use((err, req, res, next) => {
   }
 
   // Default error
-  res.status(err.status || 500).json({
+  res.status(err.statusCode || 500).json({
     success: false,
     message: err.message || "Internal Server Error",
     ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
@@ -229,7 +229,7 @@ const PORT = process.env.PORT || 3001;
 // Start server
 const startServer = async () => {
   try {
-    // Connect to Supabase
+    // Test Supabase connection
     await connectDB();
 
     app.listen(PORT, () => {

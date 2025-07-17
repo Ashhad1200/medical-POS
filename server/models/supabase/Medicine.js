@@ -4,23 +4,30 @@ class Medicine {
   constructor(data = {}) {
     this.id = data.id;
     this.name = data.name;
-    this.genericName = data.genericName;
+    this.generic_name = data.generic_name;
     this.manufacturer = data.manufacturer;
-    this.batchNumber = data.batchNumber;
-    this.sellingPrice = data.sellingPrice;
-    this.costPrice = data.costPrice;
-    this.gstPerUnit = data.gstPerUnit || 0;
-    this.gstRate = data.gstRate || 0;
+    this.batch_number = data.batch_number;
+    this.selling_price = data.selling_price;
+    this.cost_price = data.cost_price;
+    this.gst_per_unit = data.gst_per_unit || 0;
+    this.gst_rate = data.gst_rate || 0;
     this.quantity = data.quantity || 0;
-    this.lowStockThreshold = data.lowStockThreshold || 10;
-    this.expiryDate = data.expiryDate;
+    this.low_stock_threshold = data.low_stock_threshold || 10;
+    this.expiry_date = data.expiry_date;
     this.category = data.category;
+    this.subcategory = data.subcategory;
     this.description = data.description;
-    this.isActive = data.isActive !== false;
-    this.organizationId = data.organizationId;
-    this.supplierId = data.supplierId;
-    this.createdAt = data.createdAt || new Date().toISOString();
-    this.updatedAt = data.updatedAt || new Date().toISOString();
+    this.dosage_form = data.dosage_form;
+    this.strength = data.strength;
+    this.pack_size = data.pack_size;
+    this.storage_conditions = data.storage_conditions;
+    this.prescription_required = data.prescription_required || false;
+    this.is_active = data.is_active !== false;
+    this.organization_id = data.organization_id;
+    this.supplier_id = data.supplier_id;
+    this.created_by = data.created_by;
+    this.created_at = data.created_at || new Date().toISOString();
+    this.updated_at = data.updated_at || new Date().toISOString();
   }
 
   // Static methods for database operations
@@ -61,16 +68,16 @@ class Medicine {
           suppliers (
             id,
             name,
-            contactPerson,
+            contact_person,
             phone,
             email
           )
         `
         )
-        .eq("organizationId", organizationId);
+        .eq("organization_id", organizationId);
 
       if (options.isActive !== undefined) {
-        query = query.eq("isActive", options.isActive);
+        query = query.eq("is_active", options.isActive);
       }
 
       if (options.category) {
@@ -82,11 +89,11 @@ class Medicine {
       }
 
       if (options.supplierId) {
-        query = query.eq("supplierId", options.supplierId);
+        query = query.eq("supplier_id", options.supplierId);
       }
 
       if (options.lowStock) {
-        query = query.lte("quantity", supabase.raw("lowStockThreshold"));
+        query = query.lte("quantity", supabase.raw("low_stock_threshold"));
       }
 
       if (options.outOfStock) {
@@ -94,15 +101,15 @@ class Medicine {
       }
 
       if (options.expired) {
-        query = query.lt("expiryDate", new Date().toISOString());
+        query = query.lt("expiry_date", new Date().toISOString());
       }
 
       if (options.expiringSoon) {
         const thirtyDaysFromNow = new Date();
         thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
         query = query
-          .gte("expiryDate", new Date().toISOString())
-          .lte("expiryDate", thirtyDaysFromNow.toISOString());
+          .gte("expiry_date", new Date().toISOString())
+          .lte("expiry_date", thirtyDaysFromNow.toISOString());
       }
 
       // Search functionality
@@ -110,10 +117,10 @@ class Medicine {
         const searchTerm = options.search.toLowerCase();
         query = query.or(`
           name.ilike.%${searchTerm}%,
-          genericName.ilike.%${searchTerm}%,
+          generic_name.ilike.%${searchTerm}%,
           manufacturer.ilike.%${searchTerm}%,
           category.ilike.%${searchTerm}%,
-          batchNumber.ilike.%${searchTerm}%
+          batch_number.ilike.%${searchTerm}%
         `);
       }
 
@@ -122,7 +129,7 @@ class Medicine {
         const sortOrder = options.sortOrder || "asc";
         query = query.order(options.sortBy, { ascending: sortOrder === "asc" });
       } else {
-        query = query.order("createdAt", { ascending: false });
+        query = query.order("created_at", { ascending: false });
       }
 
       // Pagination
@@ -157,22 +164,22 @@ class Medicine {
           suppliers (
             id,
             name,
-            contactPerson,
+            contact_person,
             phone,
             email
           )
         `
         )
-        .eq("organizationId", organizationId)
-        .eq("isActive", true)
+        .eq("organization_id", organizationId)
+        .eq("is_active", true)
         .gt("quantity", 0)
         .or(
           `
           name.ilike.%${searchTerm}%,
-          genericName.ilike.%${searchTerm}%,
+          generic_name.ilike.%${searchTerm}%,
           manufacturer.ilike.%${searchTerm}%,
           category.ilike.%${searchTerm}%,
-          batchNumber.ilike.%${searchTerm}%
+          batch_number.ilike.%${searchTerm}%
         `
         )
         .limit(limit);
@@ -201,10 +208,10 @@ class Medicine {
           )
         `
         )
-        .eq("organizationId", organizationId)
-        .eq("isActive", true)
+        .eq("organization_id", organizationId)
+        .eq("is_active", true)
         .gt("quantity", 0)
-        .lte("quantity", supabase.raw("lowStockThreshold"));
+        .lte("quantity", supabase.raw("low_stock_threshold"));
 
       if (error) throw error;
       return data ? data.map((medicine) => new Medicine(medicine)) : [];
@@ -230,8 +237,8 @@ class Medicine {
           )
         `
         )
-        .eq("organizationId", organizationId)
-        .eq("isActive", true)
+        .eq("organization_id", organizationId)
+        .eq("is_active", true)
         .eq("quantity", 0);
 
       if (error) throw error;
@@ -258,9 +265,9 @@ class Medicine {
           )
         `
         )
-        .eq("organizationId", organizationId)
-        .eq("isActive", true)
-        .lt("expiryDate", new Date().toISOString());
+        .eq("organization_id", organizationId)
+        .eq("is_active", true)
+        .lt("expiry_date", new Date().toISOString());
 
       if (error) throw error;
       return data ? data.map((medicine) => new Medicine(medicine)) : [];
@@ -290,10 +297,10 @@ class Medicine {
           )
         `
         )
-        .eq("organizationId", organizationId)
-        .eq("isActive", true)
-        .gte("expiryDate", currentDate.toISOString())
-        .lte("expiryDate", futureDate.toISOString());
+        .eq("organization_id", organizationId)
+        .eq("is_active", true)
+        .gte("expiry_date", currentDate.toISOString())
+        .lte("expiry_date", futureDate.toISOString());
 
       if (error) throw error;
       return data ? data.map((medicine) => new Medicine(medicine)) : [];
@@ -321,7 +328,7 @@ class Medicine {
 
   async save() {
     try {
-      this.updatedAt = new Date().toISOString();
+      this.updated_at = new Date().toISOString();
 
       if (this.id) {
         // Update existing medicine
@@ -347,13 +354,13 @@ class Medicine {
   async updateQuantity(newQuantity) {
     try {
       this.quantity = Math.max(0, newQuantity);
-      this.updatedAt = new Date().toISOString();
+      this.updated_at = new Date().toISOString();
 
       const { data, error } = await supabase
         .from("medicines")
         .update({
           quantity: this.quantity,
-          updatedAt: this.updatedAt,
+          updated_at: this.updated_at,
         })
         .eq("id", this.id)
         .select()
@@ -381,7 +388,7 @@ class Medicine {
 
   // Computed properties
   get isLowStock() {
-    return this.quantity > 0 && this.quantity <= this.lowStockThreshold;
+    return this.quantity > 0 && this.quantity <= this.low_stock_threshold;
   }
 
   get isOutOfStock() {
@@ -389,15 +396,15 @@ class Medicine {
   }
 
   get isExpired() {
-    return new Date(this.expiryDate) < new Date();
+    return new Date(this.expiry_date) < new Date();
   }
 
   get isExpiringSoon() {
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
     return (
-      new Date(this.expiryDate) <= thirtyDaysFromNow &&
-      new Date(this.expiryDate) > new Date()
+      new Date(this.expiry_date) <= thirtyDaysFromNow &&
+      new Date(this.expiry_date) > new Date()
     );
   }
 

@@ -139,7 +139,7 @@ const CounterDashboard = () => {
 
     // Check if adding to existing cart item would exceed stock
     const existingCartItem = cart.find(
-      (item) => item.medicineId === medicine._id
+      (item) => item.medicineId === medicine.id
     );
     const currentCartQuantity = existingCartItem?.quantity || 0;
     const totalRequestedQuantity = currentCartQuantity + requestedQuantity;
@@ -166,7 +166,7 @@ const CounterDashboard = () => {
     }
 
     const cartItem = {
-      medicineId: medicine._id,
+      medicineId: medicine.id,
       name: medicine.name,
       unitPrice: medicine.sellingPrice,
       tradePrice: medicine.tradePrice,
@@ -194,7 +194,7 @@ const CounterDashboard = () => {
       if (!cartItem) return;
 
       // Find the original medicine data to check stock
-      const medicine = searchResults.find((med) => med._id === medicineId);
+      const medicine = searchResults.find((med) => med.id === medicineId);
       if (medicine && updates.quantity > medicine.quantity) {
         toast.error(`Only ${medicine.quantity} units available in stock`);
         return;
@@ -248,7 +248,7 @@ const CounterDashboard = () => {
     // Final inventory validation before submitting order
     const invalidItems = [];
     cart.forEach((item) => {
-      const medicine = searchResults.find((med) => med._id === item.medicineId);
+      const medicine = searchResults.find((med) => med.id === item.medicineId);
       if (medicine && item.quantity > medicine.quantity) {
         invalidItems.push({
           name: item.name,
@@ -294,7 +294,7 @@ const CounterDashboard = () => {
 
       // Store order data for receipt (exclude profit for counter staff)
       const receiptData = {
-        orderId: result.orderId || result._id,
+        orderId: result.orderId || result.id,
         items: cart,
         customer: customerInfo,
         totals: isCounterStaff
@@ -328,7 +328,7 @@ const CounterDashboard = () => {
     // Final inventory validation before saving order
     const invalidItems = [];
     cart.forEach((item) => {
-      const medicine = searchResults.find((med) => med._id === item.medicineId);
+      const medicine = searchResults.find((med) => med.id === item.medicineId);
       if (medicine && item.quantity > medicine.quantity) {
         invalidItems.push({
           name: item.name,

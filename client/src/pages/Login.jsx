@@ -21,10 +21,10 @@ const LoginPage = () => {
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !isLoading) {
       navigate("/dashboard");
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, isLoading, navigate]);
 
   // Show auth errors
   useEffect(() => {
@@ -52,27 +52,15 @@ const LoginPage = () => {
     try {
       setIsLoading(true);
       await signIn(formData.email, formData.password);
-      // Navigation will be handled by the useEffect above
     } catch (error) {
-      // Error is already handled by the signIn function
       console.error("Login error:", error);
+      toast.error(error.message || "Login failed");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleDemoLogin = async (role) => {
-    const credentials = {
-      admin: { email: "admin@moizmedical.com", password: "admin123" },
-      counter: { email: "counter@moizmedical.com", password: "counter123" },
-      warehouse: {
-        email: "warehouse@moizmedical.com",
-        password: "warehouse123",
-      },
-    };
 
-    setFormData(credentials[role]);
-  };
 
   if (authLoading) {
     return (
@@ -89,29 +77,13 @@ const LoginPage = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
-          <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-indigo-100">
-            <svg
-              className="h-8 w-8 text-indigo-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-              />
-            </svg>
-          </div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Medical Store POS
+            Sign in to your account
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Sign in to your account
+            Moiz Medical Store Management System
           </p>
         </div>
-
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
@@ -154,8 +126,8 @@ const LoginPage = () => {
                   <svg
                     className="h-5 w-5 text-gray-400"
                     fill="none"
-                    stroke="currentColor"
                     viewBox="0 0 24 24"
+                    stroke="currentColor"
                   >
                     <path
                       strokeLinecap="round"
@@ -168,8 +140,8 @@ const LoginPage = () => {
                   <svg
                     className="h-5 w-5 text-gray-400"
                     fill="none"
-                    stroke="currentColor"
                     viewBox="0 0 24 24"
+                    stroke="currentColor"
                   >
                     <path
                       strokeLinecap="round"
@@ -192,7 +164,7 @@ const LoginPage = () => {
           <div>
             <button
               type="submit"
-              disabled={isLoading || authLoading}
+              disabled={isLoading}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
@@ -206,52 +178,8 @@ const LoginPage = () => {
             </button>
           </div>
 
-          {/* Demo Login Buttons */}
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-gradient-to-br from-blue-50 to-indigo-100 text-gray-500">
-                  Demo Accounts
-                </span>
-              </div>
-            </div>
 
-            <div className="mt-6 grid grid-cols-3 gap-3">
-              <button
-                type="button"
-                onClick={() => handleDemoLogin("admin")}
-                className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                <span className="text-xs">Admin</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoLogin("counter")}
-                className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                <span className="text-xs">Counter</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoLogin("warehouse")}
-                className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                <span className="text-xs">Warehouse</span>
-              </button>
-            </div>
-          </div>
         </form>
-
-        {/* Footer */}
-        <div className="mt-8 text-center">
-          <p className="text-xs text-gray-500">
-            Medical Store POS System v1.0.0
-          </p>
-          <p className="text-xs text-gray-400 mt-1">Powered by Supabase</p>
-        </div>
       </div>
     </div>
   );

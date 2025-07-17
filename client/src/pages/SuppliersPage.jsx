@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -6,6 +6,8 @@ import {
   supplierServices,
   purchaseOrderServices,
 } from "../services/api";
+import { useAuth } from "../hooks/useAuth";
+import api from "../services/api";
 
 // Import components
 import OutOfStockTable from "../components/Suppliers/OutOfStockTable";
@@ -18,6 +20,10 @@ import AddSupplierModal from "../components/Suppliers/AddSupplierModal";
 import { useCreateSupplier } from "../hooks/useSuppliers";
 
 const SuppliersPage = () => {
+  const { profile } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
   // State management
   const [showQuantityModal, setShowQuantityModal] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
@@ -29,7 +35,7 @@ const SuppliersPage = () => {
   const [sortOrder, setSortOrder] = useState("asc");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
-  const [stockFilter, setStockFilter] = useState("out-of-stock"); // out-of-stock, low-stock, all
+  const [stockFilter, setStockFilter] = useState("out-of-stock");
 
   // Cart for purchase order
   const [orderCart, setOrderCart] = useState([]);
@@ -62,7 +68,7 @@ const SuppliersPage = () => {
       sortOrder,
       page: currentPage,
       limit: itemsPerPage,
-      includeExpired: false, // Don't include expired items
+      includeExpired: false,
     };
 
     if (searchQuery.length >= 2) {
@@ -78,7 +84,6 @@ const SuppliersPage = () => {
         apiFilters.lowStock = true;
         break;
       case "all":
-        // Show all items that need restocking (out of stock + low stock)
         apiFilters.needsRestocking = true;
         break;
       default:
@@ -94,17 +99,17 @@ const SuppliersPage = () => {
   const {
     data: medicinesData,
     isLoading,
-    error,
+    error: stockError,
     refetch,
   } = useQuery({
     queryKey: ["medicines", filters],
     queryFn: () => medicineServices.getAll(filters).then((res) => res.data),
-    staleTime: 2 * 60 * 1000, // 2 minutes for stock data
+    staleTime: 2 * 60 * 1000,
     keepPreviousData: true,
   });
 
   // Fetch suppliers for selection
-  const { data: suppliersData } = useQuery({
+  const { data: suppliersQueryData } = useQuery({
     queryKey: ["suppliers", { limit: 100 }],
     queryFn: () =>
       supplierServices.getAll({ limit: 100 }).then((res) => res.data),
@@ -118,8 +123,6 @@ const SuppliersPage = () => {
       queryClient.invalidateQueries({ queryKey: ["medicines"] });
       queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
       toast.success("Purchase order created successfully!");
-
-      // Success is handled in handleCreateOrder function
     },
     onError: (error) => {
       const message = error.response?.data?.message || "Failed to create order";
@@ -131,7 +134,7 @@ const SuppliersPage = () => {
   // Extract data
   const medicines = medicinesData?.data?.medicines || [];
   const pagination = medicinesData?.data?.pagination || {};
-  const suppliers = suppliersData?.data?.suppliers || [];
+  const suppliers = suppliersQueryData?.data?.suppliers || [];
 
   // Event handlers
   const handleAddQuantity = (medicine) => {
@@ -141,13 +144,13 @@ const SuppliersPage = () => {
 
   const handleQuantitySubmit = (quantity, notes, expiryDate, batchNumber) => {
     const existingItem = orderCart.find(
-      (item) => item.medicineId === selectedMedicine._id
+      (item) => item.medicineId === selectedMedicine.id
     );
 
     if (existingItem) {
       setOrderCart(
         orderCart.map((item) =>
-          item.medicineId === selectedMedicine._id
+          item.medicineId === selectedMedicine.id
             ? {
                 ...item,
                 quantity: quantity,
@@ -161,7 +164,7 @@ const SuppliersPage = () => {
       toast.success(`Updated quantity for ${selectedMedicine.name}`);
     } else {
       const newItem = {
-        medicineId: selectedMedicine._id,
+        medicineId: selectedMedicine.id,
         name: selectedMedicine.name,
         manufacturer: selectedMedicine.manufacturer,
         batchNumber: batchNumber || selectedMedicine.batchNumber,
@@ -169,75 +172,62 @@ const SuppliersPage = () => {
         tradePrice: selectedMedicine.tradePrice || 0,
         notes: notes,
         expiryDate: expiryDate,
-        currentStock: selectedMedicine.quantity,
-        minStockLevel: selectedMedicine.minStockLevel || 10,
       };
       setOrderCart([...orderCart, newItem]);
-      toast.success(`Added ${selectedMedicine.name} to order`);
+      toast.success(`Added ${selectedMedicine.name} to cart`);
     }
-
     setShowQuantityModal(false);
-    setSelectedMedicine(null);
   };
 
   const handleRemoveFromCart = (medicineId) => {
     setOrderCart(orderCart.filter((item) => item.medicineId !== medicineId));
-    toast.success("Item removed from order");
   };
 
   const handleProceedToSupplier = () => {
     if (orderCart.length === 0) {
-      toast.error("Please add items to your order first");
+      toast.error("Please add items to cart first");
       return;
     }
     setShowSupplierModal(true);
   };
 
-  // Finalize order -> create PO in backend
   const finalizePurchaseOrder = async (supplier) => {
     try {
       const orderPayload = {
-        supplierId: supplier._id,
+        supplierId: supplier.id,
         items: orderCart.map((item) => ({
           medicineId: item.medicineId,
-          name: item.name,
-          manufacturer: item.manufacturer,
           quantity: item.quantity,
-          unitPrice: item.tradePrice,
-          batchNumber: item.batchNumber || `BATCH-${Date.now()}`,
-          expiryDate:
-            item.expiryDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-          notes: item.notes || "",
+          tradePrice: item.tradePrice,
+          notes: item.notes,
+          expiryDate: item.expiryDate,
+          batchNumber: item.batchNumber,
         })),
-        expectedDeliveryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        notes: `Stock order via UI (${orderCart.length} items)`,
-        taxPercent: 0,
-        discountAmount: 0,
+        expectedDate: orderData.expectedDate,
+        notes: orderData.notes,
       };
 
       const response = await createOrderMutation.mutateAsync(orderPayload);
-
-      queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
-
-      setSelectedSupplier(supplier);
-      setOrderData({ purchaseOrder: response.data.data.purchaseOrder });
-      setShowReceiptModal(true);
+      setOrderCart([]);
+      setOrderData({ expectedDate: "", notes: "" });
       setShowSupplierModal(false);
-      handleClearCart();
+      setShowReceiptModal(true);
+      setSelectedSupplier(supplier);
     } catch (error) {
-      console.error("Purchase order creation error:", error);
+      console.error("Error creating purchase order:", error);
     }
   };
 
   const handleSupplierSelect = (supplier) => {
     setSelectedSupplier(supplier);
-    setShowSupplierModal(false);
+    finalizePurchaseOrder(supplier);
   };
 
   const calculateOrderTotal = () => {
-    return orderCart.reduce((total, item) => {
-      return total + item.quantity * item.tradePrice;
-    }, 0);
+    return orderCart.reduce(
+      (total, item) => total + item.tradePrice * item.quantity,
+      0
+    );
   };
 
   const handleCreateOrder = async () => {
@@ -246,64 +236,37 @@ const SuppliersPage = () => {
       return;
     }
 
-    if (orderCart.length === 0) {
-      toast.error("Please add items to your order");
-      return;
-    }
-
-    // Transform frontend data to match backend API structure
-    const orderPayload = {
-      supplierId: selectedSupplier._id,
-      items: orderCart.map((item) => ({
-        medicineId: item.medicineId,
-        name: item.name,
-        manufacturer: item.manufacturer,
-        quantity: item.quantity,
-        unitPrice: item.tradePrice, // Map tradePrice to unitPrice
-        batchNumber: item.batchNumber || `BATCH-${Date.now()}`,
-        expiryDate:
-          item.expiryDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // Default to 1 year from now
-        notes: item.notes || "",
-      })),
-      expectedDeliveryDate:
-        orderData.expectedDate ||
-        new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default to 7 days from now
-      notes: orderData.notes || "",
-      taxPercent: 0, // Default tax
-      discountAmount: 0, // Default discount
-    };
-
     try {
+      const orderPayload = {
+        supplierId: selectedSupplier.id,
+        items: orderCart.map((item) => ({
+          medicineId: item.medicineId,
+          quantity: item.quantity,
+          tradePrice: item.tradePrice,
+          notes: item.notes,
+          expiryDate: item.expiryDate,
+          batchNumber: item.batchNumber,
+        })),
+        expectedDate: orderData.expectedDate,
+        notes: orderData.notes,
+      };
+
       const response = await createOrderMutation.mutateAsync(orderPayload);
-
-      // Extract order ID from response
-      const orderId =
-        response.data?.data?.purchaseOrder?.orderNumber ||
-        response.data?.data?.purchaseOrder?._id;
-
-      // Update order data with the response
-      setOrderData((prev) => ({
-        ...prev,
-        orderId: orderId,
-        purchaseOrder: response.data?.data?.purchaseOrder,
-      }));
-
-      // Show receipt modal
+      setOrderCart([]);
+      setOrderData({ expectedDate: "", notes: "" });
+      setShowSupplierModal(false);
       setShowReceiptModal(true);
     } catch (error) {
-      console.error("Order creation error:", error);
-      // Error is already handled by the mutation
+      console.error("Error creating purchase order:", error);
     }
   };
 
   const handleClearCart = () => {
     setOrderCart([]);
-    setSelectedSupplier(null);
     setOrderData({ expectedDate: "", notes: "" });
-    toast.success("Order cleared");
+    toast.success("Cart cleared");
   };
 
-  // Pagination handlers
   const handlePageChange = (newPage) => {
     setCurrentPage(newPage);
   };
@@ -320,7 +283,6 @@ const SuppliersPage = () => {
     }
   };
 
-  // Reset page when filters change
   const handleSearchChange = (query) => {
     setSearchQuery(query);
     setCurrentPage(1);
@@ -340,16 +302,7 @@ const SuppliersPage = () => {
   const handleAddSupplierSubmit = async (e) => {
     e.preventDefault();
     try {
-      await createSupplierMutation.mutateAsync({
-        ...newSupplier,
-        address: {
-          street: newSupplier.address,
-          city: newSupplier.city,
-          state: newSupplier.state,
-          country: "India",
-          postalCode: newSupplier.pincode,
-        },
-      });
+      await createSupplierMutation.mutateAsync(newSupplier);
       setShowAddSupplierModal(false);
       setNewSupplier({
         name: "",
@@ -363,24 +316,26 @@ const SuppliersPage = () => {
         state: "",
         pincode: "",
       });
+      toast.success("Supplier added successfully!");
     } catch (error) {
-      // toast handled in hook
+      console.error("Error adding supplier:", error);
     }
   };
 
   // Error state
-  if (error) {
+  if (stockError) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-red-500 text-xl mb-4">
-            Error loading stock data
-          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            Error Loading Inventory
+          </h3>
+          <p className="text-red-600 mt-1">{stockError.message}</p>
           <button
             onClick={() => refetch()}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+            className="mt-4 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
           >
-            Try Again
+            Retry
           </button>
         </div>
       </div>
@@ -389,107 +344,83 @@ const SuppliersPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                Stock Replenishment
-              </h1>
-              <div className="flex items-center space-x-4 mt-2">
-                <p className="text-gray-600">
-                  {stockFilter === "out-of-stock"
-                    ? "Showing items with zero stock"
-                    : stockFilter === "low-stock"
-                    ? "Showing items below minimum level"
-                    : "Showing all items needing restock"}
-                </p>
-                {pagination?.total && (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    {pagination.total} items found
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Order Summary & Actions */}
-            <div className="flex items-center space-x-4">
-              {/* Add Supplier Button */}
-              <button
-                onClick={() => setShowAddSupplierModal(true)}
-                className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-              >
-                <span>➕ Add Supplier</span>
-              </button>
-
-              {orderCart.length > 0 && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-center space-x-4">
-                    <div className="text-sm">
-                      <span className="font-medium text-blue-900">
-                        {orderCart.length} items
-                      </span>
-                      <span className="text-blue-700 ml-2">
-                        Rs. {calculateOrderTotal().toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={handleClearCart}
-                        className="text-sm px-3 py-1 text-red-600 bg-red-50 rounded hover:bg-red-100"
-                      >
-                        Clear
-                      </button>
-                      <button
-                        onClick={handleProceedToSupplier}
-                        className="text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-                      >
-                        Select Supplier
-                      </button>
-                    </div>
-                  </div>
-
-                  {selectedSupplier && (
-                    <div className="mt-2 pt-2 border-t border-blue-200">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-blue-700">
-                          Supplier:{" "}
-                          <span className="font-medium">
-                            {selectedSupplier.name}
-                          </span>
-                        </span>
-                        <button
-                          onClick={handleCreateOrder}
-                          disabled={createOrderMutation.isLoading}
-                          className="text-sm px-4 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-                        >
-                          {createOrderMutation.isLoading
-                            ? "Creating..."
-                            : "Create Order"}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+      <div className="max-w-7xl mx-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold text-gray-900">
+            Inventory Management
+          </h1>
+          <div className="flex space-x-3">
+            <button
+              onClick={() => setShowAddSupplierModal(true)}
+              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+            >
+              Add Supplier
+            </button>
+            <button
+              onClick={() => setShowOrderHistory(true)}
+              className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700"
+            >
+              Order History
+            </button>
           </div>
         </div>
 
-        {/* Filters Section */}
+        {/* Stock Filters */}
         <StockFilters
           searchQuery={searchQuery}
-          setSearchQuery={handleSearchChange}
+          onSearchChange={handleSearchChange}
           sortBy={sortBy}
-          setSortBy={(field) => handleSortChange(field, sortOrder)}
           sortOrder={sortOrder}
-          setSortOrder={(order) => handleSortChange(sortBy, order)}
+          onSortChange={handleSortChange}
           stockFilter={stockFilter}
-          setStockFilter={handleStockFilterChange}
+          onStockFilterChange={handleStockFilterChange}
         />
 
-        {/* Main Content */}
+        {/* Order Cart Summary */}
+        {orderCart.length > 0 && (
+          <div className="bg-white rounded-lg shadow p-4 mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">Purchase Order Cart</h3>
+              <div className="flex space-x-2">
+                <button
+                  onClick={handleClearCart}
+                  className="text-red-600 hover:text-red-800"
+                >
+                  Clear Cart
+                </button>
+                <button
+                  onClick={handleProceedToSupplier}
+                  className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
+                >
+                  Proceed to Supplier ({orderCart.length} items)
+                </button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {orderCart.map((item) => (
+                <div
+                  key={item.medicineId}
+                  className="flex justify-between items-center"
+                >
+                  <span>
+                    {item.name} - Qty: {item.quantity}
+                  </span>
+                  <button
+                    onClick={() => handleRemoveFromCart(item.medicineId)}
+                    className="text-red-600 hover:text-red-800"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              <div className="border-t pt-2">
+                <strong>Total: ${calculateOrderTotal()}</strong>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Out of Stock Table */}
         <OutOfStockTable
           medicines={medicines}
           isLoading={isLoading}
@@ -502,54 +433,46 @@ const SuppliersPage = () => {
           onPrevPage={handlePrevPage}
           stockFilter={stockFilter}
         />
+
+        {/* Modals */}
+        <AddQuantityModal
+          isOpen={showQuantityModal}
+          onClose={() => setShowQuantityModal(false)}
+          onSubmit={handleQuantitySubmit}
+          medicine={selectedMedicine}
+        />
+
+        <SelectSupplierModal
+          isOpen={showSupplierModal}
+          onClose={() => setShowSupplierModal(false)}
+          onSelectSupplier={handleSupplierSelect}
+          suppliers={suppliers}
+          orderData={orderData}
+          setOrderData={setOrderData}
+          onCreateOrder={handleCreateOrder}
+        />
+
+        <OrderReceiptModal
+          isOpen={showReceiptModal}
+          onClose={() => setShowReceiptModal(false)}
+          supplier={selectedSupplier}
+          orderItems={orderCart}
+          total={calculateOrderTotal()}
+        />
+
+        <SupplierOrderHistory
+          isOpen={showOrderHistory}
+          onClose={() => setShowOrderHistory(false)}
+        />
+
+        <AddSupplierModal
+          isOpen={showAddSupplierModal}
+          onClose={() => setShowAddSupplierModal(false)}
+          onSubmit={handleAddSupplierSubmit}
+          supplier={newSupplier}
+          setSupplier={setNewSupplier}
+        />
       </div>
-
-      {/* Modals */}
-      <AddQuantityModal
-        show={showQuantityModal}
-        onClose={() => {
-          setShowQuantityModal(false);
-          setSelectedMedicine(null);
-        }}
-        medicine={selectedMedicine}
-        onSubmit={handleQuantitySubmit}
-        existingItem={orderCart.find(
-          (item) => item.medicineId === selectedMedicine?._id
-        )}
-      />
-
-      <SelectSupplierModal
-        show={showSupplierModal}
-        onClose={() => setShowSupplierModal(false)}
-        suppliers={suppliers}
-        onSelect={handleSupplierSelect}
-        onFinalize={finalizePurchaseOrder}
-        orderItems={orderCart}
-      />
-
-      <OrderReceiptModal
-        show={showReceiptModal}
-        onClose={() => setShowReceiptModal(false)}
-        orderData={orderData}
-        supplier={selectedSupplier}
-        items={orderCart}
-        total={calculateOrderTotal()}
-        autoPrint={true}
-      />
-
-      <SupplierOrderHistory
-        show={showOrderHistory}
-        onClose={() => setShowOrderHistory(false)}
-      />
-
-      <AddSupplierModal
-        show={showAddSupplierModal}
-        onClose={() => setShowAddSupplierModal(false)}
-        newSupplier={newSupplier}
-        setNewSupplier={setNewSupplier}
-        onSubmit={handleAddSupplierSubmit}
-        isLoading={createSupplierMutation.isLoading}
-      />
     </div>
   );
 };

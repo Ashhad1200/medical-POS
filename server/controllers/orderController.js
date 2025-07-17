@@ -16,7 +16,7 @@ const getAllOrders = async (req, res) => {
     let query = supabase
       .from("orders")
       .select("*, order_items(*)")
-      .eq("organizationId", organizationId);
+      .eq("organization_id", organizationId);
 
     // Apply status filter
     if (status && status !== "all") {
@@ -25,19 +25,19 @@ const getAllOrders = async (req, res) => {
 
     // Apply date range filter
     if (startDate) {
-      query = query.gte("createdAt", startDate);
+      query = query.gte("created_at", startDate);
     }
     if (endDate) {
-      query = query.lte("createdAt", endDate);
+      query = query.lte("created_at", endDate);
     }
 
     // Apply customer name filter
     if (customerName) {
-      query = query.ilike("customerName", `%${customerName}%`);
+      query = query.ilike("customer_name", `%${customerName}%`);
     }
 
     // Apply sorting and pagination
-    query = query.order("createdAt", { ascending: false });
+    query = query.order("created_at", { ascending: false });
     const offset = (page - 1) * limit;
     query = query.range(offset, offset + limit - 1);
 
@@ -82,7 +82,7 @@ const getOrder = async (req, res) => {
       .from("orders")
       .select("*, order_items(*)")
       .eq("id", id)
-      .eq("organizationId", organizationId)
+      .eq("organization_id", organizationId)
       .single();
 
     if (error || !order) {
@@ -109,36 +109,52 @@ const getOrder = async (req, res) => {
 const createOrder = async (req, res) => {
   try {
     const {
-      userId,
+      user_id,
+      customer_name,
+      customer_phone,
+      customer_email,
       items,
-      totalAmount,
-      taxAmount,
-      taxPercent,
+      total_amount,
+      tax_amount,
+      tax_percent,
       subtotal,
       profit,
       discount,
-      paymentMethod,
+      discount_percent,
+      payment_method,
+      payment_status,
       status,
-      completedAt,
+      completed_at,
+      notes,
     } = req.body;
 
     const organizationId = req.user.organization_id;
+
+    // Generate order number
+    const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
 
     // Start a transaction
     const { data: order, error: orderError } = await supabase
       .from("orders")
       .insert({
-        userId,
-        organizationId,
-        totalAmount: parseFloat(totalAmount),
-        taxAmount: parseFloat(taxAmount),
-        taxPercent: parseFloat(taxPercent),
+        order_number: orderNumber,
+        user_id,
+        customer_name,
+        customer_phone,
+        customer_email,
+        organization_id: organizationId,
+        total_amount: parseFloat(total_amount),
+        tax_amount: parseFloat(tax_amount || 0),
+        tax_percent: parseFloat(tax_percent || 0),
         subtotal: parseFloat(subtotal),
-        profit: parseFloat(profit),
-        discount: parseFloat(discount),
-        paymentMethod,
-        status,
-        completedAt,
+        profit: parseFloat(profit || 0),
+        discount: parseFloat(discount || 0),
+        discount_percent: parseFloat(discount_percent || 0),
+        payment_method,
+        payment_status: payment_status || 'pending',
+        status: status || 'pending',
+        completed_at,
+        notes,
       })
       .select()
       .single();
@@ -154,12 +170,16 @@ const createOrder = async (req, res) => {
     // Create order items
     if (items && items.length > 0) {
       const orderItems = items.map((item) => ({
-        orderId: order.id,
-        medicineId: item.medicineId,
+        order_id: order.id,
+        medicine_id: item.medicine_id,
         quantity: parseInt(item.quantity),
-        unitPrice: parseFloat(item.unitPrice),
-        totalPrice: parseFloat(item.totalPrice),
-        discount: parseFloat(item.discount),
+        unit_price: parseFloat(item.unit_price),
+        total_price: parseFloat(item.total_price),
+        discount: parseFloat(item.discount || 0),
+        discount_percent: parseFloat(item.discount_percent || 0),
+        cost_price: parseFloat(item.cost_price),
+        profit: parseFloat(item.profit || 0),
+        gst_amount: parseFloat(item.gst_amount || 0),
       }));
 
       const { error: itemsError } = await supabase
@@ -182,10 +202,10 @@ const createOrder = async (req, res) => {
           .from("medicines")
           .update({
             quantity: supabase.raw(`quantity - ${item.quantity}`),
-            updatedAt: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
           })
-          .eq("id", item.medicineId)
-          .eq("organizationId", organizationId);
+          .eq("id", item.medicine_id)
+          .eq("organization_id", organizationId);
       }
     }
 
@@ -254,10 +274,10 @@ const getDashboardData = async (req, res) => {
     // Get orders within the selected range
     const { data: orders, error: ordersError } = await supabase
       .from("orders")
-      .select("totalAmount, status, createdAt")
-      .eq("organizationId", organizationId)
-      .gte("createdAt", startDate)
-      .lte("createdAt", endDate);
+      .select("total_amount, status, created_at")
+      .eq("organization_id", organizationId)
+      .gte("created_at", startDate)
+      .lte("created_at", endDate);
 
     if (ordersError) {
       return res.status(500).json({
@@ -270,7 +290,7 @@ const getDashboardData = async (req, res) => {
     const dashboardData = {
       totalOrders: orders?.length || 0,
       totalRevenue:
-        orders?.reduce((sum, order) => sum + (order.totalAmount || 0), 0) || 0,
+        orders?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0,
       completedOrders:
         orders?.filter((order) => order.status === "completed").length || 0,
       pendingOrders:
@@ -303,7 +323,7 @@ const getOrderPdf = async (req, res) => {
       .from("orders")
       .select("*, order_items(*)")
       .eq("id", id)
-      .eq("organizationId", organizationId)
+      .eq("organization_id", organizationId)
       .single();
 
     if (error || !order) {
@@ -328,9 +348,9 @@ const getOrderPdf = async (req, res) => {
     doc.moveDown();
 
     // Add order details
-    doc.fontSize(12).text(`Order Number: ${order.id}`);
-    doc.text(`Date: ${new Date(order.createdAt).toLocaleString()}`);
-    doc.text(`Customer: ${order.userId}`);
+    doc.fontSize(12).text(`Order Number: ${order.order_number}`);
+    doc.text(`Date: ${new Date(order.created_at).toLocaleString()}`);
+    doc.text(`Customer: ${order.customer_name || 'Walk-in Customer'}`);
     doc.moveDown();
 
     // Add table header
@@ -345,22 +365,22 @@ const getOrderPdf = async (req, res) => {
     // Add table rows
     let y = 220;
     order.order_items.forEach((item) => {
-      doc.text(item.medicineId, 50, y);
+      doc.text(item.medicine_id, 50, y);
       doc.text(item.quantity, 250, y);
-      doc.text(item.unitPrice.toFixed(2), 350, y);
-      doc.text(item.totalPrice.toFixed(2), 450, y);
+      doc.text(item.unit_price.toFixed(2), 350, y);
+      doc.text(item.total_price.toFixed(2), 450, y);
       y += 20;
     });
 
     // Add totals
     doc.moveDown();
     doc.text(`Subtotal: ${order.subtotal.toFixed(2)}`, { align: "right" });
-    doc.text(`Tax: ${order.taxAmount.toFixed(2)}`, { align: "right" });
+    doc.text(`Tax: ${order.tax_amount.toFixed(2)}`, { align: "right" });
     doc.text(`Discount: ${order.discount.toFixed(2)}`, {
       align: "right",
     });
     doc.font("Helvetica-Bold");
-    doc.text(`Total: ${order.totalAmount.toFixed(2)}`, { align: "right" });
+    doc.text(`Total: ${order.total_amount.toFixed(2)}`, { align: "right" });
     doc.font("Helvetica");
 
     // Finalize PDF
@@ -387,16 +407,16 @@ const getSalesChartData = async (req, res) => {
 
     const { data: weeklyData, error: weeklyError } = await supabase
       .from("orders")
-      .select("createdAt, totalAmount")
-      .eq("organizationId", organizationId)
-      .gte("createdAt", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
+      .select("created_at, total_amount")
+      .eq("organization_id", organizationId)
+      .gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
 
     if (weeklyError) throw weeklyError;
 
     const weeklySales = last7Days.map((day) => {
       const total = weeklyData
-        .filter((order) => order.createdAt.startsWith(day))
-        .reduce((sum, order) => sum + order.totalAmount, 0);
+        .filter((order) => order.created_at.startsWith(day))
+        .reduce((sum, order) => sum + order.total_amount, 0);
       return { date: day, sales: total };
     });
 
@@ -413,21 +433,21 @@ const getSalesChartData = async (req, res) => {
 
     const { data: monthlyData, error: monthlyError } = await supabase
       .from("orders")
-      .select("createdAt, totalAmount")
-      .eq("organizationId", organizationId)
-      .gte("createdAt", new Date(new Date().setFullYear(new Date().getFullYear() - 1)));
+      .select("created_at, total_amount")
+      .eq("organization_id", organizationId)
+      .gte("created_at", new Date(new Date().setFullYear(new Date().getFullYear() - 1)));
 
     if (monthlyError) throw monthlyError;
 
     const monthlySales = last12Months.map(({ year, month, name }) => {
       const total = monthlyData
         .filter((order) => {
-          const orderDate = new Date(order.createdAt);
+          const orderDate = new Date(order.created_at);
           return (
             orderDate.getFullYear() === year && orderDate.getMonth() + 1 === month
           );
         })
-        .reduce((sum, order) => sum + order.totalAmount, 0);
+        .reduce((sum, order) => sum + order.total_amount, 0);
       return { month: name, sales: total };
     });
 

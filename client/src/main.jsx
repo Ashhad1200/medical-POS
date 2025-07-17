@@ -4,23 +4,7 @@ import App from "./App.jsx";
 import "./index.css";
 
 // Clear localStorage on development if there are issues
-if (process.env.NODE_ENV === "development") {
-  // Check for corrupted tokens and clear if necessary
-  const token = localStorage.getItem("token");
-  if (token) {
-    try {
-      // Simple check if token looks valid (JWT format)
-      const parts = token.split(".");
-      if (parts.length !== 3) {
-        console.warn("Invalid token format found, clearing localStorage");
-        localStorage.clear();
-      }
-    } catch (error) {
-      console.warn("Error checking token, clearing localStorage");
-      localStorage.clear();
-    }
-  }
-}
+// Removed outdated development token check to prevent localStorage clearing
 
 // Add global error handler
 window.addEventListener("error", (e) => {

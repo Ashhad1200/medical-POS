@@ -101,32 +101,53 @@ const createSupplier = async (req, res) => {
       phone,
       address,
       contact_person,
-      tax_number,
+      tax_id,
       payment_terms,
-      notes,
+      city,
+      state,
+      country,
+      postal_code,
+      website,
+      credit_limit,
     } = req.body;
 
     const organizationId = req.user.organization_id;
+    const userSupabase = req.supabase || supabase;
+    
+    console.log('Supplier creation - User ID:', req.user.id);
+    console.log('Supplier creation - Organization ID:', req.user.organization_id);
+    console.log('Supplier creation - Using authenticated client:', !!req.supabase);
+    
+    const supplierData = {
+      name,
+      email,
+      phone,
+      address,
+      contact_person,
+      tax_id,
+      payment_terms,
+      city,
+      state,
+      country,
+      postal_code,
+      website,
+      credit_limit: credit_limit ? parseFloat(credit_limit) : null,
+      current_balance: 0,
+      organization_id: req.user.organization_id, // Ensure user's org ID is used
+      is_active: true,
+      created_by: req.user.id,
+    };
+    
+    console.log('Supplier creation - Supplier data:', supplierData);
 
-    const { data: supplier, error } = await supabase
+    const { data: supplier, error } = await userSupabase
       .from("suppliers")
-      .insert({
-        name,
-        email,
-        phone,
-        address,
-        contact_person,
-        tax_number,
-        payment_terms,
-        notes,
-        organization_id: organizationId,
-        is_active: true,
-        created_by: req.user.id,
-      })
+      .insert(supplierData)
       .select()
       .single();
 
     if (error) {
+      console.error('Supplier creation error details:', error);
       return res.status(400).json({
         success: false,
         message: "Error creating supplier",

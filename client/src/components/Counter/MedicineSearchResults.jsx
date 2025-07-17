@@ -16,13 +16,13 @@ const MedicineSearchResults = ({
   };
 
   const handleAddToCart = (medicine) => {
-    const quantity = quantities[medicine._id] || 1;
+    const quantity = quantities[medicine.id] || 1;
     onAddToCart(medicine, quantity);
 
     // Reset quantity after adding
     setQuantities((prev) => ({
       ...prev,
-      [medicine._id]: 1,
+      [medicine.id]: 1,
     }));
   };
 
@@ -130,12 +130,12 @@ const MedicineSearchResults = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
         {medicines.map((medicine) => {
           const stockStatus = getStockStatus(medicine);
-          const currentQuantity = quantities[medicine._id] || 1;
+          const currentQuantity = quantities[medicine.id] || 1;
           const maxQuantity = Math.min(medicine.quantity, 999);
 
           return (
             <div
-              key={medicine._id}
+              key={medicine.id}
               className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
             >
               {/* Medicine Header */}
@@ -225,7 +225,7 @@ const MedicineSearchResults = ({
                     max={maxQuantity}
                     value={currentQuantity}
                     onChange={(e) =>
-                      handleQuantityChange(medicine._id, e.target.value)
+                      handleQuantityChange(medicine.id, e.target.value)
                     }
                     className="w-16 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:ring-blue-500 focus:border-blue-500"
                     disabled={medicine.quantity === 0}

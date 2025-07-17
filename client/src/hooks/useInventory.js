@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { medicineServices, inventoryServices } from "../services/api";
+import { medicineServices } from "../services/api";
 import toast from "react-hot-toast";
 
 // Query Keys
@@ -19,7 +19,7 @@ export const inventoryKeys = {
 export const useInventoryMedicines = (filters = {}) => {
   return useQuery({
     queryKey: inventoryKeys.medicinesList(filters),
-    queryFn: () => inventoryServices.getAll(filters).then((res) => res.data),
+    queryFn: () => medicineServices.getAll(filters).then((res) => res.data),
     staleTime: 5 * 60 * 1000, // 5 minutes
     keepPreviousData: true,
   });
@@ -37,7 +37,7 @@ export const useInventoryMedicine = (id) => {
 export const useLowStockMedicines = () => {
   return useQuery({
     queryKey: inventoryKeys.lowStock(),
-    queryFn: () => inventoryServices.getLowStock().then((res) => res.data),
+    queryFn: () => medicineServices.getLowStock().then((res) => res.data),
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 };
@@ -45,8 +45,7 @@ export const useLowStockMedicines = () => {
 export const useExpiredMedicines = () => {
   return useQuery({
     queryKey: inventoryKeys.expired(),
-    queryFn: () =>
-      inventoryServices.getAll({ expired: true }).then((res) => res.data),
+    queryFn: () => medicineServices.getExpired().then((res) => res.data),
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };
@@ -55,7 +54,7 @@ export const useSearchInventory = (searchTerm) => {
   return useQuery({
     queryKey: inventoryKeys.search(searchTerm),
     queryFn: () =>
-      inventoryServices.getAll({ search: searchTerm }).then((res) => res.data),
+      medicineServices.search({ q: searchTerm }).then((res) => res.data),
     enabled: !!searchTerm && searchTerm.length >= 2,
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
@@ -66,10 +65,10 @@ export const useInventoryStats = () => {
     queryKey: inventoryKeys.stats(),
     queryFn: async () => {
       const [allMedicines, lowStock] = await Promise.all([
-        inventoryServices
+        medicineServices
           .getAll({ includeExpired: true, limit: 1000 }) // Fetch all medicines
           .then((res) => res.data),
-        inventoryServices.getLowStock().then((res) => res.data),
+        medicineServices.getLowStock().then((res) => res.data),
       ]);
 
       const medicines = allMedicines.data?.medicines || [];
@@ -212,7 +211,7 @@ export const useUpdateStock = () => {
 
   return useMutation({
     mutationFn: ({ id, quantity }) =>
-      inventoryServices.updateStock(id, quantity),
+      medicineServices.updateStock(id, { quantity }),
     onMutate: async ({ id, quantity }) => {
       // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: inventoryKeys.medicine(id) });
@@ -328,7 +327,7 @@ export const useBulkImport = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (formData) => inventoryServices.bulkImport(formData),
+    mutationFn: (formData) => medicineServices.bulkImport(formData),
     onSuccess: (response) => {
       // Invalidate all inventory queries and stats to refresh data
       queryClient.invalidateQueries({ queryKey: inventoryKeys.all });
@@ -347,7 +346,7 @@ export const useBulkImport = () => {
 
 export const useExportInventory = () => {
   return useMutation({
-    mutationFn: () => inventoryServices.exportData(),
+    mutationFn: () => medicineServices.exportInventory(),
     onSuccess: (response) => {
       // Create download link for the exported file
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -392,7 +391,7 @@ export const useInventoryCache = () => {
   const prefetchLowStock = () => {
     queryClient.prefetchQuery({
       queryKey: inventoryKeys.lowStock(),
-      queryFn: () => inventoryServices.getLowStock().then((res) => res.data),
+      queryFn: () => medicineServices.getLowStock().then((res) => res.data),
       staleTime: 2 * 60 * 1000,
     });
   };

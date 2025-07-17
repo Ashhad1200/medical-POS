@@ -592,3 +592,41 @@ CREATE TRIGGER trigger_update_medicine_quantity_after_purchase
     AFTER INSERT ON public.purchase_order_items
     FOR EACH ROW
     EXECUTE FUNCTION update_medicine_quantity_after_purchase();
+
+-- Function to get low stock medicines
+CREATE OR REPLACE FUNCTION get_low_stock_medicines(org_id UUID)
+RETURNS TABLE(
+    id UUID,
+    name VARCHAR(255),
+    generic_name VARCHAR(255),
+    manufacturer VARCHAR(255),
+    batch_number VARCHAR(100),
+    selling_price DECIMAL(10,2),
+    cost_price DECIMAL(10,2),
+    gst_per_unit DECIMAL(10,2),
+    gst_rate DECIMAL(5,2),
+    quantity INTEGER,
+    low_stock_threshold INTEGER,
+    expiry_date DATE,
+    category VARCHAR(100),
+    subcategory VARCHAR(100),
+    description TEXT,
+    dosage_form VARCHAR(50),
+    strength VARCHAR(50),
+    prescription_required BOOLEAN,
+    supplier_id UUID,
+    organization_id UUID,
+    is_active BOOLEAN,
+    created_at TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT m.*
+    FROM public.medicines m
+    WHERE m.organization_id = org_id
+      AND m.is_active = true
+      AND m.quantity <= m.low_stock_threshold
+    ORDER BY m.quantity ASC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

@@ -33,10 +33,10 @@ router.post("/refresh", (req, res) => {
 });
 
 // Protected routes
-router.use(auth);
+// router.use(auth);
 
 // POST /api/auth/logout
-router.post("/logout", (req, res) => {
+router.post("/logout", auth, (req, res) => {
   res.json({
     success: true,
     message: "User logged out successfully",
@@ -44,13 +44,13 @@ router.post("/logout", (req, res) => {
 });
 
 // GET /api/auth/profile
-router.get("/profile", getProfile);
+router.get("/profile", auth, getProfile);
 
 // PUT /api/auth/profile
-router.put("/profile", updateProfile);
+router.put("/profile", auth, updateProfile);
 
 // PUT /api/auth/change-password
-router.put("/change-password", (req, res) => {
+router.put("/change-password", auth, (req, res) => {
   res.json({
     success: false,
     message: "Change password functionality not implemented yet",

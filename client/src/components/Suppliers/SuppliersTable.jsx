@@ -220,7 +220,7 @@ const SuppliersTable = ({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {suppliers.map((supplier) => (
             <div
-              key={supplier._id}
+              key={supplier.id}
               className="bg-gray-50 rounded-lg border p-6 hover:shadow-md transition-all duration-200 hover:border-blue-200"
             >
               {/* Header */}
@@ -342,7 +342,7 @@ const SuppliersTable = ({
 
               {/* Delete Button */}
               <button
-                onClick={() => onDeleteSupplier(supplier._id, supplier.name)}
+                onClick={() => onDeleteSupplier(supplier.id, supplier.name)}
                 disabled={deleteSupplierMutation?.isLoading}
                 className="w-full mt-2 bg-red-50 text-red-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >

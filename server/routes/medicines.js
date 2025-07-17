@@ -25,10 +25,7 @@ const upload = multer({ storage });
 // Protected routes
 router.use(auth);
 
-// Test route
-router.get("/test", (req, res) => {
-  res.json({ success: true, message: "Medicine routes are working" });
-});
+
 
 // Search medicines route (must be before /:id route)
 router.get("/search", searchMedicines);

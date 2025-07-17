@@ -3,23 +3,30 @@ const { supabase } = require("../../config/supabase");
 class Order {
   constructor(data = {}) {
     this.id = data.id;
-    this.userId = data.userId;
-    this.organizationId = data.organizationId;
-    this.totalAmount = data.totalAmount || 0;
-    this.taxAmount = data.taxAmount || 0;
-    this.taxPercent = data.taxPercent || 0;
+    this.order_number = data.order_number;
+    this.user_id = data.user_id;
+    this.customer_name = data.customer_name;
+    this.customer_phone = data.customer_phone;
+    this.customer_email = data.customer_email;
+    this.organization_id = data.organization_id;
+    this.total_amount = data.total_amount || 0;
+    this.tax_amount = data.tax_amount || 0;
+    this.tax_percent = data.tax_percent || 0;
     this.subtotal = data.subtotal || 0;
     this.profit = data.profit || 0;
     this.discount = data.discount || 0;
-    this.paymentMethod = data.paymentMethod || "cash";
+    this.discount_percent = data.discount_percent || 0;
+    this.payment_method = data.payment_method || "cash";
+    this.payment_status = data.payment_status || "pending";
     this.status = data.status || "pending";
-    this.completedAt = data.completedAt;
-    this.createdAt = data.createdAt || new Date().toISOString();
-    this.updatedAt = data.updatedAt || new Date().toISOString();
+    this.notes = data.notes;
+    this.completed_at = data.completed_at;
+    this.created_at = data.created_at || new Date().toISOString();
+    this.updated_at = data.updated_at || new Date().toISOString();
 
     // Related data
-    this.items = data.items || [];
-    this.user = data.user;
+    this.order_items = data.order_items || [];
+    this.users = data.users;
   }
 
   // Static methods for database operations
@@ -94,26 +101,26 @@ class Order {
           )
         `
         )
-        .eq("organizationId", organizationId);
+        .eq("organization_id", organizationId);
 
       if (options.status) {
         query = query.eq("status", options.status);
       }
 
       if (options.userId) {
-        query = query.eq("userId", options.userId);
+        query = query.eq("user_id", options.userId);
       }
 
       if (options.paymentMethod) {
-        query = query.eq("paymentMethod", options.paymentMethod);
+        query = query.eq("payment_method", options.paymentMethod);
       }
 
       if (options.dateFrom) {
-        query = query.gte("createdAt", options.dateFrom);
+        query = query.gte("created_at", options.dateFrom);
       }
 
       if (options.dateTo) {
-        query = query.lte("createdAt", options.dateTo);
+        query = query.lte("created_at", options.dateTo);
       }
 
       // Sorting
@@ -121,7 +128,7 @@ class Order {
         const sortOrder = options.sortOrder || "desc";
         query = query.order(options.sortBy, { ascending: sortOrder === "asc" });
       } else {
-        query = query.order("createdAt", { ascending: false });
+        query = query.order("created_at", { ascending: false });
       }
 
       // Pagination
@@ -176,10 +183,10 @@ class Order {
           )
         `
         )
-        .eq("organizationId", organizationId)
-        .gte("createdAt", startDate)
-        .lte("createdAt", endDate)
-        .order("createdAt", { ascending: false });
+        .eq("organization_id", organizationId)
+        .gte("created_at", startDate)
+        .lte("created_at", endDate)
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
       return data ? data.map((order) => new Order(order)) : [];

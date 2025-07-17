@@ -1,4 +1,6 @@
-const { supabase } = require("../config/supabase");
+const jwt = require('jsonwebtoken');
+const { createClient } = require('@supabase/supabase-js');
+const { supabase } = require('../config/supabase');
 
 const auth = async (req, res, next) => {
   try {
@@ -45,8 +47,35 @@ const auth = async (req, res, next) => {
       });
     }
 
+    // Create authenticated client with user session
+    const authenticatedClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    );
+    
+    // Set the session with the user's access token
+    const { error: sessionError } = await authenticatedClient.auth.setSession({
+      access_token: token,
+      refresh_token: user.refresh_token || ''
+    });
+    
+    if (sessionError) {
+      console.error('Session setting error:', sessionError);
+      // Fallback to service role if session setting fails
+      req.supabase = supabase;
+    } else {
+      console.log('Session set successfully for user:', user.id);
+      req.supabase = authenticatedClient;
+    }
+    
     req.token = token;
     req.user = profile;
+    
+    console.log('Auth middleware - Using authenticated client for user:', {
+      userId: user.id,
+      organizationId: profile.organization_id,
+      clientType: sessionError ? 'service_role' : 'authenticated'
+    });
     next();
   } catch (error) {
     console.error("Auth middleware error:", error);

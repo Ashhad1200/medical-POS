@@ -100,7 +100,7 @@ const UsersPage = () => {
     e.preventDefault();
 
     try {
-      await api.patch(`/users/${selectedUser._id}`, editUser);
+      await api.patch(`/users/${selectedUser.id}`, editUser);
       toast.success("User updated successfully");
       setShowEditModal(false);
       setSelectedUser(null);
@@ -252,7 +252,7 @@ const UsersPage = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredUsers.map((user) => (
-                    <tr key={user._id} className="hover:bg-gray-50">
+                    <tr key={user.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
                           <div className="text-sm font-medium text-gray-900">
@@ -308,7 +308,7 @@ const UsersPage = () => {
                           </button>
                           <button
                             onClick={() =>
-                              handleToggleStatus(user._id, user.isActive)
+                              handleToggleStatus(user.id, user.isActive)
                             }
                             className={`${
                               user.isActive
@@ -319,7 +319,7 @@ const UsersPage = () => {
                             {user.isActive ? "Deactivate" : "Activate"}
                           </button>
                           <button
-                            onClick={() => handleDeleteUser(user._id)}
+                            onClick={() => handleDeleteUser(user.id)}
                             className="text-red-600 hover:text-red-900"
                           >
                             Delete

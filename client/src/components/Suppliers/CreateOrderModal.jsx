@@ -55,13 +55,13 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
 
   const addMedicineToOrder = (medicine) => {
     const existingItem = currentOrder.find(
-      (item) => item.medicineId === medicine._id
+      (item) => item.medicineId === medicine.id
     );
 
     if (existingItem) {
       setCurrentOrder(
         currentOrder.map((item) =>
-          item.medicineId === medicine._id
+          item.medicineId === medicine.id
             ? { ...item, quantity: item.quantity + 1 }
             : item
         )
@@ -70,7 +70,7 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
       setCurrentOrder([
         ...currentOrder,
         {
-          medicineId: medicine._id,
+          medicineId: medicine.id,
           name: medicine.name,
           manufacturer: medicine.manufacturer,
           quantity: 1,
@@ -109,7 +109,7 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
     }
 
     const orderPayload = {
-      supplierId: supplier._id,
+      supplierId: supplier.id,
       items: currentOrder,
       expectedDate: orderData.expectedDate,
       notes: orderData.notes,
@@ -203,7 +203,7 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
                 ) : filteredMedicines.length > 0 ? (
                   filteredMedicines.map((medicine) => (
                     <div
-                      key={medicine._id}
+                      key={medicine.id}
                       className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
                     >
                       <div className="flex justify-between items-start">

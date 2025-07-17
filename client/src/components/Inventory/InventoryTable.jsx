@@ -120,7 +120,7 @@ const TableRow = ({
       !isNaN(newQuantity) &&
       newQuantity >= 0
     ) {
-      onUpdateQuantity(medicine._id, newQuantity);
+      onUpdateQuantity(medicine.id, newQuantity);
     }
     setEditingMedicine(null);
   };
@@ -191,7 +191,7 @@ const TableRow = ({
       {/* Stock Management */}
       <td className="px-6 py-4">
         <div className="flex items-center space-x-2">
-          {editingMedicine === medicine._id ? (
+          {editingMedicine === medicine.id ? (
             <input
               type="number"
               min="0"
@@ -207,7 +207,7 @@ const TableRow = ({
             />
           ) : (
             <button
-              onClick={() => setEditingMedicine(medicine._id)}
+              onClick={() => setEditingMedicine(medicine.id)}
               className="text-lg font-semibold text-gray-900 hover:text-blue-600 transition-colors"
               title="Click to edit quantity"
             >
@@ -265,7 +265,7 @@ const TableRow = ({
       <td className="px-6 py-4">
         <div className="flex items-center space-x-2">
           <button
-            onClick={() => setEditingMedicine(medicine._id)}
+            onClick={() => setEditingMedicine(medicine.id)}
             className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
             title="Edit quantity"
           >
@@ -285,7 +285,7 @@ const TableRow = ({
           </button>
 
           <button
-            onClick={() => onDeleteMedicine(medicine._id, medicine.name)}
+            onClick={() => onDeleteMedicine(medicine.id, medicine.name)}
             className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
             title="Delete medicine"
           >
@@ -387,7 +387,7 @@ const InventoryTable = ({
           <tbody className="bg-white divide-y divide-gray-200">
             {medicines.map((medicine) => (
               <TableRow
-                key={medicine._id}
+                key={medicine.id}
                 medicine={medicine}
                 editingMedicine={editingMedicine}
                 setEditingMedicine={setEditingMedicine}

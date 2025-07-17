@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import api from "../services/api";
+import { useAuth } from "../hooks/useAuth";
+import OrderTable from "../components/Counter/OrderTable";
 
 const OrdersPage = () => {
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const { profile } = useAuth();
+  const [ordersData, setOrdersData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0]
   );
@@ -16,15 +20,11 @@ const OrdersPage = () => {
     totalProfit: 0,
   });
 
-  useEffect(() => {
-    fetchOrders();
-  }, [selectedDate]);
-
   const fetchOrders = async () => {
     setLoading(true);
     try {
       const response = await api.get(`/orders?date=${selectedDate}`);
-      setOrders(response.data.data.orders);
+      setOrdersData(response.data.data.orders);
       setSummary(response.data.data.summary);
     } catch (error) {
       toast.error("Error fetching orders");
@@ -33,6 +33,30 @@ const OrdersPage = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const fetchInitialOrders = async () => {
+      try {
+        setLoading(true);
+        const response = await api.get("/orders"); // Example API call for orders
+        setOrdersData(response.data);
+        setError(null);
+      } catch (err) {
+        setError("Failed to fetch orders data");
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchInitialOrders();
+  }, []);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [selectedDate]);
+
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
 
   const handleOrderClick = async (orderId) => {
     // Validate order ID before making API call
@@ -104,7 +128,7 @@ const OrdersPage = () => {
         <div className="bg-white rounded-lg p-6 w-full max-w-4xl mx-4 max-h-screen overflow-y-auto">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold text-gray-900">
-              Order Details - #{order?._id?.slice(-8) ?? "N/A"}
+              Order Details - #{order?.id?.slice(-8) ?? "N/A"}
             </h2>
             <button
               onClick={onClose}
@@ -226,7 +250,7 @@ const OrdersPage = () => {
 
             <div className="flex flex-col justify-end">
               <button
-                onClick={() => downloadReceipt(order?._id)}
+                onClick={() => downloadReceipt(order?.id)}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 Download Receipt
@@ -374,7 +398,7 @@ const OrdersPage = () => {
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
                 <p className="mt-4 text-gray-500">Loading orders...</p>
               </div>
-            ) : (orders?.length ?? 0) > 0 ? (
+            ) : (ordersData?.length ?? 0) > 0 ? (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
@@ -406,24 +430,24 @@ const OrdersPage = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {orders?.map((order) => (
+                    {ordersData?.map((order) => (
                       <tr
-                        key={order?._id || `order-${Math.random()}`}
+                        key={order?.id || `order-${Math.random()}`}
                         className={`hover:bg-gray-50 ${
-                          order?._id
+                          order?.id
                             ? "cursor-pointer"
                             : "cursor-not-allowed opacity-50"
                         }`}
                         onClick={() => {
-                          if (order?._id && order._id !== "undefined") {
-                            handleOrderClick(order._id);
+                          if (order?.id && order.id !== "undefined") {
+                            handleOrderClick(order.id);
                           } else {
                             toast.error("Invalid order - no ID available");
                           }
                         }}
                       >
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
-                          #{order?._id?.slice(-8) ?? "N/A"}
+                          #{order?.id?.slice(-8) ?? "N/A"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {order?.createdAt
@@ -459,15 +483,15 @@ const OrdersPage = () => {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (order?._id && order._id !== "undefined") {
-                                downloadReceipt(order._id);
+                              if (order?.id && order.id !== "undefined") {
+                                downloadReceipt(order.id);
                               } else {
                                 toast.error("Invalid order - no ID available");
                               }
                             }}
-                            disabled={!order?._id || order._id === "undefined"}
+                            disabled={!order?.id || order.id === "undefined"}
                             className={`${
-                              order?._id && order._id !== "undefined"
+                              order?.id && order.id !== "undefined"
                                 ? "text-blue-600 hover:text-blue-800"
                                 : "text-gray-400 cursor-not-allowed"
                             }`}

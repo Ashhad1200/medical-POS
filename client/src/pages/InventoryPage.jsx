@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import {
   useInventoryMedicines,
@@ -10,16 +10,23 @@ import {
   useInventoryStats,
   getStockStatus,
 } from "../hooks/useInventory";
+import { useAuth } from "../hooks/useAuth";
+import api from "../services/api"; // Assuming API service is set up
+import InventoryTable from "../components/Inventory/InventoryTable";
+import InventoryFilters from "../components/Inventory/InventoryFilters";
+import InventoryStats from "../components/Inventory/InventoryStats";
 
 // Import components for better organization
-import InventoryStats from "../components/Inventory/InventoryStats";
-import InventoryFilters from "../components/Inventory/InventoryFilters";
-import InventoryTable from "../components/Inventory/InventoryTable";
 import AddMedicineModal from "../components/Inventory/AddMedicineModal";
 import ImportModal from "../components/Inventory/ImportModal";
 
 const InventoryPage = () => {
-  // State management
+  const { profile } = useAuth();
+  
+  // All state hooks must be declared first
+  const [inventoryData, setInventoryData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -45,6 +52,23 @@ const InventoryPage = () => {
     description: "",
     minStockLevel: 10,
   });
+
+  useEffect(() => {
+    const fetchInventory = async () => {
+      try {
+        setLoading(true);
+        const response = await api.get("/inventory"); // Example API call
+        setInventoryData(response.data);
+        setError(null);
+      } catch (err) {
+        setError("Failed to fetch inventory data");
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchInventory();
+  }, []);
 
   // Build API filters
   const filters = useMemo(() => {
@@ -91,7 +115,7 @@ const InventoryPage = () => {
   const {
     data: medicinesData,
     isLoading,
-    error,
+    error: apiError,
     refetch,
   } = useInventoryMedicines(filters);
 
@@ -315,7 +339,7 @@ const InventoryPage = () => {
   };
 
   // Error state
-  if (error) {
+  if (apiError) {
     return (
       <div className="min-h-screen bg-gray-50 p-6">
         <div className="max-w-7xl mx-auto">
@@ -338,7 +362,7 @@ const InventoryPage = () => {
                 <h3 className="text-lg font-medium text-red-800">
                   Error Loading Inventory
                 </h3>
-                <p className="text-red-600 mt-1">{error.message}</p>
+                <p className="text-red-600 mt-1">{apiError.message}</p>
                 <button
                   onClick={() => refetch()}
                   className="mt-3 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"

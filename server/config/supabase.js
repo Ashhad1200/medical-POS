@@ -110,6 +110,7 @@ module.exports = {
   supabase,
   supabasePublic,
   supabaseConnection,
+  createClient,
   connectDB: () => supabaseConnection.connect(),
   disconnectDB: () => supabaseConnection.disconnect(),
 };

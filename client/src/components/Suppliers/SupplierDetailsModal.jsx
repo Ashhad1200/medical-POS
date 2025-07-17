@@ -14,10 +14,10 @@ const SupplierDetailsModal = ({
 
   // Fetch purchase orders for this supplier
   const { data: ordersData, isLoading: ordersLoading } = useQuery({
-    queryKey: ["purchase-orders", supplier?._id],
+    queryKey: ["purchase-orders", supplier?.id],
     queryFn: () =>
-      purchaseOrderServices.getBySupplier(supplier._id).then((res) => res.data),
-    enabled: show && !!supplier?._id,
+      purchaseOrderServices.getBySupplier(supplier.id).then((res) => res.data),
+    enabled: show && !!supplier?.id,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -400,13 +400,13 @@ const SupplierDetailsModal = ({
                 ) : orders.length > 0 ? (
                   orders.map((order) => (
                     <div
-                      key={order._id}
+                      key={order.id}
                       className="border rounded-lg p-4 hover:bg-gray-50"
                     >
                       <div className="flex justify-between items-start mb-2">
                         <div>
                           <h4 className="font-medium text-gray-900">
-                            Order #{order._id?.slice(-8)}
+                            Order #{order.id?.slice(-8)}
                           </h4>
                           <p className="text-sm text-gray-600">
                             {new Date(order.createdAt).toLocaleDateString()}

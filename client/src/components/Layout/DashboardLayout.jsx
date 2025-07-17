@@ -1,20 +1,17 @@
 import React, { useState } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
-import { useSelector, useDispatch } from "react-redux";
-import { logoutUser } from "../../store/slices/authSlice";
+import { useAuth } from "../../hooks/useAuth";
 import { toast } from "react-hot-toast";
 
 const DashboardLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const dispatch = useDispatch();
-  const { user } = useSelector((state) => state.auth);
+  const { user, profile, signOut } = useAuth();
 
   const handleLogout = async () => {
     try {
-      await dispatch(logoutUser()).unwrap();
-      toast.success("Logged out successfully");
+      await signOut();
       navigate("/login");
     } catch (error) {
       toast.error("Error logging out");
@@ -55,7 +52,7 @@ const DashboardLayout = () => {
     const roleBasedItems = [];
 
     // Admin can access orders
-    if (user?.role === "admin") {
+    if (profile?.role_in_pos === "admin") {
       roleBasedItems.push({
         name: "Orders",
         href: "/orders",
@@ -79,7 +76,7 @@ const DashboardLayout = () => {
     }
 
     // Counter, warehouse, and admin can access medicines
-    if (["counter", "warehouse", "admin"].includes(user?.role)) {
+    if (["counter", "warehouse", "admin"].includes(profile?.role_in_pos)) {
       roleBasedItems.push({
         name: "Medicines",
         href: "/medicines",
@@ -103,7 +100,7 @@ const DashboardLayout = () => {
     }
 
     // Warehouse and Admin can access inventory and suppliers
-    if (["warehouse", "admin"].includes(user?.role)) {
+    if (["warehouse", "admin"].includes(profile?.role_in_pos)) {
       roleBasedItems.push(
         {
           name: "Inventory",
@@ -149,7 +146,7 @@ const DashboardLayout = () => {
     }
 
     // Admin only items
-    if (user?.role === "admin") {
+    if (profile?.role_in_pos === "admin") {
       roleBasedItems.push({
         name: "Users",
         href: "/users",
@@ -173,7 +170,7 @@ const DashboardLayout = () => {
     }
 
     return [...baseItems, ...roleBasedItems].filter((item) =>
-      item.roles.includes(user?.role)
+      item.roles.includes(profile?.role_in_pos)
     );
   };
 
@@ -200,75 +197,20 @@ const DashboardLayout = () => {
     <div className="min-h-screen bg-gray-100 flex">
       {/* Sidebar */}
       <div
-        className={`${
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0`}
+        } lg:translate-x-0 lg:static lg:inset-0`}
       >
-        <div className="flex items-center justify-center h-16 bg-blue-600">
-          <h1 className="text-xl font-bold text-white">Moiz Medical Store</h1>
-        </div>
-
-        {/* User Info */}
-        <div className="p-4 border-b border-gray-200">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-                <span className="text-white font-medium">
-                  {user?.fullName?.charAt(0).toUpperCase()}
-                </span>
-              </div>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-900">
-                {user?.fullName}
-              </p>
-              <span
-                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeColor(
-                  user?.role
-                )}`}
-              >
-                {user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1)}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Navigation */}
-        <nav className="mt-5 px-2">
-          <div className="space-y-1">
-            {navigationItems.map((item) => (
-              <Link
-                key={item.name}
-                to={item.href}
-                className={`${
-                  isCurrentPath(item.href)
-                    ? "bg-blue-100 border-blue-500 text-blue-700"
-                    : "border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                } group flex items-center px-2 py-2 text-sm font-medium rounded-md border-l-4 transition-colors duration-150`}
-              >
-                <span
-                  className={`${
-                    isCurrentPath(item.href)
-                      ? "text-blue-500"
-                      : "text-gray-400 group-hover:text-gray-500"
-                  } mr-3 flex-shrink-0`}
-                >
-                  {item.icon}
-                </span>
-                {item.name}
-              </Link>
-            ))}
-          </div>
-        </nav>
-
-        {/* Logout Button */}
-        <div className="absolute bottom-0 w-full p-4">
+        <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
+          <h1 className="text-xl font-semibold text-gray-900">
+            Medical Store POS
+          </h1>
           <button
-            onClick={handleLogout}
-            className="w-full flex items-center px-2 py-2 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-50 hover:text-gray-900 transition-colors duration-150"
+            onClick={() => setSidebarOpen(false)}
+            className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
           >
             <svg
-              className="mr-3 w-6 h-6 text-gray-400"
+              className="w-6 h-6"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -277,22 +219,88 @@ const DashboardLayout = () => {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                d="M6 18L18 6M6 6l12 12"
               />
             </svg>
-            Sign out
           </button>
+        </div>
+
+        <nav className="mt-6 px-3">
+          <div className="space-y-1">
+            {navigationItems.map((item) => (
+              <Link
+                key={item.name}
+                to={item.href}
+                className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                  isCurrentPath(item.href)
+                    ? "bg-indigo-100 text-indigo-700"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                }`}
+              >
+                <span className="mr-3">{item.icon}</span>
+                {item.name}
+              </Link>
+            ))}
+          </div>
+        </nav>
+
+        {/* User info and logout */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-sm font-medium">
+                  {profile?.full_name?.charAt(0) ||
+                    user?.email?.charAt(0) ||
+                    "U"}
+                </span>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-900">
+                  {profile?.full_name || user?.email || "User"}
+                </p>
+                <div className="flex items-center">
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getRoleBadgeColor(
+                      profile?.role_in_pos
+                    )}`}
+                  >
+                    {profile?.role_in_pos || "User"}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 rounded-md"
+              title="Logout"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Main content area */}
-      <div className="flex-1 lg:pl-0">
-        {/* Mobile menu button */}
-        <div className="lg:hidden">
-          <div className="flex items-center justify-between h-16 px-4 bg-white shadow-sm">
+      {/* Main content */}
+      <div className="flex-1 flex flex-col lg:ml-0">
+        {/* Top bar */}
+        <div className="bg-white shadow-sm border-b border-gray-200">
+          <div className="flex items-center justify-between h-16 px-4 sm:px-6 lg:px-8">
             <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
             >
               <svg
                 className="w-6 h-6"
@@ -308,25 +316,36 @@ const DashboardLayout = () => {
                 />
               </svg>
             </button>
-            <h1 className="text-lg font-semibold text-gray-900">
-              Moiz Medical Store
-            </h1>
-            <div className="w-10"></div>
+
+            <div className="flex items-center space-x-4">
+              <div className="hidden sm:flex items-center space-x-4">
+                <span className="text-sm text-gray-500">
+                  Welcome, {profile?.full_name || user?.email || "User"}
+                </span>
+                <span
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeColor(
+                    profile?.role_in_pos
+                  )}`}
+                >
+                  {profile?.role_in_pos || "User"}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Page content */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 overflow-auto">
           <Outlet />
         </main>
       </div>
 
-      {/* Sidebar overlay for mobile */}
+      {/* Mobile overlay */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 lg:hidden"
           onClick={() => setSidebarOpen(false)}
-        ></div>
+        />
       )}
     </div>
   );

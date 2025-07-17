@@ -1,6 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const { auth, checkRole } = require("../middleware/auth");
+
+// Role-based middleware
+const adminOrCounter = checkRole(['admin', 'counter']);
+const adminOnly = checkRole(['admin']);
 const {
   getAllOrders,
   getOrder,
@@ -10,15 +14,14 @@ const {
   getSalesChartData,
 } = require("../controllers/orderController");
 
-// Middleware to validate order ID (UUID format)
+// Middleware to validate order ID (MongoDB ObjectId format)
 const validateOrderId = (req, res, next) => {
   const { id } = req.params;
 
-  // Simple UUID validation (basic check)
-  const uuidRegex =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  // MongoDB ObjectId validation (24 character hex string)
+  const objectIdRegex = /^[0-9a-fA-F]{24}$/;
 
-  if (!id || id === "undefined" || id === "null" || !uuidRegex.test(id)) {
+  if (!id || id === "undefined" || id === "null" || !objectIdRegex.test(id)) {
     return res.status(400).json({
       success: false,
       message: "Invalid order ID format",
@@ -32,26 +35,26 @@ const validateOrderId = (req, res, next) => {
 router.use(auth);
 
 // Get dashboard data (admin only)
-router.get("/dashboard", checkRole(["admin"]), getDashboardData);
+router.get("/dashboard", adminOnly, getDashboardData);
 
 // Get sales chart data (admin only)
-router.get("/sales-chart", checkRole(["admin"]), getSalesChartData);
+router.get("/sales-chart", adminOnly, getSalesChartData);
 
 // Get all orders (admin or counter)
-router.get("/", checkRole(["admin", "counter"]), getAllOrders);
+router.get("/", adminOrCounter, getAllOrders);
 
 // Get single order (admin or counter) - with ID validation
-router.get("/:id", checkRole(["admin", "counter"]), validateOrderId, getOrder);
+router.get("/:id", adminOrCounter, validateOrderId, getOrder);
 
 // Get order PDF (admin or counter) - with ID validation
 router.get(
   "/:id/receipt",
-  checkRole(["admin", "counter"]),
+  adminOrCounter,
   validateOrderId,
   getOrderPdf
 );
 
 // Create order (counter and admin)
-router.post("/", checkRole(["admin", "counter"]), createOrder);
+router.post("/", adminOrCounter, createOrder);
 
 module.exports = router;
