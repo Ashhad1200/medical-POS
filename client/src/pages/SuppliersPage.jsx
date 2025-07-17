@@ -167,9 +167,9 @@ const SuppliersPage = () => {
         medicineId: selectedMedicine.id,
         name: selectedMedicine.name,
         manufacturer: selectedMedicine.manufacturer,
-        batchNumber: batchNumber || selectedMedicine.batchNumber,
+        batchNumber: batchNumber || selectedMedicine.batch_number,
         quantity: quantity,
-        tradePrice: selectedMedicine.tradePrice || 0,
+        tradePrice: selectedMedicine.cost_price || 0,
         notes: notes,
         expiryDate: expiryDate,
       };
@@ -198,7 +198,7 @@ const SuppliersPage = () => {
         items: orderCart.map((item) => ({
           medicineId: item.medicineId,
           quantity: item.quantity,
-          tradePrice: item.tradePrice,
+          tradePrice: item.cost_price,
           notes: item.notes,
           expiryDate: item.expiryDate,
           batchNumber: item.batchNumber,
@@ -225,7 +225,7 @@ const SuppliersPage = () => {
 
   const calculateOrderTotal = () => {
     return orderCart.reduce(
-      (total, item) => total + item.tradePrice * item.quantity,
+      (total, item) => total + item.cost_price * item.quantity,
       0
     );
   };
@@ -242,7 +242,7 @@ const SuppliersPage = () => {
         items: orderCart.map((item) => ({
           medicineId: item.medicineId,
           quantity: item.quantity,
-          tradePrice: item.tradePrice,
+          tradePrice: item.cost_price,
           notes: item.notes,
           expiryDate: item.expiryDate,
           batchNumber: item.batchNumber,

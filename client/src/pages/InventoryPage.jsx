@@ -42,15 +42,15 @@ const InventoryPage = () => {
   const [newMedicine, setNewMedicine] = useState({
     name: "",
     manufacturer: "",
-    batchNumber: "",
-    retailPrice: "",
-    tradePrice: "",
-    gstPerUnit: "",
+    batch_number: "",
+    selling_price: "",
+    cost_price: "",
+    gst_per_unit: "",
     quantity: "",
-    expiryDate: "",
+    expiry_date: "",
     category: "",
     description: "",
-    minStockLevel: 10,
+    low_stock_threshold: 10,
   });
 
   useEffect(() => {
@@ -142,7 +142,8 @@ const InventoryPage = () => {
         case "expired":
           // Only show medicines that are actually expired
           filtered = filtered.filter((medicine) => {
-            const expiryDate = new Date(medicine.expiryDate);
+            if (!medicine.expiry_date) return false;
+            const expiryDate = new Date(medicine.expiry_date);
             const today = new Date();
             today.setHours(0, 0, 0, 0); // Reset to start of day for accurate comparison
             return expiryDate < today;
@@ -151,7 +152,8 @@ const InventoryPage = () => {
         case "expiring-soon":
           // Show medicines expiring within 30 days
           filtered = filtered.filter((medicine) => {
-            const expiryDate = new Date(medicine.expiryDate);
+            if (!medicine.expiry_date) return false;
+            const expiryDate = new Date(medicine.expiry_date);
             const today = new Date();
             const thirtyDaysFromNow = new Date();
             thirtyDaysFromNow.setDate(today.getDate() + 30);
@@ -163,7 +165,7 @@ const InventoryPage = () => {
           filtered = filtered.filter((medicine) => {
             return (
               medicine.quantity > 0 &&
-              medicine.quantity <= (medicine.minStockLevel || 10)
+              medicine.quantity <= (medicine.low_stock_threshold || 10)
             );
           });
           break;
@@ -176,7 +178,8 @@ const InventoryPage = () => {
         case "in-stock":
           // Show medicines that are in stock and not expired
           filtered = filtered.filter((medicine) => {
-            const expiryDate = new Date(medicine.expiryDate);
+            if (!medicine.expiry_date) return medicine.quantity > 0;
+            const expiryDate = new Date(medicine.expiry_date);
             const today = new Date();
             return medicine.quantity > 0 && expiryDate >= today;
           });
@@ -194,7 +197,7 @@ const InventoryPage = () => {
           medicine.name?.toLowerCase().includes(searchTerm) ||
           medicine.manufacturer?.toLowerCase().includes(searchTerm) ||
           medicine.category?.toLowerCase().includes(searchTerm) ||
-          medicine.batchNumber?.toLowerCase().includes(searchTerm)
+          medicine.batch_number?.toLowerCase().includes(searchTerm)
       );
     }
 
@@ -207,11 +210,11 @@ const InventoryPage = () => {
 
     const medicineData = {
       ...newMedicine,
-      retailPrice: parseFloat(newMedicine.retailPrice),
-      tradePrice: parseFloat(newMedicine.tradePrice),
-      gstPerUnit: parseFloat(newMedicine.gstPerUnit) || 0,
+      selling_price: parseFloat(newMedicine.selling_price),
+      cost_price: parseFloat(newMedicine.cost_price),
+      gst_per_unit: parseFloat(newMedicine.gst_per_unit) || 0,
       quantity: parseInt(newMedicine.quantity),
-      minStockLevel: parseInt(newMedicine.minStockLevel) || 10,
+      low_stock_threshold: parseInt(newMedicine.low_stock_threshold) || 10,
     };
 
     try {
@@ -292,15 +295,15 @@ const InventoryPage = () => {
     setNewMedicine({
       name: "",
       manufacturer: "",
-      batchNumber: "",
-      retailPrice: "",
-      tradePrice: "",
-      gstPerUnit: "",
+      batch_number: "",
+      selling_price: "",
+      cost_price: "",
+      gst_per_unit: "",
       quantity: "",
-      expiryDate: "",
+      expiry_date: "",
       category: "",
       description: "",
-      minStockLevel: 10,
+      low_stock_threshold: 10,
     });
   };
 

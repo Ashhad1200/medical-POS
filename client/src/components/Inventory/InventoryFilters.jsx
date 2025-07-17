@@ -22,8 +22,8 @@ const InventoryFilters = ({
   const sortOptions = [
     { value: "name", label: "Name" },
     { value: "quantity", label: "Quantity" },
-    { value: "retailPrice", label: "Price" },
-    { value: "expiryDate", label: "Expiry Date" },
+    { value: "selling_price", label: "Price" },
+    { value: "expiry_date", label: "Expiry Date" },
     { value: "manufacturer", label: "Manufacturer" },
     { value: "createdAt", label: "Date Added" },
   ];

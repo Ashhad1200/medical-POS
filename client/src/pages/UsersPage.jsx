@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import api from "../services/api";
+import { useAuth } from "../hooks/useAuth";
 
 const UsersPage = () => {
+  const { user, loading: authLoading } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -46,8 +48,10 @@ const UsersPage = () => {
   ];
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    if (user && !authLoading) {
+      fetchUsers();
+    }
+  }, [user, authLoading]);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -178,6 +182,27 @@ const UsersPage = () => {
 
     return matchesSearch && matchesRole;
   });
+
+  // Show loading spinner while authentication is loading
+  if (authLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  // Redirect to login if user is not authenticated
+  if (!user) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h2>
+          <p className="text-gray-600">Please log in to access the user management page.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

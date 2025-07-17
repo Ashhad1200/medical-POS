@@ -275,21 +275,21 @@ const OrderReceiptModal = ({
                           <div className="text-sm text-gray-600 space-y-1">
                             <div>Quantity: {item.quantity} units</div>
                             <div>
-                              Unit Price: Rs. {item.tradePrice.toFixed(2)}
+                              Unit Price: Rs. {item.cost_price.toFixed(2)}
                             </div>
                             <div className="font-medium">
                               Total: Rs.{" "}
-                              {(item.quantity * item.tradePrice).toFixed(2)}
+                              {(item.quantity * item.cost_price).toFixed(2)}
                             </div>
-                            {item.expiryDate && (
+                            {item.expiry_date && (
                               <div className="text-xs text-gray-500">
                                 Expiry:{" "}
-                                {new Date(item.expiryDate).toLocaleDateString()}
+                                {new Date(item.expiry_date).toLocaleDateString()}
                               </div>
                             )}
-                            {item.batchNumber && (
+                            {item.batch_number && (
                               <div className="text-xs text-gray-500">
-                                Batch: {item.batchNumber}
+                                Batch: {item.batch_number}
                               </div>
                             )}
                             {item.notes && (
@@ -303,16 +303,16 @@ const OrderReceiptModal = ({
                           {item.manufacturer}
                         </td>
                         <td className="border border-gray-800 px-4 py-3">
-                          {item.batchNumber || "N/A"}
+                          {item.batch_number || "N/A"}
                         </td>
                         <td className="border border-gray-800 px-4 py-3 text-center font-medium">
                           {item.quantity}
                         </td>
                         <td className="border border-gray-800 px-4 py-3 text-right">
-                          Rs. {item.tradePrice.toFixed(2)}
+                          Rs. {item.cost_price.toFixed(2)}
                         </td>
                         <td className="border border-gray-800 px-4 py-3 text-right font-medium">
-                          Rs. {(item.quantity * item.tradePrice).toFixed(2)}
+                          Rs. {(item.quantity * item.cost_price).toFixed(2)}
                         </td>
                       </tr>
                     ))}

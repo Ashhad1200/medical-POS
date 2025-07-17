@@ -41,8 +41,8 @@ const ShoppingCart = ({
 
   const handleQuantityChange = (medicineId, newQuantity) => {
     const item = cart.find((item) => item.medicineId === medicineId);
-    if (newQuantity > item.availableStock) {
-      alert(`Only ${item.availableStock} units available in stock`);
+    if (newQuantity > item.available_stock) {
+      alert(`Only ${item.available_stock} units available in stock`);
       return;
     }
     onUpdateItem(medicineId, { quantity: parseInt(newQuantity) });
@@ -97,7 +97,7 @@ const ShoppingCart = ({
                   {item.name}
                 </h3>
                 <p className="text-xs text-gray-500 mt-1">
-                  {item.manufacturer} • Batch: {item.batchNumber}
+                  {item.manufacturer} • Batch: {item.batch_number}
                 </p>
                 <div className="flex items-center space-x-2 mt-2">
                   <span className="text-xs text-gray-500">Price:</span>
@@ -149,7 +149,7 @@ const ShoppingCart = ({
                   <input
                     type="number"
                     min="1"
-                    max={item.availableStock}
+                    max={item.available_stock}
                     value={item.quantity}
                     onChange={(e) =>
                       handleQuantityChange(item.medicineId, e.target.value)
@@ -160,14 +160,14 @@ const ShoppingCart = ({
                     onClick={() =>
                       handleQuantityChange(item.medicineId, item.quantity + 1)
                     }
-                    disabled={item.quantity >= item.availableStock}
+                    disabled={item.quantity >= item.available_stock}
                     className="w-6 h-6 rounded border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-50"
                   >
                     +
                   </button>
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  Stock: {item.availableStock}
+                  Stock: {item.available_stock}
                 </p>
               </div>
 
@@ -218,13 +218,13 @@ const ShoppingCart = ({
                     </span>
                   </div>
                 )}
-                {(item.gstPerUnit || 0) > 0 && (
+                {(item.gst_per_unit || 0) > 0 && (
                   <div className="flex justify-between items-center text-blue-600">
                     <span>GST:</span>
                     <span>
                       +
                       {formatCurrency(
-                        (item.gstPerUnit || 0) * (item.quantity || 1)
+                        (item.gst_per_unit || 0) * (item.quantity || 1)
                       )}
                     </span>
                   </div>
@@ -238,7 +238,7 @@ const ShoppingCart = ({
                           (item.quantity || 1) *
                           (item.discountPercent || 0)) /
                           100 +
-                        (item.gstPerUnit || 0) * (item.quantity || 1)
+                        (item.gst_per_unit || 0) * (item.quantity || 1)
                     )}
                   </span>
                 </div>

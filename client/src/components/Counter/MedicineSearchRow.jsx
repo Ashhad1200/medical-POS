@@ -4,12 +4,12 @@ const MedicineSearchRow = ({ medicine, onAddToCart, isInCart }) => {
   const [quantity, setQuantity] = useState(1);
   const [discountPercent, setDiscountPercent] = useState(0);
 
-  const isExpired = new Date(medicine.expiryDate) <= new Date();
+  const isExpired = medicine.expiry_date ? new Date(medicine.expiry_date) <= new Date() : false;
   const isOutOfStock = medicine.quantity === 0;
-  const isLowStock = medicine.quantity <= 10;
+  const isLowStock = medicine.quantity <= (medicine.low_stock_threshold || 10);
 
   const calculateFinalPrice = () => {
-    const basePrice = medicine.sellingPrice * quantity;
+    const basePrice = medicine.selling_price * quantity;
     const discountAmount = (basePrice * discountPercent) / 100;
     return basePrice - discountAmount;
   };
@@ -48,7 +48,7 @@ const MedicineSearchRow = ({ medicine, onAddToCart, isInCart }) => {
           <p className="text-sm text-gray-600">{medicine.manufacturer}</p>
           <div className="flex items-center space-x-2 mt-1">
             <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-              Batch: {medicine.batchNumber}
+              Batch: {medicine.batch_number}
             </span>
             {isLowStock && !isOutOfStock && (
               <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
@@ -130,7 +130,7 @@ const MedicineSearchRow = ({ medicine, onAddToCart, isInCart }) => {
             {discountPercent > 0 && (
               <div className="text-xs text-gray-500">
                 <span className="line-through">
-                  Rs.{(medicine.sellingPrice * quantity).toFixed(2)}
+                  Rs.{(medicine.selling_price * quantity).toFixed(2)}
                 </span>
                 <span className="text-red-600 ml-1">
                   ({discountPercent}% off)
@@ -138,7 +138,7 @@ const MedicineSearchRow = ({ medicine, onAddToCart, isInCart }) => {
               </div>
             )}
             <div className="text-xs text-gray-500">
-              Unit: Rs.{medicine.sellingPrice.toFixed(2)}
+              Unit: Rs.{medicine.selling_price.toFixed(2)}
             </div>
           </div>
         </div>
@@ -201,10 +201,10 @@ const MedicineSearchRow = ({ medicine, onAddToCart, isInCart }) => {
       <div className="mt-3 pt-3 border-t border-gray-100">
         <div className="flex justify-between items-center text-sm">
           <span className="text-gray-600">
-            Expires: {new Date(medicine.expiryDate).toLocaleDateString("en-IN")}
+            Expires: {new Date(medicine.expiry_date).toLocaleDateString("en-IN")}
           </span>
           <span className="text-gray-600">
-            GST: Rs.{(medicine.gstPerUnit || 0).toFixed(2)} per unit
+            GST: Rs.{(medicine.gst_per_unit || 0).toFixed(2)} per unit
           </span>
         </div>
       </div>

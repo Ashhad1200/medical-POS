@@ -168,7 +168,7 @@ const OrdersPage = () => {
                       </h4>
                       <p className="text-sm text-gray-600">
                         Quantity: {item?.quantity ?? 0} | Unit Price: Rs.
-                        {(item?.retailPrice ?? 0).toFixed(2)}
+                        {(item?.selling_price ?? 0).toFixed(2)}
                       </p>
                       {(item?.discount ?? 0) > 0 && (
                         <p className="text-sm text-green-600">

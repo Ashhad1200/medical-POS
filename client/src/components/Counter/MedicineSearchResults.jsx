@@ -27,9 +27,9 @@ const MedicineSearchResults = ({
   };
 
   const getStockStatus = (medicine) => {
-    const isExpired = new Date(medicine.expiryDate) < new Date();
+    const isExpired = medicine.expiry_date ? new Date(medicine.expiry_date) < new Date() : false;
     const isOutOfStock = medicine.quantity === 0;
-    const isLowStock = medicine.quantity <= (medicine.minStockLevel || 10);
+    const isLowStock = medicine.quantity <= (medicine.low_stock_threshold || 10);
 
     if (isExpired) {
       return { status: "expired", color: "red", text: "Expired" };
@@ -166,7 +166,7 @@ const MedicineSearchResults = ({
                 <div>
                   <span className="text-gray-500">Price:</span>
                   <span className="ml-1 font-semibold text-green-600">
-                    {formatCurrency(medicine.sellingPrice || 0)}
+                    {formatCurrency(medicine.selling_price || 0)}
                   </span>
                 </div>
                 <div>
@@ -177,21 +177,21 @@ const MedicineSearchResults = ({
                 </div>
                 <div>
                   <span className="text-gray-500">Batch:</span>
-                  <span className="ml-1">{medicine.batchNumber || "N/A"}</span>
+                  <span className="ml-1">{medicine.batch_number || "N/A"}</span>
                 </div>
-                {(medicine.gstPerUnit || 0) > 0 ? (
+                {(medicine.gst_per_unit || 0) > 0 ? (
                   <div>
                     <span className="text-gray-500">GST per unit:</span>
                     <span className="ml-1 text-blue-600">
-                      {formatCurrency(medicine.gstPerUnit || 0)}
+                      {formatCurrency(medicine.gst_per_unit || 0)}
                     </span>
                   </div>
                 ) : (
                   <div>
                     <span className="text-gray-500">Expiry:</span>
                     <span className="ml-1">
-                      {medicine.expiryDate
-                        ? new Date(medicine.expiryDate).toLocaleDateString()
+                      {medicine.expiry_date
+                        ? new Date(medicine.expiry_date).toLocaleDateString()
                         : "N/A"}
                     </span>
                   </div>
@@ -199,7 +199,7 @@ const MedicineSearchResults = ({
               </div>
 
               {/* Show total price including GST */}
-              {(medicine.gstPerUnit || 0) > 0 && (
+              {(medicine.gst_per_unit || 0) > 0 && (
                 <div className="mb-3 p-2 bg-blue-50 rounded text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">
@@ -207,8 +207,8 @@ const MedicineSearchResults = ({
                     </span>
                     <span className="font-semibold text-blue-700">
                       {formatCurrency(
-                        (medicine.sellingPrice || 0) +
-                          (medicine.gstPerUnit || 0)
+                        (medicine.selling_price || 0) +
+                          (medicine.gst_per_unit || 0)
                       )}
                     </span>
                   </div>

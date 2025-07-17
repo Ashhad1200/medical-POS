@@ -108,11 +108,11 @@ const CounterDashboard = () => {
         cart.reduce((total, item) => {
           const retailTotal = (item.unitPrice || 0) * (item.quantity || 1);
           const tradeTotal =
-            (item.tradePrice || (item.unitPrice || 0) * 0.7) *
-            (item.quantity || 1);
+        (item.cost_price || (item.unitPrice || 0) * 0.7) *
+        (item.quantity || 1);
           const itemDiscount =
             (retailTotal * (item.discountPercent || 0)) / 100;
-          const itemGst = (item.gstPerUnit || 0) * (item.quantity || 1);
+          const itemGst = (item.gst_per_unit || 0) * (item.quantity || 1);
           return total + (retailTotal - itemDiscount + itemGst - tradeTotal);
         }, 0) - globalDiscount;
     }
@@ -168,14 +168,14 @@ const CounterDashboard = () => {
     const cartItem = {
       medicineId: medicine.id,
       name: medicine.name,
-      unitPrice: medicine.sellingPrice,
-      tradePrice: medicine.tradePrice,
+      unitPrice: medicine.selling_price,
+      cost_price: medicine.cost_price,
       quantity: quantity,
       discountPercent: discountPercent,
-      availableStock: medicine.quantity,
-      gstPerUnit: medicine.gstPerUnit || 0,
+      available_stock: medicine.quantity,
+      gst_per_unit: medicine.gst_per_unit || 0,
       manufacturer: medicine.manufacturer,
-      batchNumber: medicine.batchNumber,
+      batch_number: medicine.batch_number,
     };
 
     dispatch(addToCart(cartItem));
@@ -275,9 +275,9 @@ const CounterDashboard = () => {
         name: item.name,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
-        tradePrice: item.tradePrice || item.unitPrice * 0.7,
+        cost_price: item.cost_price || item.unitPrice * 0.7,
         discountPercent: item.discountPercent || 0,
-        gstPerUnit: item.gstPerUnit || 0,
+        gst_per_unit: item.gst_per_unit || 0,
       })),
       customer: customerInfo,
       payment: {
@@ -355,7 +355,7 @@ const CounterDashboard = () => {
         name: item.name,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
-        tradePrice: item.tradePrice || item.unitPrice * 0.7,
+        cost_price: item.cost_price || item.unitPrice * 0.7,
         discountPercent: item.discountPercent || 0,
       })),
       customer: customerInfo,

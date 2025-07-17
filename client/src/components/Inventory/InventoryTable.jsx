@@ -107,10 +107,10 @@ const TableRow = ({
   updateStockMutation,
 }) => {
   const stockStatus = getStockStatus(medicine);
-  const isExpired = new Date(medicine.expiryDate) <= new Date();
-  const daysUntilExpiry = Math.ceil(
-    (new Date(medicine.expiryDate) - new Date()) / (1000 * 60 * 60 * 24)
-  );
+  const isExpired = medicine.expiry_date ? new Date(medicine.expiry_date) <= new Date() : false;
+  const daysUntilExpiry = medicine.expiry_date ? Math.ceil(
+    (new Date(medicine.expiry_date) - new Date()) / (1000 * 60 * 60 * 24)
+  ) : 0;
 
   const handleQuantitySubmit = (e) => {
     e.preventDefault();
@@ -126,9 +126,9 @@ const TableRow = ({
   };
 
   const profitMargin =
-    medicine.retailPrice > 0
+    medicine.selling_price > 0 && medicine.cost_price > 0
       ? (
-          ((medicine.retailPrice - medicine.tradePrice) / medicine.tradePrice) *
+          ((medicine.selling_price - medicine.cost_price) / medicine.cost_price) *
           100
         ).toFixed(1)
       : 0;
@@ -166,7 +166,7 @@ const TableRow = ({
             </p>
             <div className="flex items-center space-x-2 mt-1">
               <span className="text-xs text-gray-500">
-                Batch: {medicine.batchNumber}
+                Batch: {medicine.batch_number || 'N/A'}
               </span>
             </div>
           </div>
@@ -177,10 +177,10 @@ const TableRow = ({
       <td className="px-6 py-4">
         <div className="text-right space-y-1">
           <div className="text-base font-semibold text-gray-900">
-            Rs.{medicine.retailPrice?.toFixed(2) || "0.00"}
+            Rs.{medicine.selling_price?.toFixed(2) || "0.00"}
           </div>
           <div className="text-sm text-gray-500">
-            Trade: Rs.{medicine.tradePrice?.toFixed(2) || "0.00"}
+            Cost: Rs.{medicine.cost_price?.toFixed(2) || "0.00"}
           </div>
           <div className="text-xs text-green-600 font-medium">
             +{profitMargin}% margin
@@ -230,7 +230,7 @@ const TableRow = ({
       <td className="px-6 py-4">
         <div className="space-y-1">
           <div className="text-sm text-gray-900">
-            {new Date(medicine.expiryDate).toLocaleDateString()}
+            {medicine.expiry_date ? new Date(medicine.expiry_date).toLocaleDateString() : 'N/A'}
           </div>
           <div
             className={`text-xs ${
@@ -255,9 +255,9 @@ const TableRow = ({
         <div className="text-right">
           <div className="text-sm font-medium text-gray-900">
             Rs.
-            {((medicine.quantity || 0) * (medicine.tradePrice || 0)).toFixed(2)}
+            {((medicine.quantity || 0) * (medicine.cost_price || 0)).toFixed(2)}
           </div>
-          <div className="text-xs text-gray-500">Trade value</div>
+          <div className="text-xs text-gray-500">Cost value</div>
         </div>
       </td>
 

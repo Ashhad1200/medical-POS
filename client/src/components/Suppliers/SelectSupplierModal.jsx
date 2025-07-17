@@ -67,9 +67,9 @@ const SelectSupplierModal = ({
       items: orderItems.map((item) => ({
         name: item.name,
         quantity: item.quantity,
-        unitPrice: item.tradePrice,
-        total: item.quantity * item.tradePrice,
-        batchNumber: item.batchNumber || "N/A",
+        unitPrice: item.cost_price,
+        total: item.quantity * item.cost_price,
+        batchNumber: item.batch_number || "N/A",
         manufacturer: item.manufacturer || "N/A",
       })),
       subtotal: calculateOrderTotal(),
@@ -93,7 +93,7 @@ const SelectSupplierModal = ({
 
   const calculateOrderTotal = () => {
     return orderItems.reduce((total, item) => {
-      return total + item.quantity * item.tradePrice;
+      return total + item.quantity * item.cost_price;
     }, 0);
   };
 
@@ -315,8 +315,8 @@ const SelectSupplierModal = ({
                 </td>
                 <td>${item.batchNumber || "N/A"}</td>
                 <td>${item.quantity}</td>
-                <td>${item.tradePrice.toFixed(2)}</td>
-                <td>${(item.quantity * item.tradePrice).toFixed(2)}</td>
+                <td>${item.cost_price.toFixed(2)}</td>
+                <td>${(item.quantity * item.cost_price).toFixed(2)}</td>
               </tr>
             `
               )
@@ -379,8 +379,8 @@ ${orderItems
     (item, index) => `
 ${index + 1}. ${item.name}
    Quantity: ${item.quantity} units
-   Unit Price: Rs. ${item.tradePrice.toFixed(2)}
-   Total: Rs. ${(item.quantity * item.tradePrice).toFixed(2)}
+   Unit Price: Rs. ${item.cost_price.toFixed(2)}
+   Total: Rs. ${(item.quantity * item.cost_price).toFixed(2)}
    ${item.batchNumber ? `Batch: ${item.batchNumber}` : ""}
    ${item.notes ? `Note: ${item.notes}` : ""}
 `
@@ -591,13 +591,13 @@ ${formatDate(new Date())} ${new Date().toLocaleTimeString()}
                       <div className="flex justify-between">
                         <span>Price:</span>
                         <span className="font-medium">
-                          Rs. {item.tradePrice.toFixed(2)}
+                          Rs. {item.cost_price.toFixed(2)}
                         </span>
                       </div>
                       <div className="flex justify-between border-t border-gray-200 pt-1">
                         <span>Total:</span>
                         <span className="font-medium">
-                          Rs. {(item.quantity * item.tradePrice).toFixed(2)}
+                          Rs. {(item.quantity * item.cost_price).toFixed(2)}
                         </span>
                       </div>
                       {item.notes && (
@@ -605,15 +605,15 @@ ${formatDate(new Date())} ${new Date().toLocaleTimeString()}
                           Note: {item.notes}
                         </div>
                       )}
-                      {item.expiryDate && (
+                      {item.expiry_date && (
                         <div className="text-xs text-gray-500">
                           Expiry:{" "}
-                          {new Date(item.expiryDate).toLocaleDateString()}
+                          {new Date(item.expiry_date).toLocaleDateString()}
                         </div>
                       )}
-                      {item.batchNumber && (
+                      {item.batch_number && (
                         <div className="text-xs text-gray-500">
-                          Batch: {item.batchNumber}
+                          Batch: {item.batch_number}
                         </div>
                       )}
                     </div>

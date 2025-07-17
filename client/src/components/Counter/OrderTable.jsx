@@ -5,8 +5,8 @@ const OrderTable = ({ items, onUpdateItem, onRemoveItem }) => {
     if (newQuantity < 1) return;
 
     const item = items.find((item) => item.medicineId === medicineId);
-    if (newQuantity > item.availableStock) {
-      alert(`Only ${item.availableStock} units available in stock`);
+    if (newQuantity > item.available_stock) {
+      alert(`Only ${item.available_stock} units available in stock`);
       return;
     }
 
@@ -84,7 +84,7 @@ const OrderTable = ({ items, onUpdateItem, onRemoveItem }) => {
                     {item.name}
                   </div>
                   <div className="text-sm text-gray-500">
-                    Available: {item.availableStock} units
+                    Available: {item.available_stock} units
                   </div>
                 </div>
               </td>
@@ -94,7 +94,7 @@ const OrderTable = ({ items, onUpdateItem, onRemoveItem }) => {
                   Rs.{item.unitPrice.toFixed(2)}
                 </div>
                 <div className="text-xs text-gray-500">
-                  Trade: Rs.{item.tradePrice.toFixed(2)}
+                  Trade: Rs.{item.cost_price.toFixed(2)}
                 </div>
               </td>
 
@@ -125,7 +125,7 @@ const OrderTable = ({ items, onUpdateItem, onRemoveItem }) => {
                   <input
                     type="number"
                     min="1"
-                    max={item.availableStock}
+                    max={item.available_stock}
                     value={item.quantity}
                     onChange={(e) =>
                       handleQuantityChange(
@@ -141,7 +141,7 @@ const OrderTable = ({ items, onUpdateItem, onRemoveItem }) => {
                       handleQuantityChange(item.medicineId, item.quantity + 1)
                     }
                     className="w-8 h-8 bg-gray-200 rounded-full hover:bg-gray-300 flex items-center justify-center"
-                    disabled={item.quantity >= item.availableStock}
+                    disabled={item.quantity >= item.available_stock}
                   >
                     <svg
                       className="w-4 h-4"

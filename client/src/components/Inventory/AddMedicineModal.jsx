@@ -21,11 +21,11 @@ const AddMedicineModal = ({
     const required = [
       "name",
       "manufacturer",
-      "batchNumber",
-      "retailPrice",
-      "tradePrice",
+      "batch_number",
+      "selling_price",
+      "cost_price",
       "quantity",
-      "expiryDate",
+      "expiry_date",
     ];
     return required.every((field) => newMedicine[field]);
   };
@@ -117,9 +117,9 @@ const AddMedicineModal = ({
                     <input
                       type="text"
                       required
-                      value={newMedicine.batchNumber}
+                      value={newMedicine.batch_number}
                       onChange={(e) =>
-                        handleInputChange("batchNumber", e.target.value)
+                        handleInputChange("batch_number", e.target.value)
                       }
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                       placeholder="Batch number"
@@ -155,16 +155,16 @@ const AddMedicineModal = ({
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Retail Price (Rs.) *
+                        Selling Price (Rs.) *
                       </label>
                       <input
                         type="number"
                         step="0.01"
                         min="0"
                         required
-                        value={newMedicine.retailPrice}
+                        value={newMedicine.selling_price}
                         onChange={(e) =>
-                          handleInputChange("retailPrice", e.target.value)
+                          handleInputChange("selling_price", e.target.value)
                         }
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                         placeholder="0.00"
@@ -173,16 +173,16 @@ const AddMedicineModal = ({
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Trade Price (Rs.) *
+                        Cost Price (Rs.) *
                       </label>
                       <input
                         type="number"
                         step="0.01"
                         min="0"
                         required
-                        value={newMedicine.tradePrice}
+                        value={newMedicine.cost_price}
                         onChange={(e) =>
-                          handleInputChange("tradePrice", e.target.value)
+                          handleInputChange("cost_price", e.target.value)
                         }
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                         placeholder="0.00"
@@ -199,9 +199,9 @@ const AddMedicineModal = ({
                         type="number"
                         step="0.01"
                         min="0"
-                        value={newMedicine.gstPerUnit}
+                        value={newMedicine.gst_per_unit}
                         onChange={(e) =>
-                          handleInputChange("gstPerUnit", e.target.value)
+                          handleInputChange("gst_per_unit", e.target.value)
                         }
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                         placeholder="0.00"
@@ -234,9 +234,9 @@ const AddMedicineModal = ({
                       <input
                         type="date"
                         required
-                        value={newMedicine.expiryDate}
+                        value={newMedicine.expiry_date}
                         onChange={(e) =>
-                          handleInputChange("expiryDate", e.target.value)
+                          handleInputChange("expiry_date", e.target.value)
                         }
                         min={new Date().toISOString().split("T")[0]}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
@@ -250,9 +250,9 @@ const AddMedicineModal = ({
                       <input
                         type="number"
                         min="0"
-                        value={newMedicine.minStockLevel}
+                        value={newMedicine.low_stock_threshold}
                         onChange={(e) =>
-                          handleInputChange("minStockLevel", e.target.value)
+                          handleInputChange("low_stock_threshold", e.target.value)
                         }
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                         placeholder="10"
@@ -264,7 +264,7 @@ const AddMedicineModal = ({
                   </div>
 
                   {/* Profit Calculation */}
-                  {newMedicine.retailPrice && newMedicine.tradePrice && (
+                  {newMedicine.selling_price && newMedicine.cost_price && (
                     <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                       <h4 className="text-sm font-medium text-green-800 mb-2">
                         Profit Analysis
@@ -277,19 +277,19 @@ const AddMedicineModal = ({
                           <span className="font-semibold text-green-900 ml-2">
                             Rs.
                             {(
-                              parseFloat(newMedicine.retailPrice) -
-                              parseFloat(newMedicine.tradePrice)
+                              parseFloat(newMedicine.selling_price) -
+                              parseFloat(newMedicine.cost_price)
                             ).toFixed(2)}
                           </span>
                         </div>
                         <div>
                           <span className="text-green-700">Profit margin:</span>
                           <span className="font-semibold text-green-900 ml-2">
-                            {newMedicine.tradePrice > 0
+                            {newMedicine.cost_price > 0
                               ? (
-                                  ((parseFloat(newMedicine.retailPrice) -
-                                    parseFloat(newMedicine.tradePrice)) /
-                                    parseFloat(newMedicine.tradePrice)) *
+                                  ((parseFloat(newMedicine.selling_price) -
+                                    parseFloat(newMedicine.cost_price)) /
+                                    parseFloat(newMedicine.cost_price)) *
                                   100
                                 ).toFixed(1)
                               : 0}

@@ -67,7 +67,7 @@ const OutOfStockTable = ({
   // Get stock status info
   const getStockStatus = (medicine) => {
     const quantity = medicine.quantity || 0;
-    const minStock = medicine.minStockLevel || 10;
+    const minStock = medicine.low_stock_threshold || 10;
 
     if (quantity === 0) {
       return {
@@ -337,11 +337,11 @@ const OutOfStockTable = ({
                         </span>
                         <span>
                           <span className="font-medium">Batch:</span>{" "}
-                          {medicine.batchNumber}
+                          {medicine.batch_number}
                         </span>
                         <span>
                           <span className="font-medium">Trade Price:</span> Rs.
-                          {medicine.tradePrice?.toFixed(2) || "0.00"}
+                          {medicine.cost_price?.toFixed(2) || "0.00"}
                         </span>
                       </div>
                       <div className="mt-2 flex items-center space-x-4">
@@ -359,15 +359,15 @@ const OutOfStockTable = ({
                         <span className="text-sm text-gray-600">
                           Min Level:{" "}
                           <span className="font-medium">
-                            {medicine.minStockLevel || 10}
+                            {medicine.low_stock_threshold || 10}
                           </span>
                         </span>
-                        {medicine.expiryDate && (
+                        {medicine.expiry_date && (
                           <span className="text-sm text-gray-600">
                             Expires:{" "}
                             <span className="font-medium">
                               {new Date(
-                                medicine.expiryDate
+                                medicine.expiry_date
                               ).toLocaleDateString()}
                             </span>
                           </span>

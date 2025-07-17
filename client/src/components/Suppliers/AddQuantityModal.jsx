@@ -17,7 +17,7 @@ const AddQuantityModal = ({
     if (medicine && show) {
       // Calculate suggested quantity based on current stock and min level
       const currentStock = medicine.quantity || 0;
-      const minStock = medicine.minStockLevel || 10;
+      const minStock = medicine.low_stock_threshold || 10;
       const suggested = Math.max(minStock - currentStock, 1);
       setSuggestedQuantity(suggested);
 
@@ -38,7 +38,7 @@ const AddQuantityModal = ({
         const defaultExpiry = new Date();
         defaultExpiry.setFullYear(defaultExpiry.getFullYear() + 1);
         setExpiryDate(defaultExpiry.toISOString().split("T")[0]);
-        setBatchNumber(medicine.batchNumber || `BATCH-${Date.now()}`);
+        setBatchNumber(medicine.batch_number || `BATCH-${Date.now()}`);
       }
     }
   }, [medicine, show, existingItem]);
@@ -106,7 +106,7 @@ const AddQuantityModal = ({
             <div>
               <span className="font-medium">Batch:</span>
               <br />
-              {medicine.batchNumber}
+              {medicine.batch_number}
             </div>
             <div>
               <span className="font-medium">Current Stock:</span>
@@ -129,7 +129,7 @@ const AddQuantityModal = ({
             <div>
               <span className="font-medium">Trade Price:</span>
               <br />
-              Rs. {medicine.tradePrice?.toFixed(2) || "0.00"}
+              Rs. {medicine.cost_price?.toFixed(2) || "0.00"}
             </div>
             <div>
               <span className="font-medium">Stock Deficit:</span>
@@ -222,7 +222,7 @@ const AddQuantityModal = ({
             {quantity > 0 && (
               <p className="mt-1 text-sm text-gray-600">
                 Total cost: Rs.
-                {(quantity * (medicine.tradePrice || 0)).toFixed(2)}
+                {(quantity * (medicine.cost_price || 0)).toFixed(2)}
               </p>
             )}
           </div>
@@ -284,10 +284,10 @@ const AddQuantityModal = ({
               <li>
                 • Consider ordering {minStock * 2} units for 2-month supply
               </li>
-              {medicine.expiryDate && (
+              {medicine.expiry_date && (
                 <li>
                   • Check expiry date:{" "}
-                  {new Date(medicine.expiryDate).toLocaleDateString()}
+                  {new Date(medicine.expiry_date).toLocaleDateString()}
                 </li>
               )}
             </ul>

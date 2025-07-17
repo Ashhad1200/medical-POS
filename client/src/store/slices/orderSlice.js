@@ -84,13 +84,13 @@ const orderSlice = createSlice({
           medicineId: cartItem.medicineId,
           name: cartItem.name,
           unitPrice: cartItem.unitPrice,
-          tradePrice: cartItem.tradePrice || cartItem.unitPrice * 0.7,
+          cost_price: cartItem.cost_price || cartItem.unitPrice * 0.7,
           quantity: cartItem.quantity,
           discountPercent: cartItem.discountPercent || 0,
           availableStock: cartItem.availableStock,
-          gstPerUnit: cartItem.gstPerUnit || 0,
+          gst_per_unit: cartItem.gst_per_unit || 0,
           manufacturer: cartItem.manufacturer || "Unknown",
-          batchNumber: cartItem.batchNumber || "N/A",
+          batch_number: cartItem.batch_number || "N/A",
         });
       }
     },

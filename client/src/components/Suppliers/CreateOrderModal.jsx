@@ -49,7 +49,7 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
       (medicine) =>
         medicine.name?.toLowerCase().includes(query) ||
         medicine.manufacturer?.toLowerCase().includes(query) ||
-        medicine.batchNumber?.toLowerCase().includes(query)
+        medicine.batch_number?.toLowerCase().includes(query)
     );
   }, [medicines, searchQuery]);
 
@@ -74,7 +74,7 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
           name: medicine.name,
           manufacturer: medicine.manufacturer,
           quantity: 1,
-          tradePrice: medicine.tradePrice || 0,
+          tradePrice: medicine.cost_price || 0,
           notes: "",
         },
       ]);
@@ -216,10 +216,10 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
                           </p>
                           <div className="flex items-center space-x-4 mt-2">
                             <span className="text-sm text-gray-500">
-                              Batch: {medicine.batchNumber}
+                              Batch: {medicine.batch_number}
                             </span>
                             <span className="text-sm font-medium text-green-600">
-                              Rs. {medicine.tradePrice?.toFixed(2) || "0.00"}
+                              Rs. {medicine.cost_price?.toFixed(2) || "0.00"}
                             </span>
                             <span className="text-sm text-gray-500">
                               Stock: {medicine.quantity}

@@ -14,9 +14,9 @@ const StockFilters = ({
     { value: "name", label: "Medicine Name" },
     { value: "manufacturer", label: "Manufacturer" },
     { value: "quantity", label: "Current Stock" },
-    { value: "minStockLevel", label: "Min Stock Level" },
-    { value: "tradePrice", label: "Trade Price" },
-    { value: "expiryDate", label: "Expiry Date" },
+    { value: "low_stock_threshold", label: "Min Stock Level" },
+    { value: "cost_price", label: "Trade Price" },
+    { value: "expiry_date", label: "Expiry Date" },
   ];
 
   const stockFilterOptions = [

@@ -77,18 +77,19 @@ export const useInventoryStats = () => {
 
       // Calculate expired medicines
       const expiredMedicines = medicines.filter((med) => {
-        const expiryDate = new Date(med.expiryDate);
+        if (!med.expiry_date) return false;
+        const expiryDate = new Date(med.expiry_date);
         return expiryDate < today;
       });
 
       // Calculate valid medicines (in stock and not expired)
       const validMedicines = medicines.filter(
-        (med) => med.quantity > 0 && new Date(med.expiryDate) >= today
+        (med) => med.quantity > 0 && (!med.expiry_date || new Date(med.expiry_date) >= today)
       );
 
       // Calculate total inventory value from all medicines
       const totalValue = medicines.reduce((total, med) => {
-        return total + (med.quantity || 0) * (med.tradePrice || 0);
+        return total + (med.quantity || 0) * (med.cost_price || 0);
       }, 0);
 
       // Calculate expiring soon (within 30 days)
@@ -96,7 +97,8 @@ export const useInventoryStats = () => {
       thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
 
       const expiringSoon = medicines.filter((med) => {
-        const expiryDate = new Date(med.expiryDate);
+        if (!med.expiry_date) return false;
+        const expiryDate = new Date(med.expiry_date);
         return expiryDate > today && expiryDate <= thirtyDaysFromNow;
       }).length;
 
@@ -406,9 +408,10 @@ export const useInventoryCache = () => {
 // Helper function to get stock status
 export const getStockStatus = (medicine) => {
   const currentDate = new Date();
-  const expiryDate = new Date(medicine.expiryDate);
-  const isExpired = expiryDate < currentDate;
-  const isLowStock = medicine.quantity <= 10;
+  const expiryDate = medicine.expiry_date ? new Date(medicine.expiry_date) : null;
+  const isExpired = expiryDate ? expiryDate < currentDate : false;
+  const lowStockThreshold = medicine.low_stock_threshold || 10;
+  const isLowStock = medicine.quantity <= lowStockThreshold;
   const isOutOfStock = medicine.quantity === 0;
 
   if (isExpired) {

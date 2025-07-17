@@ -17,13 +17,13 @@ const QuickAccessMedicines = ({ medicines, onAddToCart }) => {
     const medicineData = {
       _id: medicine.id,
       name: medicine.name,
-      sellingPrice: medicine.price,
-      tradePrice: medicine.price * 0.7, // Assuming 30% margin
+      selling_price: medicine.price,
+      cost_price: medicine.price * 0.7, // Assuming 30% margin
       quantity: 999, // Assume high stock for quick access
-      gstPerUnit: medicine.price * 0.12, // 12% GST
+      gst_per_unit: medicine.price * 0.12, // 12% GST
       manufacturer: "Generic",
-      batchNumber: "QA001",
-      expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year from now
+      batch_number: "QA001",
+      expiry_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year from now
     };
 
     onAddToCart(medicineData, 1);

@@ -30,14 +30,14 @@ const SupplierOrderHistory = ({ show, onClose }) => {
                 quantity: 100,
                 unitPrice: 2.5,
                 total: 250.0,
-                batchNumber: "BATCH-001",
+                batch_number: "BATCH-001",
               },
               {
                 name: "Amoxicillin 250mg",
                 quantity: 50,
                 unitPrice: 8.0,
                 total: 400.0,
-                batchNumber: "BATCH-002",
+                batch_number: "BATCH-002",
               },
             ],
             subtotal: 650.0,
@@ -62,14 +62,14 @@ const SupplierOrderHistory = ({ show, onClose }) => {
                 quantity: 75,
                 unitPrice: 3.2,
                 total: 240.0,
-                batchNumber: "BATCH-003",
+                batch_number: "BATCH-003",
               },
               {
                 name: "Cetirizine 10mg",
                 quantity: 200,
                 unitPrice: 1.5,
                 total: 300.0,
-                batchNumber: "BATCH-004",
+                batch_number: "BATCH-004",
               },
             ],
             subtotal: 540.0,
@@ -94,7 +94,7 @@ const SupplierOrderHistory = ({ show, onClose }) => {
                 quantity: 60,
                 unitPrice: 4.5,
                 total: 270.0,
-                batchNumber: "BATCH-005",
+                batch_number: "BATCH-005",
               },
             ],
             subtotal: 270.0,
@@ -321,7 +321,7 @@ const SupplierOrderHistory = ({ show, onClose }) => {
                   <tr>
                     <td>${index + 1}</td>
                     <td>${item.name}</td>
-                    <td>${item.batchNumber}</td>
+                    <td>${item.batch_number}</td>
                     <td>${item.quantity}</td>
                     <td>${item.unitPrice.toFixed(2)}</td>
                     <td>${item.total.toFixed(2)}</td>
