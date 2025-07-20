@@ -16,6 +16,7 @@ class Organization {
     this.max_users = data.max_users || 5;
     this.current_users = data.current_users || 0;
     this.trial_ends_at = data.trial_ends_at;
+    this.access_valid_till = data.access_valid_till;
     this.billing_email = data.billing_email;
     this.tax_id = data.tax_id;
     this.currency = data.currency || "USD";

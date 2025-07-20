@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-hot-toast";
+import { useAuthContext } from "../contexts/AuthContext";
 import {
   searchMedicines,
   clearSearchResults,
@@ -27,16 +28,16 @@ import ReceiptModal from "../components/Counter/ReceiptModal";
 
 const CounterDashboard = () => {
   const dispatch = useDispatch();
+  const { profile } = useAuthContext();
   const { searchResults, isSearching } = useSelector(
     (state) => state.medicines
   );
   const { cart, customerInfo, paymentMethod, isCreating } = useSelector(
     (state) => state.orders
   );
-  const { user } = useSelector((state) => state.auth);
 
   // Check if user is counter staff (hide profit info)
-  const isCounterStaff = user?.role === "counter";
+  const isCounterStaff = profile?.role_in_pos === "counter";
 
   // State management
   const [searchQuery, setSearchQuery] = useState("");

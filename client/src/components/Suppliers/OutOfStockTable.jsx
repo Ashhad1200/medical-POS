@@ -101,13 +101,27 @@ const OutOfStockTable = ({
 
   // Pagination component
   const Pagination = () => {
-    if (!pagination || pagination.totalPages <= 1) return null;
+    if (!pagination || !pagination.totalPages || pagination.totalPages <= 1) return null;
 
-    const { currentPage, totalPages, hasNextPage, hasPrevPage } = pagination;
+    const { 
+      currentPage = 1, 
+      totalPages = 1, 
+      hasNextPage = false, 
+      hasPrevPage = false,
+      limit = 20,
+      total = 0
+    } = pagination;
+    
+    // Ensure all values are numbers and not NaN
+    const safePage = Number(currentPage) || 1;
+    const safeTotal = Number(totalPages) || 1;
+    const safeLimit = Number(limit) || 20;
+    const safeCount = Number(total) || 0;
+    
     const maxVisiblePages = 5;
 
-    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    let startPage = Math.max(1, safePage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(safeTotal, startPage + maxVisiblePages - 1);
 
     if (endPage - startPage + 1 < maxVisiblePages) {
       startPage = Math.max(1, endPage - maxVisiblePages + 1);
@@ -141,16 +155,13 @@ const OutOfStockTable = ({
             <p className="text-sm text-gray-700">
               Showing{" "}
               <span className="font-medium">
-                {(currentPage - 1) * (pagination.limit || 20) + 1}
+                {(safePage - 1) * safeLimit + 1}
               </span>{" "}
               to{" "}
               <span className="font-medium">
-                {Math.min(
-                  currentPage * (pagination.limit || 20),
-                  pagination.total || 0
-                )}
+                {Math.min(safePage * safeLimit, safeCount)}
               </span>{" "}
-              of <span className="font-medium">{pagination.total || 0}</span>{" "}
+              of <span className="font-medium">{safeCount}</span>{" "}
               results
             </p>
           </div>
@@ -195,7 +206,7 @@ const OutOfStockTable = ({
                   key={page}
                   onClick={() => onPageChange(page)}
                   className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                    page === currentPage
+                    page === safePage
                       ? "z-10 bg-blue-50 border-blue-500 text-blue-600"
                       : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
                   }`}
@@ -204,18 +215,18 @@ const OutOfStockTable = ({
                 </button>
               ))}
 
-              {endPage < totalPages && (
+              {endPage < safeTotal && (
                 <>
-                  {endPage < totalPages - 1 && (
+                  {endPage < safeTotal - 1 && (
                     <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
                       ...
                     </span>
                   )}
                   <button
-                    onClick={() => onPageChange(totalPages)}
+                    onClick={() => onPageChange(safeTotal)}
                     className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
                   >
-                    {totalPages}
+                    {safeTotal}
                   </button>
                 </>
               )}
@@ -341,7 +352,7 @@ const OutOfStockTable = ({
                         </span>
                         <span>
                           <span className="font-medium">Trade Price:</span> Rs.
-                          {medicine.cost_price?.toFixed(2) || "0.00"}
+                          {medicine.tradePrice?.toFixed(2) || "0.00"}
                         </span>
                       </div>
                       <div className="mt-2 flex items-center space-x-4">

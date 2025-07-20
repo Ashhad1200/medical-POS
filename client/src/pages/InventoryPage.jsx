@@ -10,7 +10,7 @@ import {
   useInventoryStats,
   getStockStatus,
 } from "../hooks/useInventory";
-import { useAuth } from "../hooks/useAuth";
+import { useAuthContext } from "../contexts/AuthContext";
 import api from "../services/api"; // Assuming API service is set up
 import InventoryTable from "../components/Inventory/InventoryTable";
 import InventoryFilters from "../components/Inventory/InventoryFilters";
@@ -21,7 +21,7 @@ import AddMedicineModal from "../components/Inventory/AddMedicineModal";
 import ImportModal from "../components/Inventory/ImportModal";
 
 const InventoryPage = () => {
-  const { profile } = useAuth();
+  const { profile } = useAuthContext();
   
   // All state hooks must be declared first
   const [inventoryData, setInventoryData] = useState([]);

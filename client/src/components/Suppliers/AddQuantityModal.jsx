@@ -129,7 +129,7 @@ const AddQuantityModal = ({
             <div>
               <span className="font-medium">Trade Price:</span>
               <br />
-              Rs. {medicine.cost_price?.toFixed(2) || "0.00"}
+              Rs. {medicine.tradePrice?.toFixed(2) || "0.00"}
             </div>
             <div>
               <span className="font-medium">Stock Deficit:</span>
@@ -222,7 +222,7 @@ const AddQuantityModal = ({
             {quantity > 0 && (
               <p className="mt-1 text-sm text-gray-600">
                 Total cost: Rs.
-                {(quantity * (medicine.cost_price || 0)).toFixed(2)}
+                {(quantity * (medicine.tradePrice || 0)).toFixed(2)}
               </p>
             )}
           </div>

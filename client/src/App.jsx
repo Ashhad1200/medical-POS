@@ -9,12 +9,13 @@ import { Provider } from "react-redux";
 import { Toaster } from "react-hot-toast";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { store } from "./store/store";
-import { useAuth } from "./hooks/useAuth";
+import { AuthProvider, useAuthContext } from "./contexts/AuthContext";
 import LoadingSpinner from "./components/UI/LoadingSpinner";
 import LoginPage from "./pages/Login";
 import DashboardLayout from "./components/Layout/DashboardLayout";
 
 import Dashboard from "./pages/Dashboard";
+import CounterDashboard from "./pages/CounterDashboard";
 import InventoryPage from "./pages/InventoryPage";
 import MedicinesPage from "./pages/MedicinesPage";
 import OrdersPage from "./pages/OrdersPage";
@@ -131,7 +132,7 @@ const StartupScreen = ({ onContinue }) => {
 
 // Protected Route Component
 const ProtectedRoute = ({ children, requiredRoles = [] }) => {
-  const { profile, isLoading, initialized, isAuthenticated } = useAuth();
+  const { profile, isLoading, initialized, isAuthenticated } = useAuthContext();
 
   console.log("ProtectedRoute render:", {
     profile: !!profile,
@@ -169,9 +170,21 @@ const ProtectedRoute = ({ children, requiredRoles = [] }) => {
   return children;
 };
 
+// Role-based Dashboard Component
+const RoleDashboard = () => {
+  const { profile } = useAuthContext();
+  
+  // Render CounterDashboard for counter staff, regular Dashboard for others
+  if (profile?.role_in_pos === "counter") {
+    return <CounterDashboard />;
+  }
+  
+  return <Dashboard />;
+};
+
 // App Routes Component
 const AppRoutes = () => {
-  const { profile, isLoading, initialized, isAuthenticated } = useAuth();
+  const { profile, isLoading, initialized, isAuthenticated } = useAuthContext();
 
   console.log("AppRoutes render:", {
     profile: !!profile,
@@ -241,7 +254,7 @@ const AppRoutes = () => {
           }
         >
           <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="dashboard" element={<RoleDashboard />} />
           <Route
             path="inventory"
             element={
@@ -342,35 +355,42 @@ function App() {
   return (
     <Provider store={store}>
       <QueryClientProvider client={queryClient}>
-        <Router>
-          <div className="App">
-            <AppRoutes />
-            <Toaster
-              position="top-right"
-              toastOptions={{
-                duration: 4000,
-                style: {
-                  background: "#363636",
-                  color: "#fff",
-                },
-                success: {
-                  duration: 3000,
-                  iconTheme: {
-                    primary: "#4ade80",
-                    secondary: "#fff",
+        <AuthProvider>
+          <Router
+            future={{
+              v7_startTransition: true,
+              v7_relativeSplatPath: true,
+            }}
+          >
+            <div className="App">
+              <AppRoutes />
+              <Toaster
+                position="top-right"
+                toastOptions={{
+                  duration: 4000,
+                  style: {
+                    background: "#363636",
+                    color: "#fff",
                   },
-                },
-                error: {
-                  duration: 5000,
-                  iconTheme: {
-                    primary: "#ef4444",
-                    secondary: "#fff",
+                  success: {
+                    duration: 3000,
+                    iconTheme: {
+                      primary: "#4ade80",
+                      secondary: "#fff",
+                    },
                   },
-                },
-              }}
-            />
-          </div>
-        </Router>
+                  error: {
+                    duration: 5000,
+                    iconTheme: {
+                      primary: "#ef4444",
+                      secondary: "#fff",
+                    },
+                  },
+                }}
+              />
+            </div>
+          </Router>
+        </AuthProvider>
       </QueryClientProvider>
     </Provider>
   );

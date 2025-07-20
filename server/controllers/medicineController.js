@@ -446,12 +446,12 @@ const searchMedicines = async (req, res) => {
     const { data: medicines, error } = await supabase
       .from("medicines")
       .select(
-        "id, name, generic_name, manufacturer, selling_price, quantity, low_stock_threshold"
+        "id, name, generic_name, manufacturer, batch_number, selling_price, cost_price, gst_per_unit, quantity, low_stock_threshold, expiry_date"
       )
       .eq("organization_id", organizationId)
       .eq("is_active", true)
       .or(
-        `name.ilike.%${q}%,generic_name.ilike.%${q}%,manufacturer.ilike.%${q}%`
+        `name.ilike.%${q}%,generic_name.ilike.%${q}%,manufacturer.ilike.%${q}%,batch_number.ilike.%${q}%`
       )
       .order("name")
       .limit(parseInt(limit));
@@ -466,7 +466,7 @@ const searchMedicines = async (req, res) => {
 
     res.json({
       success: true,
-      data: { medicines: lowStockMedicines },
+      data: { medicines: medicines || [] },
     });
   } catch (error) {
     console.error("Search medicines error:", error);

@@ -1,247 +1,288 @@
-import { useEffect, useState, useCallback } from "react";
-import {
-  supabase,
-  getUserProfile,
-  hasPermission,
-  canAccessRole,
-} from "../config/supabase";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { supabase, getUserProfile } from "../config/supabase";
 import { toast } from "react-hot-toast";
+import { useDispatch } from "react-redux";
+import { setUserProfile, clearUserProfile } from "../store/slices/authSlice";
+import { AUTH_CONFIG, ROLE_HIERARCHY } from "../config/constants";
+import { log } from "../utils/logger";
+
+log.auth("Supabase config initialized", {
+  url: import.meta.env.VITE_SUPABASE_URL ? "Set" : "Missing",
+  anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY ? "Set" : "Missing",
+});
 
 export const useAuth = () => {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [initialized, setInitialized] = useState(false); // New state
+  const [initialized, setInitialized] = useState(false);
   const [error, setError] = useState(null);
+  const initializationRef = useRef(false);
+  const dispatch = useDispatch();
 
-  // Fetch user profile from database
-  const fetchUserProfile = useCallback(async (userId) => {
+  const fetchAndSetUserProfile = useCallback(
+    async (supabaseUser) => {
+      if (!supabaseUser) {
+        setProfile(null);
+        setUser(null);
+        return null;
+      }
+      try {
+        // Add timeout to profile fetch to prevent hanging
+        const profilePromise = getUserProfile(supabaseUser.id);
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Profile fetch timeout')), AUTH_CONFIG.PROFILE_FETCH_TIMEOUT)
+        );
+        
+        const profileData = await Promise.race([profilePromise, timeoutPromise]);
+        
+        if (!profileData) {
+          throw new Error('Profile not found');
+        }
+        setProfile(profileData);
+        setUser(supabaseUser);
+        setIsAuthenticated(true);
+        setError(null);
+        dispatch(setUserProfile({ user: supabaseUser, profile: profileData }));
+        return profileData;
+      } catch (error) {
+        log.error('Profile fetch failed:', error);
+        
+        if (error.message === 'Profile fetch timeout') {
+          toast.error('Profile loading timed out. Please try again.');
+        } else {
+          toast.error('Session invalid. Please log in again.');
+        }
+        
+        // Force sign out on failure
+        await supabase.auth.signOut();
+        setError('Failed to fetch user profile. Please log in again.');
+        setIsAuthenticated(false);
+        setUser(null);
+        setProfile(null);
+        dispatch(clearUserProfile());
+        return null;
+      }
+    },
+    [dispatch]
+  );
+
+  const signIn = useCallback(
+    async (email, password) => {
+      try {
+        setIsAuthLoading(true);
+        setError(null);
+        const { data, error: signInError } =
+          await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+        if (signInError) throw signInError;
+        // Don't call fetchAndSetUserProfile here - let onAuthStateChange handle it
+        // This prevents duplicate profile fetches during login
+        toast.success("Successfully signed in!");
+        return data.user;
+      } catch (error) {
+        setError(error.message);
+        setIsAuthenticated(false);
+        setUser(null);
+        setProfile(null);
+        dispatch(clearUserProfile());
+        toast.error(error.message);
+        throw error;
+      } finally {
+        setIsAuthLoading(false);
+      }
+    },
+    [dispatch]
+  );
+
+  const signOut = useCallback(async () => {
     try {
-      const profileData = await getUserProfile(userId);
-      setProfile(profileData);
-      setUser(profileData);
-      setIsAuthenticated(true);
-      setError(null);
-      return profileData;
-    } catch (error) {
-      console.error("Error fetching user profile:", error);
-      setError("Failed to fetch user profile");
-      setIsAuthenticated(false);
+      setIsAuthLoading(true);
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) throw signOutError;
       setUser(null);
       setProfile(null);
-      throw error;
+      setIsAuthenticated(false);
+      setError(null);
+      dispatch(clearUserProfile());
+      toast.success("Successfully signed out!");
+    } catch (error) {
+      setError(error.message);
+      toast.error(error.message);
+    } finally {
+      setIsAuthLoading(false);
     }
-  }, []);
+  }, [dispatch]);
 
-  // Initialize authentication state
   useEffect(() => {
+    if (initializationRef.current) return;
+    initializationRef.current = true;
+    setIsAuthLoading(true);
+    log.auth('Starting initialization...');
+    
     const initializeAuth = async () => {
       try {
-        setIsLoading(true);
-
-        // Get current session
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession();
-
+        log.auth('Getting session...');
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Initialization timeout')), AUTH_CONFIG.INITIALIZATION_TIMEOUT));
+        const { data: { session }, error: sessionError } = await Promise.race([sessionPromise, timeoutPromise]);
+        
         if (sessionError) {
-          console.error("Session error:", sessionError);
-          setError(sessionError.message);
-          return;
+          log.error('Session error:', sessionError);
+          throw sessionError;
         }
-
+        
+        log.auth('Session retrieved:', !!session?.user);
+        
         if (session?.user) {
-          await fetchUserProfile(session.user.id);
+          log.auth('Fetching user profile...');
+          await fetchAndSetUserProfile(session.user);
+          log.auth('Profile fetch completed');
+        } else {
+          log.auth('No session found, setting unauthenticated state');
+          setIsAuthenticated(false);
+          setUser(null);
+          setProfile(null);
+          setError(null);
+          dispatch(clearUserProfile());
         }
       } catch (error) {
-        console.error("Auth initialization error:", error);
-        setError(error.message);
+        log.error('Initialization error:', error);
+        
+        if (error.message === 'Initialization timeout') {
+          log.auth('Initialization timed out, signing out');
+          await supabase.auth.signOut();
+          toast.error('Authentication initialization timed out. Please log in again.');
+        }
+        
+        setError(error.message || 'An unexpected error occurred during initialization.');
+        setIsAuthenticated(false);
+        setUser(null);
+        setProfile(null);
+        dispatch(clearUserProfile());
+        
+        try {
+          await supabase.auth.signOut();
+        } catch (signOutError) {
+          log.error('Sign out error:', signOutError);
+        }
+        
+        if (error.message !== 'Initialization timeout') {
+          toast.error('Initialization failed. Please try logging in.');
+        }
       } finally {
-        setIsLoading(false);
-        setInitialized(true); // Set initialized to true after initial check
+        log.auth('Initialization completed, setting initialized=true');
+        setInitialized(true);
+        setIsAuthLoading(false);
       }
     };
-
-    initializeAuth();
-  }, []); // Remove fetchUserProfile dependency
-
-  // Listen for auth state changes
-  useEffect(() => {
+    // Add absolute safety timeout to prevent infinite loading
+    const safetyTimeout = setTimeout(() => {
+      log.warn('Safety timeout triggered - forcing initialization completion');
+      if (!initializationRef.current) {
+        setInitialized(true);
+        setIsAuthLoading(false);
+      }
+    }, AUTH_CONFIG.SAFETY_TIMEOUT); // Safety timeout from config
+    
+    initializeAuth().finally(() => {
+      clearTimeout(safetyTimeout);
+    });
+    
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state change:", event, session?.user?.id);
-
-      if (event === "SIGNED_IN" && session?.user) {
-        try {
-          setIsLoading(true);
-          await fetchUserProfile(session.user.id);
-          toast.success("Successfully signed in");
-        } catch (error) {
-          console.error("Error during sign in:", error);
-          toast.error("Failed to load user profile");
-          await signOut();
-        } finally {
-          setIsLoading(false);
+      // Skip auth state changes during initialization to prevent conflicts
+      if (!initialized) {
+        log.auth('Skipping auth state change during initialization:', event);
+        return;
+      }
+      
+      log.auth('Auth state change:', event, !!session?.user);
+      setIsAuthLoading(true);
+      try {
+        if (event === "SIGNED_IN" && session?.user) {
+          log.auth('Processing SIGNED_IN event');
+          await fetchAndSetUserProfile(session.user);
+        } else if (event === "SIGNED_OUT") {
+          log.auth('Processing SIGNED_OUT event');
+          setUser(null);
+          setProfile(null);
+          setIsAuthenticated(false);
+          setError(null);
+          dispatch(clearUserProfile());
+        } else if (session?.user) {
+          log.auth('Processing session with user');
+          await fetchAndSetUserProfile(session.user);
+        } else {
+          log.auth('Processing session without user');
+          setUser(null);
+          setProfile(null);
+          setIsAuthenticated(false);
+          dispatch(clearUserProfile());
         }
-      } else if (event === "SIGNED_OUT") {
-        setUser(null);
-        setProfile(null);
-        setIsAuthenticated(false);
-        setError(null);
-        toast.success("Successfully signed out");
-      } else if (event === "TOKEN_REFRESHED") {
-        console.log("Token refreshed");
-      } else if (event === "USER_UPDATED") {
-        console.log("User updated");
-        if (session?.user) {
-          try {
-            await fetchUserProfile(session.user.id);
-          } catch (error) {
-            console.error("Error updating user profile:", error);
-          }
-        }
+      } catch (err) {
+        log.error('Auth state change error:', err);
+        setError(err.message || "An error occurred during auth state change.");
+      } finally {
+        setIsAuthLoading(false);
       }
     });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []); // Remove fetchUserProfile dependency
-
-  // Sign in function
-  const signIn = useCallback(async (email, password) => {
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        setError(error.message);
-        toast.error(error.message);
-        throw error;
-      }
-
-      // Profile will be fetched by the auth state change listener
-      return data;
-    } catch (error) {
-      console.error("Sign in error:", error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
+    return () => subscription.unsubscribe();
   }, []);
 
-  // Sign out function
-  const signOut = useCallback(async () => {
+  const refreshProfile = useCallback(async () => {
+    if (!isAuthenticated || !user) return;
     try {
-      setIsLoading(true);
-      const { error } = await supabase.auth.signOut();
-
-      if (error) {
-        console.error("Sign out error:", error);
-        toast.error("Error signing out");
-        throw error;
-      }
-
-      // State will be cleared by the auth state change listener
+      await fetchAndSetUserProfile(user);
+      toast.success("Profile refreshed!");
     } catch (error) {
-      console.error("Sign out error:", error);
-      throw error;
-    } finally {
-      setIsLoading(false);
+      toast.error("Failed to refresh profile.");
     }
+  }, [isAuthenticated, user, fetchAndSetUserProfile]);
+
+  // Permission helpers
+  const hasPermission = useCallback((profileData, permission) => {
+    return profileData?.permissions?.includes(permission);
   }, []);
-
-  // Check if user has specific permission
-  const hasUserPermission = useCallback(
-    (permission) => {
-      return hasPermission(profile, permission);
-    },
-    [profile]
-  );
-
-  // Check if user can access specific role
-  const canUserAccessRole = useCallback(
-    (requiredRole) => {
-      return canAccessRole(profile?.role_in_pos, requiredRole);
-    },
-    [profile]
-  );
-
-  // Get user role level
+  const canAccessRole = useCallback((userRole, requiredRole) => {
+    return ROLE_HIERARCHY[userRole] >= ROLE_HIERARCHY[requiredRole];
+  }, []);
   const getUserRoleLevel = useCallback(() => {
-    const roleHierarchy = {
-      admin: 4,
-      manager: 3,
-      counter: 2,
-      warehouse: 1,
-    };
-
-    return roleHierarchy[profile?.role_in_pos] || 0;
+    return ROLE_HIERARCHY[profile?.role_in_pos] || 0;
   }, [profile]);
 
-  // Refresh user profile
-  const refreshProfile = useCallback(async () => {
-    if (!isAuthenticated) return;
-
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session?.user) {
-        await fetchUserProfile(session.user.id);
-      }
-    } catch (error) {
-      console.error("Error refreshing profile:", error);
-    }
-  }, [isAuthenticated, fetchUserProfile]);
-
   return {
-    // State
     user,
     profile,
-    isLoading,
+    isLoading: isAuthLoading,
     isAuthenticated,
-    initialized, // Expose initialized state
+    initialized,
     error,
-
-    // Actions
     signIn,
     signOut,
     refreshProfile,
-
-    // Permissions
-    hasPermission: hasUserPermission,
-    canAccessRole: canUserAccessRole,
-    getUserRoleLevel,
-
-    // User info
     userId: profile?.id,
     username: profile?.username,
     email: profile?.email,
     fullName: profile?.full_name,
-    role: profile?.role,
+    role: profile?.role_in_pos,
     roleInPos: profile?.role_in_pos,
     organizationId: profile?.organization_id,
     permissions: profile?.permissions || [],
-    isAdmin: profile?.role === "admin",
-    isManager: profile?.role === "manager",
+    isAdmin: profile?.role_in_pos === "admin",
+    isManager: profile?.role_in_pos === "manager",
     isCounter: profile?.role_in_pos === "counter",
     isWarehouse: profile?.role_in_pos === "warehouse",
-
-    // Organization info
     organization: profile?.organization,
-
-    // Preferences
     theme: profile?.theme || "light",
     language: profile?.language || "en",
     timezone: profile?.timezone || "UTC",
+    hasPermission,
+    canAccessRole,
+    getUserRoleLevel,
   };
 };

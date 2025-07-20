@@ -1,12 +1,12 @@
 import React, { useState } from "react";
-import { useSelector } from "react-redux";
+import { useAuthContext } from "../../contexts/AuthContext";
 
 const DailySummary = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const { profile } = useAuthContext();
 
   // Get user role to hide profit from counter staff
-  const { user } = useSelector((state) => state.auth);
-  const isCounterStaff = user?.role === "counter";
+  const isCounterStaff = profile?.role_in_pos === "counter";
 
   // Mock data - in real app, this would come from API
   const todayStats = {

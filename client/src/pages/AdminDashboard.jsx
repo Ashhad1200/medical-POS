@@ -132,9 +132,10 @@ const AdminDashboard = () => {
   }, [autoRefresh, refetch]);
 
   const dashboardStats = statsQuery.data?.data;
-  const recentActivities = activitiesQuery.data?.data.activities;
-  const recentOrders = dashboardOrderData?.data.recentOrders;
-  const lowStockCount = dashboardStats?.lowStockMedicines?.length || 0;
+  const recentActivities = activitiesQuery.data?.data?.activities || [];
+  // Use recent activities for orders since recentOrders might not be available
+  const recentOrders = recentActivities.filter(activity => activity.type === 'order').slice(0, 5) || [];
+  const lowStockCount = dashboardStats?.lowStockItems || 0;
 
   const systemAlerts = [];
   if (lowStockCount > 0) {
@@ -366,37 +367,35 @@ const AdminDashboard = () => {
             <div className="p-6">
               {recentOrders?.length > 0 ? (
                 <div className="space-y-4">
-                  {recentOrders
-                    .slice(0, 5)
-                    .map((order, index) => (
+                  {recentOrders.map((activity, index) => (
                       <div
-                        key={index}
+                        key={activity.id || index}
                         className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                       >
                         <div>
                           <p className="text-sm font-medium text-gray-900">
-                            Order #{order.orderNumber}
+                            {activity.description.split(' - ')[0]}
                           </p>
                           <p className="text-xs text-gray-500">
-                            {order.customerName} •{" "}
+                            {activity.details?.customer || 'Walk-in Customer'} •{" "}
                             {format(
-                              new Date(order.createdAt),
+                              new Date(activity.timestamp),
                               "MMM dd, hh:mm a"
                             )}
                           </p>
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-semibold text-green-600">
-                            Rs.{order.total?.toFixed(2)}
+                            Rs.{activity.details?.amount?.toFixed(2) || '0.00'}
                           </p>
                           <span
                             className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                              order.status === "completed"
+                              activity.details?.status === "completed"
                                 ? "bg-green-100 text-green-800"
                                 : "bg-yellow-100 text-yellow-800"
                             }`}
                           >
-                            {order.status}
+                            {activity.details?.status || 'pending'}
                           </span>
                         </div>
                       </div>
@@ -508,19 +507,19 @@ const AdminDashboard = () => {
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Revenue</span>
                 <span className="font-semibold">
-                  Rs.{dashboardStats?.monthSales?.totalRevenue?.toFixed(2)}
+                  Rs.{dashboardStats?.monthlyStats?.totalSales?.toFixed(2) || '0.00'}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Orders</span>
                 <span className="font-semibold">
-                  {dashboardStats?.monthSales?.totalOrders}
+                  {dashboardStats?.monthlyStats?.totalOrders || 0}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Avg Order Value</span>
                 <span className="font-semibold">
-                  Rs.{dashboardStats?.avgOrderValue?.toFixed(2)}
+                  Rs.{dashboardStats?.monthlyStats?.averageOrderValue?.toFixed(2) || '0.00'}
                 </span>
               </div>
             </div>

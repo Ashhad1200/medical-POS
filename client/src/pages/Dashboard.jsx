@@ -1,8 +1,8 @@
 import React from "react";
-import { useAuth } from "../hooks/useAuth";
+import { useAuthContext } from "../contexts/AuthContext";
 
 const Dashboard = () => {
-  const { profile } = useAuth();
+  const { profile } = useAuthContext();
 
   const getDashboardContent = () => {
     switch (profile?.role_in_pos) {

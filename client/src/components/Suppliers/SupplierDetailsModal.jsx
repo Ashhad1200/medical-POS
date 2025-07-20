@@ -41,7 +41,7 @@ const SupplierDetailsModal = ({
 
   if (!show || !supplier) return null;
 
-  const orders = ordersData?.data?.orders || [];
+  const orders = ordersData?.purchaseOrders || [];
 
   const handleInputChange = (field, value) => {
     setEditData((prev) => ({

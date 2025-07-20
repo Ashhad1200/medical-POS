@@ -18,26 +18,30 @@ const POSModal = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-60 transition-opacity duration-300 ease-in-out"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gradient-to-br from-black/60 via-gray-900/70 to-black/60 backdrop-blur-sm transition-opacity duration-300 ease-in-out"
       onClick={onClose} // Close on backdrop click
       aria-modal="true"
       role="dialog"
     >
       <div
-        className="bg-white rounded-lg shadow-xl max-w-md w-full m-auto transform transition-all duration-300 ease-in-out scale-95 opacity-0 animate-modal-scale-in"
+        className="bg-white/10 backdrop-blur-md border border-white/20 rounded-lg shadow-xl max-w-md w-full m-auto transform transition-all duration-300 ease-in-out scale-95 opacity-0 animate-modal-scale-in"
         onClick={(e) => e.stopPropagation()} // Prevent close when clicking inside modal content
+        style={{
+          background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
+          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)'
+        }}
       >
         <div className="p-6">
           {title && (
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 leading-6">
+            <h3 className="text-lg font-semibold text-white mb-4 leading-6">
               {title}
             </h3>
           )}
-          <div className="text-sm text-gray-600">{children}</div>
+          <div className="text-sm text-gray-300">{children}</div>
         </div>
 
         {(showConfirm || showCancel) && (
-          <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse rounded-b-lg">
+          <div className="bg-white/5 backdrop-blur-sm px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse rounded-b-lg border-t border-white/10">
             {showConfirm && (
               <POSButton
                 onClick={onConfirm}

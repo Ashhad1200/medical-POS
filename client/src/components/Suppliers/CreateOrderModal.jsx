@@ -74,7 +74,7 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
           name: medicine.name,
           manufacturer: medicine.manufacturer,
           quantity: 1,
-          tradePrice: medicine.cost_price || 0,
+          tradePrice: medicine.tradePrice || 0,
           notes: "",
         },
       ]);
@@ -129,21 +129,31 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-screen overflow-y-auto">
+    <div className="fixed inset-0 bg-gradient-to-br from-black/60 via-gray-900/70 to-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-lg shadow-xl w-full max-w-6xl max-h-screen overflow-y-auto" style={{
+        background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
+        boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)'
+      }}>
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">
-              Create Purchase Order
-            </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              Supplier: <span className="font-medium">{supplier.name}</span>
-            </p>
+        <div className="flex items-center justify-between p-6 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-br from-blue-500/20 to-purple-600/20 border border-blue-400/30 rounded-lg backdrop-blur-sm">
+              <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+                Create Purchase Order
+              </h2>
+              <p className="text-sm text-gray-400 mt-1">
+                Supplier: <span className="font-medium text-blue-300">{supplier.name}</span>
+              </p>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-gray-400 hover:text-white transition-colors p-2 rounded-lg hover:bg-white/10"
           >
             <svg
               className="w-6 h-6"
@@ -166,7 +176,7 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
             {/* Available Medicines */}
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-900">
+                <h3 className="text-lg font-medium text-white">
                   Available Medicines
                 </h3>
                 <div className="relative">
@@ -175,7 +185,7 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
                     placeholder="Search medicines..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-64 pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    className="w-64 pl-10 pr-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-200 text-sm"
                   />
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <svg
@@ -204,31 +214,31 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
                   filteredMedicines.map((medicine) => (
                     <div
                       key={medicine.id}
-                      className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                      className="bg-white/5 border border-white/10 rounded-lg p-4 hover:bg-white/10 transition-colors backdrop-blur-sm"
                     >
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
-                          <h4 className="font-medium text-gray-900">
+                          <h4 className="font-medium text-white">
                             {medicine.name}
                           </h4>
-                          <p className="text-sm text-gray-600">
+                          <p className="text-sm text-gray-300">
                             {medicine.manufacturer}
                           </p>
                           <div className="flex items-center space-x-4 mt-2">
-                            <span className="text-sm text-gray-500">
+                            <span className="text-sm text-gray-400">
                               Batch: {medicine.batch_number}
                             </span>
-                            <span className="text-sm font-medium text-green-600">
-                              Rs. {medicine.cost_price?.toFixed(2) || "0.00"}
+                            <span className="text-sm font-medium text-green-400">
+                              Rs. {medicine.tradePrice?.toFixed(2) || "0.00"}
                             </span>
-                            <span className="text-sm text-gray-500">
+                            <span className="text-sm text-gray-400">
                               Stock: {medicine.quantity}
                             </span>
                           </div>
                         </div>
                         <button
                           onClick={() => addMedicineToOrder(medicine)}
-                          className="ml-4 bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors"
+                          className="ml-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white p-2 rounded-full hover:from-blue-600 hover:to-purple-700 transition-all duration-200"
                         >
                           <svg
                             className="w-4 h-4"
@@ -249,7 +259,7 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
                   ))
                 ) : (
                   <div className="text-center py-8">
-                    <p className="text-gray-500">No medicines found</p>
+                    <p className="text-gray-400">No medicines found</p>
                   </div>
                 )}
               </div>
@@ -257,7 +267,7 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
 
             {/* Order Items */}
             <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
+              <h3 className="text-lg font-medium text-white mb-4">
                 Order Items ({currentOrder.length})
               </h3>
 
@@ -266,20 +276,20 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
                   currentOrder.map((item) => (
                     <div
                       key={item.medicineId}
-                      className="border rounded-lg p-4"
+                      className="bg-white/5 border border-white/10 rounded-lg p-4 backdrop-blur-sm"
                     >
                       <div className="flex justify-between items-start mb-3">
                         <div>
-                          <h4 className="font-medium text-gray-900">
+                          <h4 className="font-medium text-white">
                             {item.name}
                           </h4>
-                          <p className="text-sm text-gray-600">
+                          <p className="text-sm text-gray-300">
                             {item.manufacturer}
                           </p>
                         </div>
                         <button
                           onClick={() => removeFromOrder(item.medicineId)}
-                          className="text-red-600 hover:text-red-800 transition-colors"
+                          className="text-red-400 hover:text-red-300 transition-colors p-1 rounded hover:bg-red-500/10"
                         >
                           <svg
                             className="w-4 h-4"
@@ -299,7 +309,7 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
 
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                          <label className="block text-xs font-medium text-gray-300 mb-1">
                             Quantity
                           </label>
                           <input
@@ -313,12 +323,12 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
                                 parseInt(e.target.value) || 1
                               )
                             }
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            className="w-full px-2 py-1 bg-white/10 border border-white/20 rounded text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-200"
                           />
                         </div>
 
                         <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                          <label className="block text-xs font-medium text-gray-300 mb-1">
                             Trade Price
                           </label>
                           <input
@@ -332,13 +342,13 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
                                 parseFloat(e.target.value) || 0
                               )
                             }
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            className="w-full px-2 py-1 bg-white/10 border border-white/20 rounded text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-200"
                           />
                         </div>
                       </div>
 
                       <div className="mt-3">
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                        <label className="block text-xs font-medium text-gray-300 mb-1">
                           Notes
                         </label>
                         <input
@@ -351,13 +361,13 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
                               e.target.value
                             )
                           }
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="w-full px-2 py-1 bg-white/10 border border-white/20 rounded text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-200"
                           placeholder="Optional notes"
                         />
                       </div>
 
                       <div className="mt-3 text-right">
-                        <span className="font-semibold text-gray-900">
+                        <span className="font-semibold text-white">
                           Subtotal: Rs.
                           {(item.quantity * item.tradePrice).toFixed(2)}
                         </span>
@@ -365,7 +375,7 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
                     </div>
                   ))
                 ) : (
-                  <div className="text-center py-8 text-gray-500">
+                  <div className="text-center py-8 text-gray-400">
                     <p>No items added to order</p>
                   </div>
                 )}
@@ -374,7 +384,7 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
               {/* Order Details */}
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
                     Expected Delivery Date
                   </label>
                   <input
@@ -386,12 +396,12 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
                         expectedDate: e.target.value,
                       })
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-200 backdrop-blur-sm"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
                     Order Notes
                   </label>
                   <textarea
@@ -400,18 +410,18 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
                       setOrderData({ ...orderData, notes: e.target.value })
                     }
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-200 backdrop-blur-sm"
                     placeholder="Additional notes for this order"
                   />
                 </div>
 
                 {/* Order Total */}
-                <div className="border-t pt-4">
+                <div className="border-t border-white/10 pt-4">
                   <div className="flex justify-between items-center mb-4">
-                    <span className="text-lg font-semibold text-gray-900">
+                    <span className="text-lg font-semibold text-white">
                       Total Amount:
                     </span>
-                    <span className="text-xl font-bold text-blue-600">
+                    <span className="text-xl font-bold text-blue-400">
                       Rs. {calculateOrderTotal().toFixed(2)}
                     </span>
                   </div>
@@ -419,7 +429,7 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
                   <div className="flex space-x-3">
                     <button
                       onClick={onClose}
-                      className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="flex-1 px-4 py-2 text-sm font-medium text-gray-300 bg-white/10 border border-white/20 rounded-lg hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-blue-400/50 transition-all duration-200 backdrop-blur-sm"
                     >
                       Cancel
                     </button>
@@ -429,7 +439,7 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
                         currentOrder.length === 0 ||
                         createOrderMutation.isLoading
                       }
-                      className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex-1 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-purple-600 border border-transparent rounded-lg hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-400/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg"
                     >
                       {createOrderMutation.isLoading ? (
                         <div className="flex items-center justify-center">

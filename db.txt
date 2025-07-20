@@ -31,9 +31,9 @@ CREATE TABLE public.audit_logs (
   metadata jsonb DEFAULT '{}'::jsonb,
   timestamp timestamp with time zone DEFAULT now(),
   CONSTRAINT audit_logs_pkey PRIMARY KEY (id),
-  CONSTRAINT audit_logs_target_user_id_fkey FOREIGN KEY (target_user_id) REFERENCES public.users(id),
+  CONSTRAINT audit_logs_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
   CONSTRAINT audit_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
-  CONSTRAINT audit_logs_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
+  CONSTRAINT audit_logs_target_user_id_fkey FOREIGN KEY (target_user_id) REFERENCES public.users(id)
 );
 CREATE TABLE public.customers (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -57,8 +57,8 @@ CREATE TABLE public.customers (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT customers_pkey PRIMARY KEY (id),
-  CONSTRAINT customers_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
-  CONSTRAINT customers_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id)
+  CONSTRAINT customers_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id),
+  CONSTRAINT customers_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
 );
 CREATE TABLE public.inventory_transactions (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -74,9 +74,9 @@ CREATE TABLE public.inventory_transactions (
   created_by uuid,
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT inventory_transactions_pkey PRIMARY KEY (id),
-  CONSTRAINT inventory_transactions_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
+  CONSTRAINT inventory_transactions_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id),
   CONSTRAINT inventory_transactions_medicine_id_fkey FOREIGN KEY (medicine_id) REFERENCES public.medicines(id),
-  CONSTRAINT inventory_transactions_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id)
+  CONSTRAINT inventory_transactions_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
 );
 CREATE TABLE public.medicines (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -106,9 +106,9 @@ CREATE TABLE public.medicines (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT medicines_pkey PRIMARY KEY (id),
+  CONSTRAINT medicines_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES public.suppliers(id),
   CONSTRAINT medicines_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
-  CONSTRAINT medicines_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id),
-  CONSTRAINT medicines_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES public.suppliers(id)
+  CONSTRAINT medicines_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id)
 );
 CREATE TABLE public.order_items (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -150,8 +150,40 @@ CREATE TABLE public.orders (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT orders_pkey PRIMARY KEY (id),
-  CONSTRAINT orders_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
-  CONSTRAINT orders_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
+  CONSTRAINT orders_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
+  CONSTRAINT orders_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.organization_ledger (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  organization_id uuid NOT NULL,
+  transaction_type character varying NOT NULL,
+  description text NOT NULL,
+  reference_number character varying,
+  amount numeric NOT NULL,
+  debit_amount numeric NOT NULL DEFAULT 0,
+  credit_amount numeric NOT NULL DEFAULT 0,
+  running_balance numeric NOT NULL,
+  category character varying NOT NULL,
+  sub_category character varying,
+  payment_method character varying,
+  order_id uuid,
+  supplier_id uuid,
+  customer_id uuid,
+  user_id uuid,
+  is_verified boolean NOT NULL DEFAULT false,
+  verified_by uuid,
+  verified_at timestamp with time zone,
+  metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+  transaction_date timestamp with time zone NOT NULL DEFAULT now(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT organization_ledger_pkey PRIMARY KEY (id),
+  CONSTRAINT organization_ledger_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT organization_ledger_verified_by_fkey FOREIGN KEY (verified_by) REFERENCES public.users(id),
+  CONSTRAINT organization_ledger_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id),
+  CONSTRAINT organization_ledger_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES public.suppliers(id),
+  CONSTRAINT organization_ledger_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id),
+  CONSTRAINT organization_ledger_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
 );
 CREATE TABLE public.organizations (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -174,6 +206,7 @@ CREATE TABLE public.organizations (
   timezone character varying DEFAULT 'UTC'::character varying,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
+  access_valid_till timestamp with time zone,
   CONSTRAINT organizations_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.purchase_order_items (
@@ -390,8 +423,8 @@ CREATE TABLE public.users (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT users_pkey PRIMARY KEY (id),
-  CONSTRAINT users_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
-  CONSTRAINT users_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public.users(id),
   CONSTRAINT users_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id),
-  CONSTRAINT users_deactivated_by_fkey FOREIGN KEY (deactivated_by) REFERENCES public.users(id)
+  CONSTRAINT users_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
+  CONSTRAINT users_deactivated_by_fkey FOREIGN KEY (deactivated_by) REFERENCES public.users(id),
+  CONSTRAINT users_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public.users(id)
 );

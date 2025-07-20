@@ -39,7 +39,7 @@ router.get("/stats", async (req, res) => {
         .eq("is_active", true),
     ]);
 
-    // Get today's orders
+    // Get today's orders with revenue calculation
     const today = new Date();
     const startOfDay = new Date(
       today.getFullYear(),
@@ -56,13 +56,46 @@ router.get("/stats", async (req, res) => {
       999
     ).toISOString();
 
-    const { count: todayOrders } = await supabase
+    // Get today's completed orders with amounts
+    const { data: todayOrdersData, count: todayOrders } = await supabase
       .from("orders")
-      .select("*", { count: "exact", head: true })
+      .select("total_amount, discount_amount, tax_amount")
       .eq("organization_id", organizationId)
       .gte("created_at", startOfDay)
       .lte("created_at", endOfDay)
       .eq("status", "completed");
+
+    // Calculate today's revenue
+    const todayRevenue = todayOrdersData?.reduce((sum, order) => {
+      return sum + (parseFloat(order.total_amount) || 0);
+    }, 0) || 0;
+
+    // Get this month's data for comparison
+    const startOfMonth = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      1
+    ).toISOString();
+    
+    const { data: monthlyOrdersData, count: monthlyOrders } = await supabase
+      .from("orders")
+      .select("total_amount, discount_amount, tax_amount")
+      .eq("organization_id", organizationId)
+      .gte("created_at", startOfMonth)
+      .eq("status", "completed");
+
+    const monthlySales = monthlyOrdersData?.reduce((sum, order) => {
+      return sum + (parseFloat(order.total_amount) || 0);
+    }, 0) || 0;
+
+    const averageOrderValue = monthlyOrders > 0 ? monthlySales / monthlyOrders : 0;
+
+    // Get pending orders count
+    const { count: pendingOrdersCount } = await supabase
+      .from("orders")
+      .select("*", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .eq("status", "pending");
 
     // Get low stock medicines
     const { count: lowStockMedicines } = await supabase
@@ -72,30 +105,74 @@ router.get("/stats", async (req, res) => {
       .eq("is_active", true)
       .lt("quantity", 10);
 
+    // Get users by role
+    const { data: usersData } = await supabase
+      .from("users")
+      .select("role_in_pos")
+      .eq("organization_id", organizationId)
+      .eq("is_active", true);
+
+    const usersByRole = usersData?.reduce((acc, user) => {
+      const role = user.role_in_pos || 'user';
+      acc[role] = (acc[role] || 0) + 1;
+      return acc;
+    }, { admin: 0, manager: 0, user: 0 }) || { admin: 0, manager: 0, user: 0 };
+
+    // Calculate growth rate (comparing this month to last month)
+    const lastMonthStart = new Date(
+      today.getFullYear(),
+      today.getMonth() - 1,
+      1
+    ).toISOString();
+    const lastMonthEnd = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      0,
+      23,
+      59,
+      59,
+      999
+    ).toISOString();
+
+    const { data: lastMonthOrdersData } = await supabase
+      .from("orders")
+      .select("total_amount")
+      .eq("organization_id", organizationId)
+      .gte("created_at", lastMonthStart)
+      .lte("created_at", lastMonthEnd)
+      .eq("status", "completed");
+
+    const lastMonthSales = lastMonthOrdersData?.reduce((sum, order) => {
+      return sum + (parseFloat(order.total_amount) || 0);
+    }, 0) || 0;
+
+    const growthRate = lastMonthSales > 0 
+      ? ((monthlySales - lastMonthSales) / lastMonthSales * 100)
+      : monthlySales > 0 ? 100 : 0;
+
+    // Estimate profit (assuming 20% margin - this should be calculated from actual cost data)
+    const estimatedProfit = todayRevenue * 0.2;
+
     const stats = {
       totalUsers: totalUsers || 0,
       totalOrders: totalOrders || 0,
       totalMedicines: totalMedicines || 0,
       totalSuppliers: totalSuppliers || 0,
       todayOrders: todayOrders || 0,
-      todayRevenue: 0, // TODO: Calculate from orders
-      todayProfit: 0, // TODO: Calculate from orders
+      todayRevenue: parseFloat(todayRevenue.toFixed(2)),
+      todayProfit: parseFloat(estimatedProfit.toFixed(2)),
       lowStockItems: lowStockMedicines || 0,
-      pendingOrders: 0, // TODO: Calculate from purchase orders
+      pendingOrders: pendingOrdersCount || 0,
       monthlyStats: {
-        totalSales: 0,
-        totalOrders: 0,
-        averageOrderValue: 0,
-        growthRate: 0,
+        totalSales: parseFloat(monthlySales.toFixed(2)),
+        totalOrders: monthlyOrders || 0,
+        averageOrderValue: parseFloat(averageOrderValue.toFixed(2)),
+        growthRate: parseFloat(growthRate.toFixed(2)),
       },
-      usersByRole: {
-        admin: 0,
-        manager: 0,
-        user: 0,
-      },
+      usersByRole,
       systemStatus: {
         status: "healthy",
-        uptime: process.uptime(),
+        uptime: Math.floor(process.uptime()),
         database: "Supabase PostgreSQL",
         lastUpdate: new Date().toISOString(),
       },

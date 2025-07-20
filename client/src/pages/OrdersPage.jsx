@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import api from "../services/api";
-import { useAuth } from "../hooks/useAuth";
+import { useAuthContext } from "../contexts/AuthContext";
 import OrderTable from "../components/Counter/OrderTable";
 
 const OrdersPage = () => {
-  const { profile } = useAuth();
+  const { profile } = useAuthContext();
   const [ordersData, setOrdersData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

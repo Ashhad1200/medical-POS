@@ -1,9 +1,10 @@
 import axios from "axios";
 import { supabase } from "../config/supabase";
+import { API_CONFIG } from "../config/constants";
+import { log } from "../utils/logger";
 
 // Use the environment variable if available, otherwise use the proxy path in dev mode
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:3001/api";
+const API_BASE_URL = API_CONFIG.BASE_URL;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -11,6 +12,7 @@ const api = axios.create({
     "Content-Type": "application/json",
   },
   withCredentials: true,
+  timeout: API_CONFIG.TIMEOUT,
 });
 
 // Request interceptor to add auth token
@@ -37,7 +39,7 @@ api.interceptors.response.use(
       typeof error.response.data === "string" &&
       error.response.data.includes("<!DOCTYPE")
     ) {
-      console.error(
+      log.error(
         "Server returned HTML instead of JSON. Check API URL and server status."
       );
       error.message =
@@ -50,7 +52,7 @@ api.interceptors.response.use(
     }
 
     // Log detailed error for debugging
-    console.error("API Error:", {
+    log.api("API Error:", {
       url: error.config?.url,
       method: error.config?.method,
       status: error.response?.status,

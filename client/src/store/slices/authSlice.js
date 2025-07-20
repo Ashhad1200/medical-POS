@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../services/api";
+import { supabase } from "../../config/supabase";
 
 // Async thunks
 export const loginUser = createAsyncThunk(

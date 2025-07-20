@@ -6,7 +6,8 @@ import {
   supplierServices,
   purchaseOrderServices,
 } from "../services/api";
-import { useAuth } from "../hooks/useAuth";
+import { useAuthContext } from "../contexts/AuthContext";
+import { useCreatePurchaseOrder } from "../hooks/usePurchaseOrders";
 import api from "../services/api";
 
 // Import components
@@ -17,10 +18,11 @@ import SelectSupplierModal from "../components/Suppliers/SelectSupplierModal";
 import OrderReceiptModal from "../components/Suppliers/OrderReceiptModal";
 import SupplierOrderHistory from "../components/Suppliers/SupplierOrderHistory";
 import AddSupplierModal from "../components/Suppliers/AddSupplierModal";
+import OrderQueueModal from "../components/Suppliers/OrderQueueModal";
 import { useCreateSupplier } from "../hooks/useSuppliers";
 
 const SuppliersPage = () => {
-  const { profile } = useAuth();
+  const { profile } = useAuthContext();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -29,6 +31,7 @@ const SuppliersPage = () => {
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [showOrderHistory, setShowOrderHistory] = useState(false);
+  const [showOrderQueue, setShowOrderQueue] = useState(false);
   const [selectedMedicine, setSelectedMedicine] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("name");
@@ -44,6 +47,7 @@ const SuppliersPage = () => {
     expectedDate: "",
     notes: "",
   });
+  const [receiptData, setReceiptData] = useState(null);
 
   const [showAddSupplierModal, setShowAddSupplierModal] = useState(false);
   const [newSupplier, setNewSupplier] = useState({
@@ -117,19 +121,7 @@ const SuppliersPage = () => {
   });
 
   // Create purchase order mutation
-  const createOrderMutation = useMutation({
-    mutationFn: (orderData) => purchaseOrderServices.create(orderData),
-    onSuccess: (response) => {
-      queryClient.invalidateQueries({ queryKey: ["medicines"] });
-      queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
-      toast.success("Purchase order created successfully!");
-    },
-    onError: (error) => {
-      const message = error.response?.data?.message || "Failed to create order";
-      toast.error(message);
-      console.error("Purchase order creation error:", error);
-    },
-  });
+  const createPurchaseOrderMutation = useCreatePurchaseOrder();
 
   // Extract data
   const medicines = medicinesData?.data?.medicines || [];
@@ -169,7 +161,7 @@ const SuppliersPage = () => {
         manufacturer: selectedMedicine.manufacturer,
         batchNumber: batchNumber || selectedMedicine.batch_number,
         quantity: quantity,
-        tradePrice: selectedMedicine.cost_price || 0,
+        tradePrice: selectedMedicine.tradePrice || 0,
         notes: notes,
         expiryDate: expiryDate,
       };
@@ -192,29 +184,57 @@ const SuppliersPage = () => {
   };
 
   const finalizePurchaseOrder = async (supplier) => {
+    if (!supplier || orderCart.length === 0) {
+      toast.error("Please select a supplier and add items to your order.");
+      return;
+    }
+
     try {
+      // Calculate totals
+      const subtotal = calculateOrderTotal();
+      const taxRate = 0.18; // 18% GST
+      const taxAmount = subtotal * taxRate;
+      const totalAmount = subtotal + taxAmount;
+
       const orderPayload = {
         supplierId: supplier.id,
         items: orderCart.map((item) => ({
           medicineId: item.medicineId,
           quantity: item.quantity,
-          tradePrice: item.cost_price,
-          notes: item.notes,
+          unitPrice: item.tradePrice,
+          notes: item.notes || "",
           expiryDate: item.expiryDate,
           batchNumber: item.batchNumber,
         })),
-        expectedDate: orderData.expectedDate,
-        notes: orderData.notes,
+        subtotal: subtotal,
+        taxAmount: taxAmount,
+        totalAmount: totalAmount,
+        notes: orderData.notes || `Stock replenishment order - ${orderCart.length} items`,
+        expectedDeliveryDate: orderData.expectedDate || new Date(
+          Date.now() + 7 * 24 * 60 * 60 * 1000
+        ).toISOString(),
+        status: "pending"
       };
 
-      const response = await createOrderMutation.mutateAsync(orderPayload);
-      setOrderCart([]);
-      setOrderData({ expectedDate: "", notes: "" });
-      setShowSupplierModal(false);
+      const response = await createPurchaseOrderMutation.mutateAsync(orderPayload);
+      
+      // Show receipt modal with the created order
+      setReceiptData({
+        orderId: response.data.orderNumber,
+        supplier: selectedSupplier,
+        items: orderCart,
+        total: totalAmount,
+        orderData: response.data
+      });
       setShowReceiptModal(true);
-      setSelectedSupplier(supplier);
+      
+      // Clear the cart after successful order creation
+      setOrderCart([]);
+      setSelectedSupplier(null);
+      setShowSupplierModal(false);
     } catch (error) {
       console.error("Error creating purchase order:", error);
+      toast.error("Failed to create purchase order. Please try again.");
     }
   };
 
@@ -225,41 +245,12 @@ const SuppliersPage = () => {
 
   const calculateOrderTotal = () => {
     return orderCart.reduce(
-      (total, item) => total + item.cost_price * item.quantity,
+      (total, item) => total + item.tradePrice * item.quantity,
       0
     );
   };
 
-  const handleCreateOrder = async () => {
-    if (!selectedSupplier) {
-      toast.error("Please select a supplier");
-      return;
-    }
 
-    try {
-      const orderPayload = {
-        supplierId: selectedSupplier.id,
-        items: orderCart.map((item) => ({
-          medicineId: item.medicineId,
-          quantity: item.quantity,
-          tradePrice: item.cost_price,
-          notes: item.notes,
-          expiryDate: item.expiryDate,
-          batchNumber: item.batchNumber,
-        })),
-        expectedDate: orderData.expectedDate,
-        notes: orderData.notes,
-      };
-
-      const response = await createOrderMutation.mutateAsync(orderPayload);
-      setOrderCart([]);
-      setOrderData({ expectedDate: "", notes: "" });
-      setShowSupplierModal(false);
-      setShowReceiptModal(true);
-    } catch (error) {
-      console.error("Error creating purchase order:", error);
-    }
-  };
 
   const handleClearCart = () => {
     setOrderCart([]);
@@ -343,136 +334,299 @@ const SuppliersPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">
-            Inventory Management
-          </h1>
-          <div className="flex space-x-3">
-            <button
-              onClick={() => setShowAddSupplierModal(true)}
-              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
-            >
-              Add Supplier
-            </button>
-            <button
-              onClick={() => setShowOrderHistory(true)}
-              className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700"
-            >
-              Order History
-            </button>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center space-x-4">
+              <h1 className="text-2xl font-bold text-gray-900">
+                Supplier Management
+              </h1>
+              <div className="hidden sm:flex items-center space-x-2 text-sm text-gray-500">
+                <span>•</span>
+                <span>{new Date().toLocaleDateString()}</span>
+              </div>
+            </div>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => {
+                  setShowAddSupplierModal(true);
+                }}
+                className="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-6 py-2 rounded-xl hover:from-purple-600 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center space-x-2"
+              >
+                <span className="text-lg">🏢</span>
+                <span>Add Supplier</span>
+              </button>
+              <button
+                onClick={() => {
+                  setShowOrderQueue(true);
+                }}
+                className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-2 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center space-x-2"
+              >
+                <span className="text-lg">📋</span>
+                <span>Order Queue</span>
+              </button>
+              <button
+                onClick={() => {
+                  setShowOrderHistory(true);
+                }}
+                className="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-6 py-2 rounded-xl hover:from-gray-600 hover:to-gray-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center space-x-2"
+              >
+                <span className="text-lg">📊</span>
+                <span>Order History</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white overflow-hidden shadow-lg rounded-xl border hover:shadow-xl transition-all duration-300">
+            <div className="p-6">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="h-12 w-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center text-white text-xl shadow-lg">
+                    📦
+                  </div>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">
+                      Total Items in Cart
+                    </dt>
+                    <dd className="text-2xl font-bold text-gray-900">
+                      {orderCart.length}
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white overflow-hidden shadow-lg rounded-xl border hover:shadow-xl transition-all duration-300">
+            <div className="p-6">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="h-12 w-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center text-white text-xl shadow-lg">
+                    💰
+                  </div>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">
+                      Cart Total
+                    </dt>
+                    <dd className="text-2xl font-bold text-gray-900">
+                      Rs. {calculateOrderTotal().toFixed(2)}
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white overflow-hidden shadow-lg rounded-xl border hover:shadow-xl transition-all duration-300">
+            <div className="p-6">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="h-12 w-12 bg-gradient-to-r from-red-500 to-red-600 rounded-xl flex items-center justify-center text-white text-xl shadow-lg">
+                    ⚠️
+                  </div>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">
+                      Out of Stock
+                    </dt>
+                    <dd className="text-2xl font-bold text-gray-900">
+                      {medicines.length}
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white overflow-hidden shadow-lg rounded-xl border hover:shadow-xl transition-all duration-300">
+            <div className="p-6">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="h-12 w-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center text-white text-xl shadow-lg">
+                    🏢
+                  </div>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">
+                      Active Suppliers
+                    </dt>
+                    <dd className="text-2xl font-bold text-gray-900">
+                      {suppliers.length}
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Stock Filters */}
-        <StockFilters
-          searchQuery={searchQuery}
-          onSearchChange={handleSearchChange}
-          sortBy={sortBy}
-          sortOrder={sortOrder}
-          onSortChange={handleSortChange}
-          stockFilter={stockFilter}
-          onStockFilterChange={handleStockFilterChange}
-        />
+        <div className="bg-white rounded-xl shadow-lg border mb-6">
+          <div className="p-6">
+            <StockFilters
+              searchQuery={searchQuery}
+              onSearchChange={handleSearchChange}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              onSortChange={handleSortChange}
+              stockFilter={stockFilter}
+              onStockFilterChange={handleStockFilterChange}
+            />
+          </div>
+        </div>
 
         {/* Order Cart Summary */}
         {orderCart.length > 0 && (
-          <div className="bg-white rounded-lg shadow p-4 mb-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium">Purchase Order Cart</h3>
-              <div className="flex space-x-2">
-                <button
-                  onClick={handleClearCart}
-                  className="text-red-600 hover:text-red-800"
-                >
-                  Clear Cart
-                </button>
-                <button
-                  onClick={handleProceedToSupplier}
-                  className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
-                >
-                  Proceed to Supplier ({orderCart.length} items)
-                </button>
-              </div>
-            </div>
-            <div className="space-y-2">
-              {orderCart.map((item) => (
-                <div
-                  key={item.medicineId}
-                  className="flex justify-between items-center"
-                >
-                  <span>
-                    {item.name} - Qty: {item.quantity}
-                  </span>
+          <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl shadow-lg border border-green-200 mb-6">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center space-x-3">
+                  <div className="h-10 w-10 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center text-white shadow-lg">
+                    🛒
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900">Purchase Order Cart</h3>
+                    <p className="text-sm text-gray-600">{orderCart.length} items ready for order</p>
+                  </div>
+                </div>
+                <div className="flex space-x-3">
                   <button
-                    onClick={() => handleRemoveFromCart(item.medicineId)}
-                    className="text-red-600 hover:text-red-800"
+                    onClick={handleClearCart}
+                    className="bg-gradient-to-r from-red-500 to-red-600 text-white px-4 py-2 rounded-xl hover:from-red-600 hover:to-red-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center space-x-2"
                   >
-                    Remove
+                    <span>🗑️</span>
+                    <span>Clear Cart</span>
+                  </button>
+                  <button
+                    onClick={handleProceedToSupplier}
+                    className="bg-gradient-to-r from-green-500 to-green-600 text-white px-6 py-2 rounded-xl hover:from-green-600 hover:to-green-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center space-x-2"
+                  >
+                    <span>🚀</span>
+                    <span>Proceed to Supplier ({orderCart.length} items)</span>
                   </button>
                 </div>
-              ))}
-              <div className="border-t pt-2">
-                <strong>Total: ${calculateOrderTotal()}</strong>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {orderCart.map((item) => (
+                  <div
+                    key={item.medicineId}
+                    className="bg-white rounded-lg p-4 shadow-md border hover:shadow-lg transition-all duration-300"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900 text-sm">{item.name}</h4>
+                        <p className="text-xs text-gray-600">{item.manufacturer}</p>
+                        <div className="flex items-center space-x-4 mt-2">
+                          <span className="text-sm font-medium text-blue-600">Qty: {item.quantity}</span>
+                          <span className="text-sm font-medium text-green-600">Rs. {(item.tradePrice * item.quantity).toFixed(2)}</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveFromCart(item.medicineId)}
+                        className="text-red-500 hover:text-red-700 transition-colors p-1 rounded-full hover:bg-red-50"
+                      >
+                        ❌
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="border-t border-green-200 pt-4 mt-6">
+                <div className="flex justify-between items-center">
+                  <span className="text-lg font-medium text-gray-700">Order Total:</span>
+                  <span className="text-2xl font-bold text-green-600">Rs. {calculateOrderTotal().toFixed(2)}</span>
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Out of Stock Table */}
-        <OutOfStockTable
-          medicines={medicines}
-          isLoading={isLoading}
-          onAddQuantity={handleAddQuantity}
-          orderCart={orderCart}
-          onRemoveFromCart={handleRemoveFromCart}
-          pagination={pagination}
-          onPageChange={handlePageChange}
-          onNextPage={handleNextPage}
-          onPrevPage={handlePrevPage}
-          stockFilter={stockFilter}
-        />
+        {/* Inventory Table */}
+        <div className="bg-white rounded-xl shadow-lg border">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center space-x-3">
+              <div className="h-8 w-8 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg flex items-center justify-center text-white shadow-lg">
+                📋
+              </div>
+              <h2 className="text-xl font-semibold text-gray-900">
+                {stockFilter === 'out-of-stock' ? 'Out of Stock Items' : 
+                 stockFilter === 'low-stock' ? 'Low Stock Items' : 
+                 'Items Needing Restocking'}
+              </h2>
+            </div>
+          </div>
+          <OutOfStockTable
+            medicines={medicines}
+            isLoading={isLoading}
+            onAddQuantity={handleAddQuantity}
+            orderCart={orderCart}
+            onRemoveFromCart={handleRemoveFromCart}
+            pagination={pagination}
+            onPageChange={handlePageChange}
+            onNextPage={handleNextPage}
+            onPrevPage={handlePrevPage}
+            stockFilter={stockFilter}
+          />
+        </div>
 
-        {/* Modals */}
-        <AddQuantityModal
-          isOpen={showQuantityModal}
-          onClose={() => setShowQuantityModal(false)}
-          onSubmit={handleQuantitySubmit}
-          medicine={selectedMedicine}
-        />
-
-        <SelectSupplierModal
-          isOpen={showSupplierModal}
-          onClose={() => setShowSupplierModal(false)}
-          onSelectSupplier={handleSupplierSelect}
-          suppliers={suppliers}
-          orderData={orderData}
-          setOrderData={setOrderData}
-          onCreateOrder={handleCreateOrder}
-        />
-
-        <OrderReceiptModal
-          isOpen={showReceiptModal}
-          onClose={() => setShowReceiptModal(false)}
-          supplier={selectedSupplier}
-          orderItems={orderCart}
-          total={calculateOrderTotal()}
-        />
-
-        <SupplierOrderHistory
-          isOpen={showOrderHistory}
-          onClose={() => setShowOrderHistory(false)}
-        />
-
-        <AddSupplierModal
-          isOpen={showAddSupplierModal}
-          onClose={() => setShowAddSupplierModal(false)}
-          onSubmit={handleAddSupplierSubmit}
-          supplier={newSupplier}
-          setSupplier={setNewSupplier}
-        />
       </div>
+
+      {/* Modals */}
+      <AddQuantityModal
+        show={showQuantityModal}
+        onClose={() => setShowQuantityModal(false)}
+        onSubmit={handleQuantitySubmit}
+        medicine={selectedMedicine}
+      />
+
+      <SelectSupplierModal
+        show={showSupplierModal}
+        onClose={() => setShowSupplierModal(false)}
+        onSelect={handleSupplierSelect}
+        suppliers={suppliers}
+        orderItems={orderCart}
+      />
+
+      <OrderReceiptModal
+        show={showReceiptModal}
+        onClose={() => setShowReceiptModal(false)}
+        supplier={receiptData?.supplier}
+        items={receiptData?.items || []}
+        total={receiptData?.total || 0}
+        orderData={receiptData?.orderData}
+      />
+
+      <SupplierOrderHistory
+        show={showOrderHistory}
+        onClose={() => setShowOrderHistory(false)}
+      />
+
+      <AddSupplierModal
+        show={showAddSupplierModal}
+        onClose={() => setShowAddSupplierModal(false)}
+        onSubmit={handleAddSupplierSubmit}
+        newSupplier={newSupplier}
+        setNewSupplier={setNewSupplier}
+      />
+
+      <OrderQueueModal
+        show={showOrderQueue}
+        onClose={() => setShowOrderQueue(false)}
+      />
     </div>
   );
 };

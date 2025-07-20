@@ -68,13 +68,18 @@ export const useDashboardData = () => {
     queryKey: orderKeys.dashboard(),
     queryFn: () => orderServices.getDashboardData().then((res) => res.data),
     select: (data) => {
-      // Flatten and map backend response to front-end friendly structure
+      // Map backend response to front-end friendly structure
+      // The server returns: { totalOrders, totalRevenue, completedOrders, pendingOrders }
       return {
-        totalSales: data?.monthSales?.totalRevenue || 0,
-        totalOrders: data?.monthSales?.totalOrders || 0,
-        totalProfit: data?.monthSales?.totalProfit || 0,
-        lowStockItems: data?.lowStockMedicines?.length || 0,
-        recentOrders: data?.recentOrders || [],
+        totalSales: data?.totalRevenue || 0,
+        totalOrders: data?.totalOrders || 0,
+        totalRevenue: data?.totalRevenue || 0,
+        completedOrders: data?.completedOrders || 0,
+        pendingOrders: data?.pendingOrders || 0,
+        // Calculate profit as estimated 30% of revenue (can be made configurable)
+        totalProfit: (data?.totalRevenue || 0) * 0.3,
+        lowStockItems: 0, // This should come from medicine service
+        recentOrders: [], // This should come from a separate endpoint
         // Provide original in case other components need it
         raw: data,
       };

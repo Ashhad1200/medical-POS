@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../hooks/useAuth";
+import { useAuthContext } from "../contexts/AuthContext";
 import { toast } from "react-hot-toast";
 
 const LoginPage = () => {
@@ -17,7 +17,7 @@ const LoginPage = () => {
     isAuthenticated,
     isLoading: authLoading,
     error: authError,
-  } = useAuth();
+  } = useAuthContext();
 
   // Redirect if already authenticated
   useEffect(() => {

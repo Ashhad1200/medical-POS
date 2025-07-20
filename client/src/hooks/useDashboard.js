@@ -34,6 +34,19 @@ export const useDashboardOrderData = () => {
   return useQuery({
     queryKey: dashboardKeys.orderData(),
     queryFn: () => orderServices.getDashboardData().then((res) => res.data),
+    select: (data) => {
+      // Map backend response to match expected structure
+      return {
+        data: {
+          totalRevenue: data?.totalRevenue || 0,
+          totalOrders: data?.totalOrders || 0,
+          completedOrders: data?.completedOrders || 0,
+          pendingOrders: data?.pendingOrders || 0,
+        },
+        // Provide original response
+        raw: data,
+      };
+    },
     staleTime: 30 * 1000, // 30 seconds
     refetchInterval: 60 * 1000, // Refetch every minute
     refetchIntervalInBackground: false,

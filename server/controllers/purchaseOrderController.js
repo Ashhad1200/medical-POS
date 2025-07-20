@@ -8,7 +8,7 @@ const getAllPurchaseOrders = async (req, res) => {
 
     let query = supabase
       .from("purchase_orders")
-      .select("*, supplier:suppliers(name, contact_person), user:users(username, full_name)")
+      .select("*, supplier:suppliers(name, contact_person), created_by_user:users!created_by(username, full_name)")
       .eq("organization_id", organizationId);
 
     if (status) {
@@ -61,7 +61,7 @@ const getPurchaseOrder = async (req, res) => {
 
     const { data: purchaseOrder, error } = await supabase
       .from("purchase_orders")
-      .select("*, supplier:suppliers(*), user:users(*), purchase_order_items(*)")
+      .select("*, supplier:suppliers(*), created_by_user:users!created_by(*), purchase_order_items(*)")
       .eq("id", id)
       .eq("organization_id", organizationId)
       .single();
