@@ -107,6 +107,8 @@ Ensure your Supabase database is properly configured:
 2. **Nixpacks Configuration:**
    - Use only `nodejs-18_x` in nixPkgs (npm is included with Node.js)
    - Avoid specifying separate npm versions in nixpacks.toml
+   - Ensure commands use `&&` to chain directory changes: `cd server && npm ci`
+   - If you see "npm ci failed" error, verify package-lock.json exists in server directory
 
 3. **CORS Errors:**
    - Ensure frontend URL is added to CORS configuration
