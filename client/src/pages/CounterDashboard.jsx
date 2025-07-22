@@ -271,22 +271,53 @@ const CounterDashboard = () => {
     }
 
     const orderData = {
-      items: cart.map((item) => ({
-        medicineId: item.medicineId,
-        name: item.name,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        cost_price: item.cost_price || item.unitPrice * 0.7,
-        discountPercent: item.discountPercent || 0,
-        gst_per_unit: item.gst_per_unit || 0,
-      })),
-      customer: customerInfo,
-      payment: {
-        method: paymentMethod,
-        globalDiscount: discountAmount,
-      },
-      totals: orderTotals,
+      // Customer information
+      customer_name: customerInfo.name || '',
+      customer_phone: customerInfo.phone || '',
+      customer_email: customerInfo.email || '',
+      
+      // Calculate total GST amount
+      tax_amount: cart.reduce((total, item) => total + ((item.gst_per_unit || 0) * (item.quantity || 1)), 0),
+      
+      // Order totals (flattened)
+      total_amount: orderTotals.grandTotal || 0,
+      subtotal: cart.reduce((total, item) => {
+        const itemTotal = (item.unitPrice || 0) * (item.quantity || 1);
+        const itemDiscount = (itemTotal * (item.discountPercent || 0)) / 100;
+        return total + (itemTotal - itemDiscount);
+      }, 0),
+      tax_percent: 0, // GST is calculated per item
+      profit: orderTotals.profit || 0,
+      discount: orderTotals.globalDiscount || 0,
+      discount_percent: orderTotals.subtotal > 0 ? ((orderTotals.globalDiscount || 0) / orderTotals.subtotal * 100) : 0,
+      
+      // Payment information
+      payment_method: paymentMethod || 'cash',
+      payment_status: 'completed',
       status: "completed",
+      completed_at: new Date().toISOString(),
+      
+      // Order items
+      items: cart.map((item) => {
+        const itemSubtotal = item.quantity * item.unitPrice;
+        const itemDiscount = itemSubtotal * (item.discountPercent || 0) / 100;
+        const itemAfterDiscount = itemSubtotal - itemDiscount;
+        const gstAmount = item.gst_per_unit * item.quantity;
+        const itemTotal = itemAfterDiscount + gstAmount;
+        const itemProfit = (item.unitPrice - (item.cost_price || item.unitPrice * 0.7)) * item.quantity;
+        
+        return {
+          medicine_id: item.medicineId,
+          quantity: item.quantity,
+          unit_price: item.unitPrice,
+          total_price: itemTotal,
+          discount: itemDiscount,
+          discount_percent: item.discountPercent || 0,
+          cost_price: item.cost_price || item.unitPrice * 0.7,
+          profit: itemProfit,
+          gst_amount: gstAmount,
+        };
+      }),
     };
 
     try {
@@ -351,21 +382,52 @@ const CounterDashboard = () => {
     }
 
     const orderData = {
-      items: cart.map((item) => ({
-        medicineId: item.medicineId,
-        name: item.name,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        cost_price: item.cost_price || item.unitPrice * 0.7,
-        discountPercent: item.discountPercent || 0,
-      })),
-      customer: customerInfo,
-      payment: {
-        method: paymentMethod || "pending",
-        globalDiscount: discountAmount,
-      },
-      totals: orderTotals,
+      // Customer information
+      customer_name: customerInfo.name || '',
+      customer_phone: customerInfo.phone || '',
+      customer_email: customerInfo.email || '',
+      
+      // Calculate total GST amount
+      tax_amount: cart.reduce((total, item) => total + ((item.gst_per_unit || 0) * (item.quantity || 1)), 0),
+      
+      // Order totals (flattened)
+      total_amount: orderTotals.grandTotal || 0,
+      subtotal: cart.reduce((total, item) => {
+        const itemTotal = (item.unitPrice || 0) * (item.quantity || 1);
+        const itemDiscount = (itemTotal * (item.discountPercent || 0)) / 100;
+        return total + (itemTotal - itemDiscount);
+      }, 0),
+      tax_percent: 0, // GST is calculated per item
+      profit: orderTotals.profit || 0,
+      discount: orderTotals.globalDiscount || 0,
+      discount_percent: orderTotals.subtotal > 0 ? ((orderTotals.globalDiscount || 0) / orderTotals.subtotal * 100) : 0,
+      
+      // Payment information
+      payment_method: paymentMethod || 'pending',
+      payment_status: 'pending',
       status: "pending",
+      
+      // Order items
+      items: cart.map((item) => {
+        const itemSubtotal = item.quantity * item.unitPrice;
+        const itemDiscount = itemSubtotal * (item.discountPercent || 0) / 100;
+        const itemAfterDiscount = itemSubtotal - itemDiscount;
+        const gstAmount = item.gst_per_unit * item.quantity;
+        const itemTotal = itemAfterDiscount + gstAmount;
+        const itemProfit = (item.unitPrice - (item.cost_price || item.unitPrice * 0.7)) * item.quantity;
+        
+        return {
+          medicine_id: item.medicineId,
+          quantity: item.quantity,
+          unit_price: item.unitPrice,
+          total_price: itemTotal,
+          discount: itemDiscount,
+          discount_percent: item.discountPercent || 0,
+          cost_price: item.cost_price || item.unitPrice * 0.7,
+          profit: itemProfit,
+          gst_amount: gstAmount,
+        };
+      }),
     };
 
     try {

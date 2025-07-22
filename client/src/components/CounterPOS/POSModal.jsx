@@ -18,13 +18,13 @@ const POSModal = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gradient-to-br from-black/60 via-gray-900/70 to-black/60 backdrop-blur-sm transition-opacity duration-300 ease-in-out"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-600 bg-opacity-50 transition-opacity duration-300 ease-in-out"
       onClick={onClose} // Close on backdrop click
       aria-modal="true"
       role="dialog"
     >
       <div
-        className="bg-white/10 backdrop-blur-md border border-white/20 rounded-lg shadow-xl max-w-md w-full m-auto transform transition-all duration-300 ease-in-out scale-95 opacity-0 animate-modal-scale-in"
+        className="bg-white rounded-lg shadow-xl max-w-md w-full m-auto transform transition-all duration-300 ease-in-out scale-95 opacity-0 animate-modal-scale-in"
         onClick={(e) => e.stopPropagation()} // Prevent close when clicking inside modal content
         style={{
           background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',

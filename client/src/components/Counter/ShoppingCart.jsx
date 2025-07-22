@@ -41,11 +41,21 @@ const ShoppingCart = ({
 
   const handleQuantityChange = (medicineId, newQuantity) => {
     const item = cart.find((item) => item.medicineId === medicineId);
-    if (newQuantity > item.available_stock) {
+    
+    // Parse and validate the quantity
+    const parsedQuantity = parseInt(newQuantity);
+    
+    // Handle invalid input (NaN, empty string, etc.)
+    if (isNaN(parsedQuantity) || parsedQuantity < 1) {
+      return; // Don't update if invalid
+    }
+    
+    if (parsedQuantity > item.available_stock) {
       alert(`Only ${item.available_stock} units available in stock`);
       return;
     }
-    onUpdateItem(medicineId, { quantity: parseInt(newQuantity) });
+    
+    onUpdateItem(medicineId, { quantity: parsedQuantity });
   };
 
   const handleDiscountChange = (medicineId, discountPercent) => {
@@ -150,7 +160,7 @@ const ShoppingCart = ({
                     type="number"
                     min="1"
                     max={item.available_stock}
-                    value={item.quantity}
+                    value={item.quantity || 1}
                     onChange={(e) =>
                       handleQuantityChange(item.medicineId, e.target.value)
                     }

@@ -198,14 +198,25 @@ const createOrder = async (req, res) => {
 
       // Update medicine quantities
       for (const item of items) {
-        await supabase
+        // First get the current quantity
+        const { data: medicine } = await supabase
           .from("medicines")
-          .update({
-            quantity: supabase.raw(`quantity - ${item.quantity}`),
-            updated_at: new Date().toISOString(),
-          })
+          .select("quantity")
           .eq("id", item.medicine_id)
-          .eq("organization_id", organizationId);
+          .eq("organization_id", organizationId)
+          .single();
+
+        if (medicine) {
+          const newQuantity = medicine.quantity - item.quantity;
+          await supabase
+            .from("medicines")
+            .update({
+              quantity: newQuantity,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", item.medicine_id)
+            .eq("organization_id", organizationId);
+        }
       }
     }
 

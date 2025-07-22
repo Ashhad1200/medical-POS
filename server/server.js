@@ -17,6 +17,7 @@ const purchaseOrderRoutes = require("./routes/purchaseOrders");
 const inventoryRoutes = require("./routes/inventory");
 const userRoutes = require("./routes/users");
 const reportRoutes = require("./routes/reports");
+const customerRoutes = require("./routes/customers");
 
 const app = express();
 
@@ -159,6 +160,7 @@ app.use("/api/purchase-orders", purchaseOrderRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/reports", reportRoutes);
+app.use("/api/customers", customerRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

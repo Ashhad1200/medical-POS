@@ -159,11 +159,13 @@ CREATE TABLE IF NOT EXISTS public.orders (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     order_number VARCHAR(50) UNIQUE NOT NULL,
     user_id UUID REFERENCES public.users(id),
+    customer_id UUID REFERENCES public.customers(id),
     customer_name VARCHAR(255),
     customer_phone VARCHAR(20),
     customer_email VARCHAR(255),
     organization_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
     total_amount DECIMAL(12,2) NOT NULL,
+    paid_amount DECIMAL(12,2) DEFAULT 0,
     tax_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
     tax_percent DECIMAL(5,2) DEFAULT 0,
     subtotal DECIMAL(12,2) NOT NULL DEFAULT 0,
@@ -337,6 +339,7 @@ CREATE INDEX IF NOT EXISTS idx_medicines_batch_number ON public.medicines(batch_
 -- Orders indexes
 CREATE INDEX IF NOT EXISTS idx_orders_organization_id ON public.orders(organization_id);
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON public.orders(user_id);
+CREATE INDEX IF NOT EXISTS idx_orders_customer_id ON public.orders(customer_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON public.orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON public.orders(created_at);
 CREATE INDEX IF NOT EXISTS idx_orders_order_number ON public.orders(order_number);

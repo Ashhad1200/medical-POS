@@ -14,17 +14,17 @@ const {
   getSalesChartData,
 } = require("../controllers/orderController");
 
-// Middleware to validate order ID (MongoDB ObjectId format)
+// Middleware to validate order ID (UUID format for Supabase)
 const validateOrderId = (req, res, next) => {
   const { id } = req.params;
 
-  // MongoDB ObjectId validation (24 character hex string)
-  const objectIdRegex = /^[0-9a-fA-F]{24}$/;
+  // UUID validation (Supabase uses UUID format)
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-  if (!id || id === "undefined" || id === "null" || !objectIdRegex.test(id)) {
+  if (!id || id === "undefined" || id === "null" || !uuidRegex.test(id)) {
     return res.status(400).json({
       success: false,
-      message: "Invalid order ID format",
+      message: "Invalid order ID format. Expected UUID format.",
     });
   }
 

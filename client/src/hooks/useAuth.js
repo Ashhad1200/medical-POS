@@ -21,6 +21,25 @@ export const useAuth = () => {
   const initializationRef = useRef(false);
   const dispatch = useDispatch();
 
+  // Helper function to check if user access has expired
+  const checkAccessValidity = useCallback((profileData) => {
+    if (!profileData?.access_valid_till) {
+      return { isValid: true }; // No expiry set, access is valid
+    }
+    
+    const now = new Date();
+    const accessValidTill = new Date(profileData.access_valid_till);
+    
+    if (now > accessValidTill) {
+      return {
+        isValid: false,
+        message: 'Your access has expired. Please contact your administrator to extend your access.'
+      };
+    }
+    
+    return { isValid: true };
+  }, []);
+
   const fetchAndSetUserProfile = useCallback(
     async (supabaseUser) => {
       if (!supabaseUser) {
@@ -40,6 +59,21 @@ export const useAuth = () => {
         if (!profileData) {
           throw new Error('Profile not found');
         }
+        
+        // Check if user access has expired
+        const accessCheck = checkAccessValidity(profileData);
+        if (!accessCheck.isValid) {
+          toast.error(accessCheck.message);
+          // Force sign out for expired access
+          await supabase.auth.signOut();
+          setError(accessCheck.message);
+          setIsAuthenticated(false);
+          setUser(null);
+          setProfile(null);
+          dispatch(clearUserProfile());
+          return null;
+        }
+        
         setProfile(profileData);
         setUser(supabaseUser);
         setIsAuthenticated(true);
@@ -65,7 +99,7 @@ export const useAuth = () => {
         return null;
       }
     },
-    [dispatch]
+    [dispatch, checkAccessValidity]
   );
 
   const signIn = useCallback(
@@ -255,6 +289,9 @@ export const useAuth = () => {
     return ROLE_HIERARCHY[profile?.role_in_pos] || 0;
   }, [profile]);
 
+  // Check current access validity
+  const currentAccessCheck = checkAccessValidity(profile);
+  
   return {
     user,
     profile,
@@ -281,8 +318,12 @@ export const useAuth = () => {
     theme: profile?.theme || "light",
     language: profile?.language || "en",
     timezone: profile?.timezone || "UTC",
+    accessValidTill: profile?.access_valid_till,
+    isAccessValid: currentAccessCheck.isValid,
+    accessExpiredMessage: currentAccessCheck.message,
     hasPermission,
     canAccessRole,
     getUserRoleLevel,
+    checkAccessValidity,
   };
 };

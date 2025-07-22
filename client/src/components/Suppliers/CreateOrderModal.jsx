@@ -129,13 +129,10 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-black/60 via-gray-900/70 to-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-lg shadow-xl w-full max-w-6xl max-h-screen overflow-y-auto" style={{
-        background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
-        boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)'
-      }}>
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-screen overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-white/10">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-gradient-to-br from-blue-500/20 to-purple-600/20 border border-blue-400/30 rounded-lg backdrop-blur-sm">
               <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -143,17 +140,17 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
               </svg>
             </div>
             <div>
-              <h2 className="text-xl font-semibold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+              <h2 className="text-xl font-semibold text-gray-900">
                 Create Purchase Order
               </h2>
-              <p className="text-sm text-gray-400 mt-1">
-                Supplier: <span className="font-medium text-blue-300">{supplier.name}</span>
+              <p className="text-sm text-gray-600 mt-1">
+                Supplier: <span className="font-medium text-blue-600">{supplier.name}</span>
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors p-2 rounded-lg hover:bg-white/10"
+            className="text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-lg hover:bg-gray-100"
           >
             <svg
               className="w-6 h-6"

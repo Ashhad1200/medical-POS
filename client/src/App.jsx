@@ -13,6 +13,7 @@ import { AuthProvider, useAuthContext } from "./contexts/AuthContext";
 import LoadingSpinner from "./components/UI/LoadingSpinner";
 import LoginPage from "./pages/Login";
 import DashboardLayout from "./components/Layout/DashboardLayout";
+import AccessExpiredModal from "./components/Auth/AccessExpiredModal";
 
 import Dashboard from "./pages/Dashboard";
 import CounterDashboard from "./pages/CounterDashboard";
@@ -22,6 +23,7 @@ import OrdersPage from "./pages/OrdersPage";
 import SuppliersPage from "./pages/SuppliersPage";
 import UsersPage from "./pages/UsersPage";
 import OrderDetailPage from "./pages/OrderDetailPage";
+import Dealers from "./pages/Dealers";
 
 // Startup Screen Component
 const StartupScreen = ({ onContinue }) => {
@@ -184,14 +186,33 @@ const RoleDashboard = () => {
 
 // App Routes Component
 const AppRoutes = () => {
-  const { profile, isLoading, initialized, isAuthenticated } = useAuthContext();
+  const { 
+    profile, 
+    isLoading, 
+    initialized, 
+    isAuthenticated, 
+    isAccessValid, 
+    accessExpiredMessage 
+  } = useAuthContext();
 
   console.log("AppRoutes render:", {
     profile: !!profile,
     isAuthenticated,
     isLoading,
     initialized,
+    isAccessValid,
   });
+
+  // Handle contact admin action
+  const handleContactAdmin = () => {
+    // You can customize this based on your organization's contact method
+    const adminEmail = profile?.organization?.admin_email || 'admin@yourcompany.com';
+    const subject = encodeURIComponent('Access Extension Request');
+    const body = encodeURIComponent(
+      `Hello,\n\nMy access to the Medical Store POS system has expired. Please extend my access.\n\nUser Details:\n- Name: ${profile?.full_name || 'N/A'}\n- Email: ${profile?.email || 'N/A'}\n- Username: ${profile?.username || 'N/A'}\n- Organization: ${profile?.organization?.name || 'N/A'}\n\nThank you.`
+    );
+    window.open(`mailto:${adminEmail}?subject=${subject}&body=${body}`);
+  };
 
   // Show loading screen only if not initialized AND still loading AND not authenticated
   // This prevents showing loading when we already have authentication state
@@ -229,86 +250,103 @@ const AppRoutes = () => {
   if (isAuthenticated && !isLoading) {
     console.log("User authenticated and ready, showing app");
     return (
-      <Routes>
-        {/* Public Routes */}
-        <Route
-          path="/login"
-          element={
-            !isAuthenticated ? (
-              <LoginPage />
-            ) : (
-              <Navigate to="/dashboard" replace />
-            )
-          }
+      <>
+        <Routes>
+          {/* Public Routes */}
+          <Route
+            path="/login"
+            element={
+              !isAuthenticated ? (
+                <LoginPage />
+              ) : (
+                <Navigate to="/dashboard" replace />
+              )
+            }
+          />
+
+
+
+          {/* Protected Routes with nested structure */}
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Navigate to="/dashboard" replace />} />
+            <Route path="dashboard" element={<RoleDashboard />} />
+            <Route
+              path="inventory"
+              element={
+                <ProtectedRoute requiredRoles={["admin", "manager", "warehouse"]}>
+                  <InventoryPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="medicines"
+              element={
+                <ProtectedRoute requiredRoles={["admin", "manager", "warehouse"]}>
+                  <MedicinesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="dealers"
+              element={
+                <ProtectedRoute requiredRoles={["admin", "counter"]}>
+                  <Dealers />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="orders"
+              element={
+                <ProtectedRoute requiredRoles={["admin", "manager", "counter"]}>
+                  <OrdersPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="order/:id"
+              element={
+                <ProtectedRoute requiredRoles={["admin", "manager", "counter"]}>
+                  <OrderDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="suppliers"
+              element={
+                <ProtectedRoute requiredRoles={["admin", "manager", "warehouse"]}>
+                  <SuppliersPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="users"
+              element={
+                <ProtectedRoute requiredRoles={["admin"]}>
+                  <UsersPage />
+                </ProtectedRoute>
+              }
+            />
+          </Route>
+
+          {/* Remove the individual routes since they're now nested */}
+          {/* Catch all route */}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+        
+        {/* Access Expired Modal - Show when user is authenticated but access is invalid */}
+        <AccessExpiredModal
+          isOpen={isAuthenticated && isAccessValid === false}
+          message={accessExpiredMessage}
+          onContactAdmin={handleContactAdmin}
         />
-
-
-
-        {/* Protected Routes with nested structure */}
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <DashboardLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<RoleDashboard />} />
-          <Route
-            path="inventory"
-            element={
-              <ProtectedRoute requiredRoles={["admin", "manager", "warehouse"]}>
-                <InventoryPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="medicines"
-            element={
-              <ProtectedRoute requiredRoles={["admin", "manager", "warehouse"]}>
-                <MedicinesPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="orders"
-            element={
-              <ProtectedRoute requiredRoles={["admin", "manager", "counter"]}>
-                <OrdersPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="order/:id"
-            element={
-              <ProtectedRoute requiredRoles={["admin", "manager", "counter"]}>
-                <OrderDetailPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="suppliers"
-            element={
-              <ProtectedRoute requiredRoles={["admin", "manager", "warehouse"]}>
-                <SuppliersPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="users"
-            element={
-              <ProtectedRoute requiredRoles={["admin"]}>
-                <UsersPage />
-              </ProtectedRoute>
-            }
-          />
-        </Route>
-
-        {/* Remove the individual routes since they're now nested */}
-        {/* Catch all route */}
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
-      </Routes>
+      </>
     );
   }
 
