@@ -102,16 +102,21 @@ Ensure your Supabase database is properly configured:
 1. **Build Failures:**
    - Check that all dependencies are in `package.json`
    - Verify Node.js version compatibility
+   - If you see "undefined variable 'npm-9_x'" error, ensure nixpacks.toml only includes valid packages
 
-2. **CORS Errors:**
+2. **Nixpacks Configuration:**
+   - Use only `nodejs-18_x` in nixPkgs (npm is included with Node.js)
+   - Avoid specifying separate npm versions in nixpacks.toml
+
+3. **CORS Errors:**
    - Ensure frontend URL is added to CORS configuration
    - Check `CLIENT_URL` environment variable
 
-3. **Database Connection:**
+4. **Database Connection:**
    - Verify Supabase credentials
    - Check network connectivity
 
-4. **Environment Variables:**
+5. **Environment Variables:**
    - Ensure all required variables are set
    - Check for typos in variable names
 
