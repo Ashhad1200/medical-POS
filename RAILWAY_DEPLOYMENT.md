@@ -26,17 +26,30 @@ This guide will help you deploy the Medical POS System to Railway.
 3. **Set Environment Variables:**
    Go to your Railway project dashboard and add these variables:
    ```
+   # Server Configuration
    NODE_ENV=production
+   PORT=$PORT
+   
+   # Supabase Configuration
+   # IMPORTANT: Use NEXT_PUBLIC_ prefix for these variables (not VITE_)
    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
    SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+   
+   # JWT Configuration
    JWT_SECRET=your-strong-jwt-secret
    JWT_EXPIRES_IN=7d
+   
+   # Client Configuration
    CLIENT_URL=https://your-frontend-domain.railway.app
+   
+   # Company Information
    COMPANY_NAME=Medical Store POS
    COMPANY_ADDRESS=123 Medical Street, Healthcare City
    COMPANY_PHONE=+1234567890
    COMPANY_EMAIL=info@medicalstore.com
+   
+   # Admin Panel Configuration
    NEXT_PUBLIC_APP_NAME="Medical POS Admin Panel"
    NEXT_PUBLIC_APP_VERSION="1.0.0"
    NEXT_PUBLIC_ENVIRONMENT=production
@@ -109,6 +122,22 @@ Ensure your Supabase database is properly configured:
    - Avoid specifying separate npm versions in nixpacks.toml
    - Ensure commands use `&&` to chain directory changes: `cd server && npm ci`
    - If you see "npm ci failed" error, verify package-lock.json exists in server directory
+
+3. **Supabase Environment Variable Errors:**
+   If you see "Missing Supabase environment variables" error:
+   - Check variable names: The server expects `NEXT_PUBLIC_` prefix, not `VITE_`:
+     ```
+     # ✅ Correct (for server)
+     NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+     NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+     SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+     
+     # ❌ Wrong (these are for client/frontend)
+     VITE_SUPABASE_URL=https://your-project.supabase.co
+     VITE_SUPABASE_ANON_KEY=your-anon-key
+     ```
+   - Set in Railway dashboard: Make sure all three Supabase variables are set in your Railway service environment variables
+   - Remove quotes: Don't wrap URLs in quotes when setting environment variables
 
 3. **CORS Errors:**
    - Ensure frontend URL is added to CORS configuration
