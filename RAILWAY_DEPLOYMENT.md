@@ -137,10 +137,35 @@ Ensure your Supabase database is properly configured:
      VITE_SUPABASE_ANON_KEY=your-anon-key
      ```
    - Set in Railway dashboard: Make sure all three Supabase variables are set in your Railway service environment variables
-   - Remove quotes: Don't wrap URLs in quotes when setting environment variables
+    - Remove quotes: Don't wrap URLs in quotes when setting environment variables
 
-3. **CORS Errors:**
-   - Ensure frontend URL is added to CORS configuration
+### Client Health Check Failures
+
+If your frontend service shows "1/1 replicas never became healthy! Healthcheck failed!":
+
+1. **Port binding issues**: Ensure the service binds to Railway's PORT:
+   ```bash
+   # In railway.json startCommand
+   "npm run preview -- --port $PORT --host 0.0.0.0"
+   ```
+
+2. **Host configuration**: Make sure vite.config.js preview uses:
+   ```javascript
+   preview: {
+     port: process.env.PORT || 4173,
+     host: '0.0.0.0',
+   }
+   ```
+
+3. **Health check timeout**: Increase timeout in railway.json:
+   ```json
+   "healthcheckTimeout": 300
+   ```
+
+4. **Build issues**: Check Railway logs for build errors and ensure `npm run build` completes successfully
+ 
+ 4. **CORS Errors:**
+    - Ensure frontend URL is added to CORS configuration
    - Check `CLIENT_URL` environment variable
 
 4. **Database Connection:**
