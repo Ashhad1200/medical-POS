@@ -150,12 +150,13 @@ If your frontend service shows "1/1 replicas never became healthy! Healthcheck f
    ```
 
 2. **Host configuration**: Make sure vite.config.js preview uses:
-   ```javascript
-   preview: {
-     port: process.env.PORT || 4173,
-     host: '0.0.0.0',
-   }
-   ```
+    ```javascript
+    preview: {
+      port: process.env.PORT || 4173,
+      host: '0.0.0.0',
+      allowedHosts: ['healthcheck.railway.app'],
+    }
+    ```
 
 3. **Health check timeout**: Increase timeout in railway.json:
    ```json

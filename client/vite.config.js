@@ -18,16 +18,19 @@ export default defineConfig({
   preview: {
     port: process.env.PORT || 4173,
     host: '0.0.0.0',
+    allowedHosts: ['healthcheck.railway.app'],
   },
   build: {
     outDir: "dist",
     sourcemap: false, // Disable sourcemaps in production for better performance
+    chunkSizeWarningLimit: 600, // Increase chunk size warning limit
     rollupOptions: {
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom'],
           router: ['react-router-dom'],
           ui: ['@headlessui/react', '@heroicons/react'],
+          utils: ['axios', 'date-fns'],
         },
       },
     },
