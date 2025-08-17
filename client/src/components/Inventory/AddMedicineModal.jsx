@@ -33,10 +33,10 @@ const AddMedicineModal = ({
   const isFormValid = validateForm();
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 bg-black flex items-center justify-center p-4 z-50">
       <div className="glass-card max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-white/5 border-b border-white/10 px-6 py-4 rounded-t-xl backdrop-blur-sm">
+        <div className="sticky top-0 bg-black border-b border-white/10 px-6 py-4 rounded-t-xl backdrop-blur-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg">
