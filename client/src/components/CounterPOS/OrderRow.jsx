@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import QuantityInput from "./QuantityInput"; // Reusing the quantity input
+import { formatCurrency } from "../../utils/currency";
 
 const OrderRow = ({ item, onUpdateQuantity, onRemoveItem }) => {
   const [quantity, setQuantity] = useState(item.quantity);
@@ -25,7 +26,7 @@ const OrderRow = ({ item, onUpdateQuantity, onRemoveItem }) => {
           {item.name}
         </p>
         <p className="text-xs text-gray-500">
-          Rs.{item.unitPrice.toFixed(2)} each{" "}
+          {formatCurrency(item.unitPrice)} each{" "}
           {item.discount > 0 ? `(${item.discount}% off)` : ""}
         </p>
       </div>
@@ -38,7 +39,7 @@ const OrderRow = ({ item, onUpdateQuantity, onRemoveItem }) => {
           idPrefix={`qty-order-${item.id}`}
         />
         <p className="text-sm font-semibold text-gray-900 w-20 text-right">
-          Rs.{subtotal.toFixed(2)}
+          {formatCurrency(subtotal)}
         </p>
         <button
           onClick={() => onRemoveItem(item.id)}

@@ -26,10 +26,18 @@ const auth = async (req, res, next) => {
       });
     }
 
-    // Get user profile from database
+    // Get user profile from database with organization data
     const { data: profile, error: profileError } = await supabase
       .from("users")
-      .select("*")
+      .select(`
+        *,
+        organization:organizations!inner(
+          id,
+          name,
+          access_valid_till,
+          is_active
+        )
+      `)
       .eq("supabase_uid", user.id)
       .single();
 
@@ -47,34 +55,35 @@ const auth = async (req, res, next) => {
       });
     }
 
-    // Create authenticated client with user session
-    const authenticatedClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    );
+    // Check organization access validity
+    const now = new Date();
+    const orgAccessValidTill = profile.organization?.access_valid_till;
+    const isOrgActive = profile.organization?.is_active;
     
-    // Set the session with the user's access token
-    const { error: sessionError } = await authenticatedClient.auth.setSession({
-      access_token: token,
-      refresh_token: user.refresh_token || ''
-    });
-    
-    if (sessionError) {
-      console.error('Session setting error:', sessionError);
-      // Fallback to service role if session setting fails
-      req.supabase = supabase;
-    } else {
-      console.log('Session set successfully for user:', user.id);
-      req.supabase = authenticatedClient;
+    if (isOrgActive === false) {
+      return res.status(403).json({
+        success: false,
+        message: "Organization has been deactivated",
+      });
     }
     
+    if (orgAccessValidTill && new Date(orgAccessValidTill) < now) {
+      return res.status(403).json({
+        success: false,
+        message: "Organization access has expired",
+      });
+    }
+
+    // For server-side operations, we'll use the service role client
+    // which has full access and doesn't require user sessions
+    req.supabase = supabase;
     req.token = token;
     req.user = profile;
     
-    console.log('Auth middleware - Using authenticated client for user:', {
+    console.log('Auth middleware - Using service role client for user:', {
       userId: user.id,
       organizationId: profile.organization_id,
-      clientType: sessionError ? 'service_role' : 'authenticated'
+      clientType: 'service_role'
     });
     next();
   } catch (error) {
@@ -95,7 +104,7 @@ const checkRole = (roles) => {
       });
     }
 
-    if (!roles.includes(req.user.role)) {
+    if (!roles.includes(req.user.role_in_pos)) {
       return res.status(403).json({
         success: false,
         message: "Access denied - insufficient permissions",
@@ -119,13 +128,28 @@ const optionalAuth = async (req, res, next) => {
       if (!error && user) {
         const { data: profile } = await supabase
           .from("users")
-          .select("*")
+          .select(`
+            *,
+            organization:organizations!inner(
+              id,
+              name,
+              access_valid_till,
+              is_active
+            )
+          `)
           .eq("supabase_uid", user.id)
           .single();
 
         if (profile && profile.is_active) {
-          req.token = token;
-          req.user = profile;
+          // Check organization access validity for optional auth too
+          const now = new Date();
+          const orgAccessValidTill = profile.organization?.access_valid_till;
+          const isOrgActive = profile.organization?.is_active;
+          
+          if (isOrgActive !== false && (!orgAccessValidTill || new Date(orgAccessValidTill) >= now)) {
+            req.token = token;
+            req.user = profile;
+          }
         }
       }
     }

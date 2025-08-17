@@ -163,7 +163,12 @@ export const useDeleteMedicine = () => {
       // Invalidate lists to ensure consistency
       queryClient.invalidateQueries({ queryKey: medicineKeys.lists() });
 
-      toast.success("Medicine deleted successfully!");
+      // Show appropriate message based on whether it was deleted or archived
+      if (response.data.archived) {
+        toast.success(response.data.message || "Medicine archived successfully!");
+      } else {
+        toast.success("Medicine deleted successfully!");
+      }
     },
     onError: (error, id, context) => {
       // Rollback optimistic update

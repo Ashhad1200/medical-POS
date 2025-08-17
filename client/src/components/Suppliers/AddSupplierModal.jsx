@@ -59,12 +59,12 @@ const AddSupplierModal = ({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Basic Information */}
+          {/* Supplier Information */}
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">
-              Basic Information
+              Supplier Information
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Supplier Name *
@@ -80,31 +80,7 @@ const AddSupplierModal = ({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Contact Person
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newSupplier.contactPerson}
-                  onChange={(e) =>
-                    handleInputChange("contactPerson", e.target.value)
-                  }
-                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-200 backdrop-blur-sm"
-                  placeholder="Enter contact person name"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Contact Information */}
-          <div>
-            <h3 className="text-lg font-medium text-white mb-4">
-              Contact Information
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Phone Number *
                 </label>
                 <input
@@ -112,155 +88,40 @@ const AddSupplierModal = ({
                   required
                   value={newSupplier.phone}
                   onChange={(e) => handleInputChange("phone", e.target.value)}
-                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-200 backdrop-blur-sm"
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                   placeholder="Enter phone number"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={newSupplier.email}
-                  onChange={(e) => handleInputChange("email", e.target.value)}
-                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-200 backdrop-blur-sm"
-                  placeholder="Enter email address"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Website
-                </label>
-                <input
-                  type="url"
-                  value={newSupplier.website}
-                  onChange={(e) => handleInputChange("website", e.target.value)}
-                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-200 backdrop-blur-sm"
-                  placeholder="https://example.com"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  GST Number
-                </label>
-                <input
-                  type="text"
-                  value={newSupplier.gstNumber}
-                  onChange={(e) =>
-                    handleInputChange("gstNumber", e.target.value)
-                  }
-                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-200 backdrop-blur-sm"
-                  placeholder="Enter GST number"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Address Information */}
-          <div>
-            <h3 className="text-lg font-medium text-white mb-4">
-              Address Information
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Address
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Address *
                 </label>
                 <textarea
                   required
                   value={newSupplier.address}
                   onChange={(e) => handleInputChange("address", e.target.value)}
                   rows={3}
-                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-200 backdrop-blur-sm"
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                   placeholder="Enter complete address"
                 />
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    City
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={newSupplier.city}
-                    onChange={(e) => handleInputChange("city", e.target.value)}
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-200 backdrop-blur-sm"
-                    placeholder="Enter city"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    State
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={newSupplier.state}
-                    onChange={(e) => handleInputChange("state", e.target.value)}
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-200 backdrop-blur-sm"
-                    placeholder="Enter state"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    PIN Code
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={newSupplier.pincode}
-                    onChange={(e) =>
-                      handleInputChange("pincode", e.target.value)
-                    }
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-200 backdrop-blur-sm"
-                    placeholder="Enter PIN code"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Additional Information */}
-          <div>
-            <h3 className="text-lg font-medium text-white mb-4">
-              Additional Information
-            </h3>
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Notes
-              </label>
-              <textarea
-                value={newSupplier.notes}
-                onChange={(e) => handleInputChange("notes", e.target.value)}
-                rows={3}
-                className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-200 backdrop-blur-sm"
-                placeholder="Enter any additional notes about the supplier"
-              />
             </div>
           </div>
 
           {/* Form Actions */}
-          <div className="flex items-center justify-end space-x-3 pt-6 border-t border-white/10">
+          <div className="flex items-center justify-end space-x-3 pt-6 border-t border-gray-200">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-300 bg-white/10 border border-white/20 rounded-lg hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-blue-400/50 transition-all duration-200 backdrop-blur-sm"
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isLoading}
-              className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-purple-600 border border-transparent rounded-lg hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-400/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg"
+              className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-purple-600 border border-transparent rounded-lg hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg"
             >
               {isLoading ? (
                 <div className="flex items-center">

@@ -1,547 +1,253 @@
-import React, { useState, useMemo, useEffect } from "react";
-import { toast } from "react-hot-toast";
-import {
-  useInventoryMedicines,
-  useCreateMedicine,
-  useUpdateStock,
-  useDeleteMedicine,
-  useBulkImport,
-  useExportInventory,
-  useInventoryStats,
-  getStockStatus,
-} from "../hooks/useInventory";
-import { useAuthContext } from "../contexts/AuthContext";
-import api from "../services/api"; // Assuming API service is set up
-import InventoryTable from "../components/Inventory/InventoryTable";
-import InventoryFilters from "../components/Inventory/InventoryFilters";
-import InventoryStats from "../components/Inventory/InventoryStats";
-
-// Import components for better organization
-import AddMedicineModal from "../components/Inventory/AddMedicineModal";
-import ImportModal from "../components/Inventory/ImportModal";
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { medicineServices } from '../services/api';
+import LoadingSpinner from '../components/UI/LoadingSpinner';
+import InventoryTable from '../components/Inventory/InventoryTable';
+import InventoryFilters from '../components/Inventory/InventoryFilters';
+import InventoryStats from '../components/Inventory/InventoryStats';
+import AddMedicineModal from '../components/Inventory/AddMedicineModal';
+import '../styles/inventory-animations.css';
 
 const InventoryPage = () => {
-  const { profile } = useAuthContext();
-  
-  // All state hooks must be declared first
-  const [inventoryData, setInventoryData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [sortBy, setSortBy] = useState("name");
-  const [sortOrder, setSortOrder] = useState("asc");
-  const [viewMode, setViewMode] = useState("table"); // table or grid
+  const [filters, setFilters] = useState({
+    search: '',
+    stockFilter: 'all',
+    category: '',
+    manufacturer: '',
+    sortBy: 'name',
+    sortOrder: 'asc',
+    page: 1,
+    limit: 10
+  });
   const [editingMedicine, setEditingMedicine] = useState(null);
-  const [importFile, setImportFile] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(20); // Fixed items per page
-
+  const [showAddModal, setShowAddModal] = useState(false);
   const [newMedicine, setNewMedicine] = useState({
-    name: "",
-    manufacturer: "",
-    batch_number: "",
-    selling_price: "",
-    cost_price: "",
-    gst_per_unit: "",
-    quantity: "",
-    expiry_date: "",
-    category: "",
-    description: "",
-    low_stock_threshold: 10,
+    name: '',
+    generic_name: '',
+    manufacturer: '',
+    batch_number: '',
+    selling_price: '',
+    cost_price: '',
+    gst_per_unit: '',
+    gst_rate: '',
+    quantity: '',
+    low_stock_threshold: '',
+    expiry_date: '',
+    category: '',
+    description: '',
+    is_active: true
+  });
+  const queryClient = useQueryClient();
+
+  const { data: inventoryData, isLoading, refetch } = useQuery({
+    queryKey: ['inventory', filters],
+    queryFn: () => medicineServices.getAll({
+      page: filters.page,
+      limit: filters.limit,
+      search: filters.search,
+      stockFilter: filters.stockFilter,
+      sortBy: filters.sortBy,
+      sortOrder: filters.sortOrder,
+      category: filters.category,
+      manufacturer: filters.manufacturer
+    }),
+    keepPreviousData: true
   });
 
-  useEffect(() => {
-    const fetchInventory = async () => {
-      try {
-        setLoading(true);
-        const response = await api.get("/inventory"); // Example API call
-        setInventoryData(response.data);
-        setError(null);
-      } catch (err) {
-        setError("Failed to fetch inventory data");
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchInventory();
-  }, []);
+  const { data: statsData, isLoading: statsLoading, refetch: refetchStats } = useQuery({
+    queryKey: ['inventory-stats'],
+    queryFn: () => medicineServices.getStats(),
+    staleTime: 5 * 60 * 1000 // 5 minutes
+  });
 
-  // Build API filters
-  const filters = useMemo(() => {
-    const apiFilters = {
-      sortBy,
-      sortOrder,
-      page: currentPage,
-      limit: itemsPerPage,
-    };
+  const handleRefreshStats = () => {
+    queryClient.invalidateQueries(['inventory-stats']);
+    refetchStats();
+  };
 
-    if (searchQuery.length >= 2) {
-      apiFilters.query = searchQuery;
+  const updateStockMutation = useMutation({
+    mutationFn: ({ id, quantity }) => medicineServices.updateStock(id, { quantity }),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['inventory']);
+      queryClient.invalidateQueries(['inventory-stats']);
+      setEditingMedicine(null);
+    },
+    onError: (error) => {
+      console.error('Error updating stock:', error);
+      alert('Failed to update stock. Please try again.');
     }
+  });
 
-    if (filterStatus !== "all") {
-      switch (filterStatus) {
-        case "low-stock":
-          apiFilters.lowStock = true;
-          break;
-        case "out-of-stock":
-          apiFilters.outOfStock = true;
-          break;
-        case "expired":
-          // For expired, we need to include expired medicines from backend
-          // and then filter client-side to show only expired ones
-          apiFilters.includeExpired = true;
-          break;
-        case "expiring-soon":
-          apiFilters.expiringSoon = true;
-          break;
-        case "in-stock":
-          apiFilters.inStock = true;
-          apiFilters.includeExpired = false;
-          break;
-        default:
-          break;
-      }
+  const deleteMedicineMutation = useMutation({
+    mutationFn: (id) => medicineServices.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['inventory']);
+      queryClient.invalidateQueries(['inventory-stats']);
+    },
+    onError: (error) => {
+      console.error('Error deleting medicine:', error);
+      alert('Failed to delete medicine. Please try again.');
     }
+  });
 
-    return apiFilters;
-  }, [searchQuery, filterStatus, sortBy, sortOrder, currentPage, itemsPerPage]);
-
-  // React Query hooks
-  const {
-    data: medicinesData,
-    isLoading,
-    error: apiError,
-    refetch,
-  } = useInventoryMedicines(filters);
-
-  const { data: statsData, isLoading: statsLoading } = useInventoryStats();
-  const createMedicineMutation = useCreateMedicine();
-  const updateStockMutation = useUpdateStock();
-  const deleteMedicineMutation = useDeleteMedicine();
-  const bulkImportMutation = useBulkImport();
-  const exportInventoryMutation = useExportInventory();
-
-  // Extract data - handle the actual response structure
-  const medicines = medicinesData?.data?.medicines || [];
-  const pagination = medicinesData?.data?.pagination || {};
-
-  // Filter data for client-side instant feedback
-  const filteredMedicines = useMemo(() => {
-    if (!medicines.length) return [];
-
-    let filtered = [...medicines];
-
-    // Apply status-based filtering
-    if (filterStatus !== "all") {
-      switch (filterStatus) {
-        case "expired":
-          // Only show medicines that are actually expired
-          filtered = filtered.filter((medicine) => {
-            if (!medicine.expiry_date) return false;
-            const expiryDate = new Date(medicine.expiry_date);
-            const today = new Date();
-            today.setHours(0, 0, 0, 0); // Reset to start of day for accurate comparison
-            return expiryDate < today;
-          });
-          break;
-        case "expiring-soon":
-          // Show medicines expiring within 30 days
-          filtered = filtered.filter((medicine) => {
-            if (!medicine.expiry_date) return false;
-            const expiryDate = new Date(medicine.expiry_date);
-            const today = new Date();
-            const thirtyDaysFromNow = new Date();
-            thirtyDaysFromNow.setDate(today.getDate() + 30);
-            return expiryDate > today && expiryDate <= thirtyDaysFromNow;
-          });
-          break;
-        case "low-stock":
-          // Show medicines with low stock (but not zero)
-          filtered = filtered.filter((medicine) => {
-            return (
-              medicine.quantity > 0 &&
-              medicine.quantity <= (medicine.low_stock_threshold || 10)
-            );
-          });
-          break;
-        case "out-of-stock":
-          // Show medicines that are completely out of stock
-          filtered = filtered.filter((medicine) => {
-            return medicine.quantity === 0;
-          });
-          break;
-        case "in-stock":
-          // Show medicines that are in stock and not expired
-          filtered = filtered.filter((medicine) => {
-            if (!medicine.expiry_date) return medicine.quantity > 0;
-            const expiryDate = new Date(medicine.expiry_date);
-            const today = new Date();
-            return medicine.quantity > 0 && expiryDate >= today;
-          });
-          break;
-        default:
-          break;
-      }
-    }
-
-    // Apply client-side search if needed
-    if (searchQuery && searchQuery.length >= 2 && !filters.query) {
-      const searchTerm = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (medicine) =>
-          medicine.name?.toLowerCase().includes(searchTerm) ||
-          medicine.manufacturer?.toLowerCase().includes(searchTerm) ||
-          medicine.category?.toLowerCase().includes(searchTerm) ||
-          medicine.batch_number?.toLowerCase().includes(searchTerm)
-      );
-    }
-
-    return filtered;
-  }, [medicines, searchQuery, filters.query, filterStatus]);
-
-  // Event handlers
-  const handleAddMedicine = async (e) => {
-    e.preventDefault();
-
-    const medicineData = {
-      ...newMedicine,
-      selling_price: parseFloat(newMedicine.selling_price),
-      cost_price: parseFloat(newMedicine.cost_price),
-      gst_per_unit: parseFloat(newMedicine.gst_per_unit) || 0,
-      quantity: parseInt(newMedicine.quantity),
-      low_stock_threshold: parseInt(newMedicine.low_stock_threshold) || 10,
-    };
-
-    try {
-      await createMedicineMutation.mutateAsync(medicineData);
+  const createMedicineMutation = useMutation({
+    mutationFn: (medicineData) => medicineServices.create(medicineData),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['inventory']);
+      queryClient.invalidateQueries(['inventory-stats']);
       setShowAddModal(false);
-      resetForm();
-    } catch (error) {
-      console.error("Failed to create medicine:", error);
-    }
-  };
-
-  const handleUpdateQuantity = async (medicineId, newQuantity) => {
-    try {
-      await updateStockMutation.mutateAsync({
-        id: medicineId,
-        quantity: parseInt(newQuantity),
+      setNewMedicine({
+        name: '',
+        generic_name: '',
+        manufacturer: '',
+        batch_number: '',
+        selling_price: '',
+        cost_price: '',
+        gst_per_unit: '',
+        gst_rate: '',
+        quantity: '',
+        low_stock_threshold: '',
+        expiry_date: '',
+        category: '',
+        description: '',
+        is_active: true
       });
-    } catch (error) {
-      console.error("Failed to update stock:", error);
+    },
+    onError: (error) => {
+      console.error('Error creating medicine:', error);
+      alert('Failed to create medicine. Please try again.');
     }
+  });
+
+  const handleFilterChange = (newFilters) => {
+    setFilters(prev => ({ ...prev, ...newFilters, page: 1 }));
   };
 
-  const handleDeleteMedicine = async (medicineId, medicineName) => {
-    if (window.confirm(`Are you sure you want to delete "${medicineName}"?`)) {
-      try {
-        await deleteMedicineMutation.mutateAsync(medicineId);
-      } catch (error) {
-        console.error("Failed to delete medicine:", error);
-      }
-    }
-  };
-
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const allowedTypes = [
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "application/vnd.ms-excel",
-      "text/csv",
-    ];
-
-    if (!allowedTypes.includes(file.type)) {
-      toast.error("Please upload an Excel (.xlsx, .xls) or CSV file");
-      return;
-    }
-
-    setImportFile(file);
-  };
-
-  const handleImportData = async () => {
-    if (!importFile) {
-      toast.error("Please select a file to import");
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("file", importFile);
-
-    try {
-      await bulkImportMutation.mutateAsync(formData);
-      setShowImportModal(false);
-      setImportFile(null);
-    } catch (error) {
-      console.error("Failed to import data:", error);
-    }
-  };
-
-  const handleExportData = async () => {
-    try {
-      await exportInventoryMutation.mutateAsync();
-    } catch (error) {
-      console.error("Failed to export data:", error);
-    }
-  };
-
-  const resetForm = () => {
-    setNewMedicine({
-      name: "",
-      manufacturer: "",
-      batch_number: "",
-      selling_price: "",
-      cost_price: "",
-      gst_per_unit: "",
-      quantity: "",
-      expiry_date: "",
-      category: "",
-      description: "",
-      low_stock_threshold: 10,
-    });
-  };
-
-  // Pagination handlers
-  const handlePageChange = (newPage) => {
-    setCurrentPage(newPage);
-  };
-
-  const handleNextPage = () => {
-    if (pagination.hasNextPage) {
-      setCurrentPage(currentPage + 1);
+  const handlePageChange = (page) => {
+    // Add smooth transition effect
+    const tableContainer = document.querySelector('.inventory-table-container');
+    if (tableContainer) {
+      tableContainer.style.opacity = '0.7';
+      tableContainer.style.transform = 'translateY(10px)';
+      
+      setTimeout(() => {
+        setFilters(prev => ({ ...prev, page }));
+        setTimeout(() => {
+          tableContainer.style.opacity = '1';
+          tableContainer.style.transform = 'translateY(0)';
+        }, 100);
+      }, 150);
+    } else {
+      setFilters(prev => ({ ...prev, page }));
     }
   };
 
   const handlePrevPage = () => {
-    if (pagination.hasPrevPage) {
-      setCurrentPage(currentPage - 1);
+    if (inventoryData?.data?.pagination?.hasPrevPage) {
+      handlePageChange(inventoryData.data.pagination.currentPage - 1);
     }
   };
 
-  // Reset page when filters change
-  const handleSearchChange = (query) => {
-    setSearchQuery(query);
-    setCurrentPage(1);
+  const handleNextPage = () => {
+    if (inventoryData?.data?.pagination?.hasNextPage) {
+      handlePageChange(inventoryData.data.pagination.currentPage + 1);
+    }
   };
 
-  const handleFilterStatusChange = (status) => {
-    setFilterStatus(status);
-    setCurrentPage(1);
+  const handleUpdateQuantity = (id, quantity) => {
+    updateStockMutation.mutate({ id, quantity });
   };
 
-  const handleSortChange = (field, order) => {
-    setSortBy(field);
-    setSortOrder(order);
-    setCurrentPage(1);
+  const handleDeleteMedicine = (id, name) => {
+    if (window.confirm(`Are you sure you want to delete ${name}?`)) {
+      deleteMedicineMutation.mutate(id);
+    }
   };
 
-  // Error state
-  if (apiError) {
+  const handleCreateMedicine = (e) => {
+    e.preventDefault();
+    createMedicineMutation.mutate(newMedicine);
+  };
+
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-            <div className="flex items-center">
-              <svg
-                className="w-6 h-6 text-red-600 mr-3"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <div>
-                <h3 className="text-lg font-medium text-red-800">
-                  Error Loading Inventory
-                </h3>
-                <p className="text-red-600 mt-1">{apiError.message}</p>
-                <button
-                  onClick={() => refetch()}
-                  className="mt-3 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
-                >
-                  Try Again
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner text="Loading inventory..." />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header Section */}
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                Inventory Management
-              </h1>
-              <p className="text-gray-600 mt-1">
-                Manage your medicine inventory, track stock levels, and monitor
-                expiry dates
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              {/* View Mode Toggle */}
-              <div className="flex bg-gray-100 rounded-lg p-1">
-                <button
-                  onClick={() => setViewMode("table")}
-                  className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    viewMode === "table"
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-gray-500 hover:text-gray-700"
-                  }`}
-                >
-                  Table
-                </button>
-                <button
-                  onClick={() => setViewMode("grid")}
-                  className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    viewMode === "grid"
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-gray-500 hover:text-gray-700"
-                  }`}
-                >
-                  Grid
-                </button>
-              </div>
-
-              {/* Action Buttons */}
-              <button
-                onClick={() => setShowImportModal(true)}
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <svg
-                  className="w-4 h-4 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
-                  />
-                </svg>
-                Import
-              </button>
-
-              <button
-                onClick={handleExportData}
-                disabled={exportInventoryMutation.isLoading}
-                className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <svg
-                  className="w-4 h-4 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                  />
-                </svg>
-                {exportInventoryMutation.isLoading ? "Exporting..." : "Export"}
-              </button>
-
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-              >
-                <svg
-                  className="w-4 h-4 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                  />
-                </svg>
-                Add Medicine
-              </button>
-            </div>
+    <div className="p-6">
+      <div className="mb-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
+            <p className="text-gray-600">Manage your medicine stock and monitor inventory levels</p>
+          </div>
+          <div className="flex space-x-3">
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              <span>Add Medicine</span>
+            </button>
+            <button
+              onClick={handleRefreshStats}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Refresh Stats
+            </button>
           </div>
         </div>
+      </div>
 
-        {/* Stats Section */}
-        <InventoryStats data={statsData} isLoading={statsLoading} />
+      <InventoryStats data={statsData?.data?.data} isLoading={statsLoading} />
 
-        {/* Filters Section */}
+      <div className="mt-6">
         <InventoryFilters
-          searchQuery={searchQuery}
-          setSearchQuery={handleSearchChange}
-          filterStatus={filterStatus}
-          setFilterStatus={handleFilterStatusChange}
-          sortBy={sortBy}
-          setSortBy={(field) => handleSortChange(field, sortOrder)}
-          sortOrder={sortOrder}
-          setSortOrder={(order) => handleSortChange(sortBy, order)}
+          searchQuery={filters.search}
+          setSearchQuery={(search) => handleFilterChange({ search })}
+          filterStatus={filters.stockFilter}
+          setFilterStatus={(stockFilter) => handleFilterChange({ stockFilter })}
+          category={filters.category}
+          setCategory={(category) => handleFilterChange({ category })}
+          manufacturer={filters.manufacturer}
+          setManufacturer={(manufacturer) => handleFilterChange({ manufacturer })}
+          sortBy={filters.sortBy}
+          setSortBy={(sortBy) => handleFilterChange({ sortBy })}
+          sortOrder={filters.sortOrder}
+          setSortOrder={(sortOrder) => handleFilterChange({ sortOrder })}
         />
+      </div>
 
-        {/* Main Content */}
+      <div className="mt-6">
         <InventoryTable
-          medicines={filteredMedicines}
+          medicines={inventoryData?.data?.data?.medicines || []}
           isLoading={isLoading}
-          viewMode={viewMode}
           editingMedicine={editingMedicine}
           setEditingMedicine={setEditingMedicine}
           onUpdateQuantity={handleUpdateQuantity}
           onDeleteMedicine={handleDeleteMedicine}
           updateStockMutation={updateStockMutation}
           deleteMedicineMutation={deleteMedicineMutation}
-          pagination={pagination}
+          pagination={inventoryData?.data?.pagination}
           onPageChange={handlePageChange}
           onNextPage={handleNextPage}
           onPrevPage={handlePrevPage}
         />
       </div>
 
-      {/* Modals */}
       <AddMedicineModal
         show={showAddModal}
-        onClose={() => {
-          setShowAddModal(false);
-          resetForm();
-        }}
+        onClose={() => setShowAddModal(false)}
         newMedicine={newMedicine}
         setNewMedicine={setNewMedicine}
-        onSubmit={handleAddMedicine}
+        onSubmit={handleCreateMedicine}
         isLoading={createMedicineMutation.isLoading}
-      />
-
-      <ImportModal
-        show={showImportModal}
-        onClose={() => {
-          setShowImportModal(false);
-          setImportFile(null);
-        }}
-        importFile={importFile}
-        onFileUpload={handleFileUpload}
-        onImport={handleImportData}
-        isLoading={bulkImportMutation.isLoading}
       />
     </div>
   );

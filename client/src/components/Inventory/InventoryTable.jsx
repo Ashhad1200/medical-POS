@@ -1,5 +1,61 @@
 import React from "react";
 import { getStockStatus } from "../../hooks/useInventory";
+import { formatCurrency, safeMultiply } from "../../utils/currency";
+
+// Add CSS for animations
+const styles = `
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .animate-fadeIn {
+    animation: fadeIn 0.3s ease-out forwards;
+  }
+  
+  .table-row-hover {
+    transition: all 0.2s ease;
+  }
+  
+  .table-row-hover:hover {
+    background-color: #eff6ff;
+  }
+  
+  .inventory-table-container {
+    transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+  }
+  
+  .action-button {
+    transition: all 0.2s ease;
+  }
+  
+  .action-button:hover {
+    transform: scale(1.1);
+  }
+  
+  .pagination-button {
+    transition: all 0.2s ease;
+  }
+  
+  .pagination-button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
+`;
+
+// Inject styles
+if (typeof document !== 'undefined' && !document.getElementById('inventory-table-styles')) {
+  const styleSheet = document.createElement('style');
+  styleSheet.id = 'inventory-table-styles';
+  styleSheet.textContent = styles;
+  document.head.appendChild(styleSheet);
+}
 
 const LoadingSkeleton = () => (
   <div className="animate-pulse">
@@ -105,6 +161,7 @@ const TableRow = ({
   onUpdateQuantity,
   onDeleteMedicine,
   updateStockMutation,
+  index = 0,
 }) => {
   const stockStatus = getStockStatus(medicine);
   const isExpired = medicine.expiry_date ? new Date(medicine.expiry_date) <= new Date() : false;
@@ -134,7 +191,10 @@ const TableRow = ({
       : 0;
 
   return (
-    <tr className="hover:bg-gray-50 transition-colors">
+    <tr 
+      className="table-row-hover animate-fadeIn" 
+      style={{animationDelay: `${index * 50}ms`}}
+    >
       {/* Medicine Details */}
       <td className="px-6 py-4">
         <div className="flex items-start space-x-3">
@@ -177,10 +237,10 @@ const TableRow = ({
       <td className="px-6 py-4">
         <div className="text-right space-y-1">
           <div className="text-base font-semibold text-gray-900">
-            Rs.{medicine.selling_price?.toFixed(2) || "0.00"}
+            {formatCurrency(medicine.selling_price)}
           </div>
           <div className="text-sm text-gray-500">
-            Cost: Rs.{medicine.cost_price?.toFixed(2) || "0.00"}
+            Cost: {formatCurrency(medicine.cost_price)}
           </div>
           <div className="text-xs text-green-600 font-medium">
             +{profitMargin}% margin
@@ -254,8 +314,7 @@ const TableRow = ({
       <td className="px-6 py-4">
         <div className="text-right">
           <div className="text-sm font-medium text-gray-900">
-            Rs.
-            {((medicine.quantity || 0) * (medicine.cost_price || 0)).toFixed(2)}
+            {formatCurrency(safeMultiply(medicine.quantity, medicine.cost_price))}
           </div>
           <div className="text-xs text-gray-500">Cost value</div>
         </div>
@@ -266,7 +325,7 @@ const TableRow = ({
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setEditingMedicine(medicine.id)}
-            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded action-button"
             title="Edit quantity"
           >
             <svg
@@ -286,7 +345,7 @@ const TableRow = ({
 
           <button
             onClick={() => onDeleteMedicine(medicine.id, medicine.name)}
-            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded action-button"
             title="Delete medicine"
           >
             <svg
@@ -343,9 +402,9 @@ const InventoryTable = ({
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+    <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
       {/* Table Header */}
-      <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+      <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-900">
             Medicines ({pagination?.totalItems || medicines.length})
@@ -357,35 +416,35 @@ const InventoryTable = ({
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto">
+      <div className="inventory-table-container overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+          <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                 Medicine Details
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
                 Pricing
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                 Stock
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                 Status
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                 Expiry
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
                 Total Value
               </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {medicines.map((medicine) => (
+            {medicines.map((medicine, index) => (
               <TableRow
                 key={medicine.id}
                 medicine={medicine}
@@ -394,6 +453,7 @@ const InventoryTable = ({
                 onUpdateQuantity={onUpdateQuantity}
                 onDeleteMedicine={onDeleteMedicine}
                 updateStockMutation={updateStockMutation}
+                index={index}
               />
             ))}
           </tbody>
@@ -402,22 +462,27 @@ const InventoryTable = ({
 
       {/* Pagination */}
       {pagination && pagination.totalPages > 1 && (
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+        <div className="px-6 py-4 border-t border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100">
           <div className="flex items-center justify-between">
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-gray-700">
               Showing{" "}
-              {(pagination.currentPage - 1) * pagination.itemsPerPage + 1} to{" "}
-              {Math.min(
-                pagination.currentPage * pagination.itemsPerPage,
-                pagination.totalItems
-              )}{" "}
-              of {pagination.totalItems} results
+              <span className="font-semibold text-blue-600">
+                {pagination.totalItems === 0 ? 0 : (pagination.currentPage - 1) * pagination.itemsPerPage + 1}
+              </span>{" "}
+              to{" "}
+              <span className="font-semibold text-blue-600">
+                {Math.min(
+                  pagination.currentPage * pagination.itemsPerPage,
+                  pagination.totalItems
+                )}
+              </span>{" "}
+              of <span className="font-semibold text-blue-600">{pagination.totalItems}</span> results
             </div>
             <div className="flex items-center space-x-2">
               <button
                 onClick={onPrevPage}
                 disabled={!pagination.hasPrevPage}
-                className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="pagination-button px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
               >
                 Previous
               </button>
@@ -428,66 +493,108 @@ const InventoryTable = ({
                   const pages = [];
                   const currentPage = pagination.currentPage;
                   const totalPages = pagination.totalPages;
+                  const maxVisiblePages = 7;
 
-                  // Always show first page
-                  if (currentPage > 3) {
+                  if (totalPages <= maxVisiblePages) {
+                    // Show all pages if total is small
+                    for (let i = 1; i <= totalPages; i++) {
+                      pages.push(
+                        <button
+                          key={i}
+                          onClick={() => onPageChange(i)}
+                          className={`pagination-button px-4 py-2 text-sm rounded-lg ${
+                            i === currentPage
+                              ? "bg-blue-600 text-white border border-blue-600 shadow-lg"
+                              : "border border-gray-300 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300"
+                          }`}
+                        >
+                          {i}
+                        </button>
+                      );
+                    }
+                  } else {
+                    // Always show first page
                     pages.push(
                       <button
                         key={1}
                         onClick={() => onPageChange(1)}
-                        className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                        className={`pagination-button px-4 py-2 text-sm rounded-lg ${
+                          1 === currentPage
+                            ? "bg-blue-600 text-white border border-blue-600 shadow-lg"
+                            : "border border-gray-300 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300"
+                        }`}
                       >
                         1
                       </button>
                     );
-                    if (currentPage > 4) {
+
+                    let startPage, endPage;
+                    
+                    if (currentPage <= 3) {
+                      // Near the beginning
+                      startPage = 2;
+                      endPage = 4;
+                    } else if (currentPage >= totalPages - 2) {
+                      // Near the end
+                      startPage = totalPages - 3;
+                      endPage = totalPages - 1;
+                    } else {
+                      // In the middle
+                      startPage = currentPage - 1;
+                      endPage = currentPage + 1;
+                    }
+                    
+                    // Add ellipsis after first page if needed
+                    if (startPage > 2) {
                       pages.push(
-                        <span key="ellipsis1" className="px-2 text-gray-500">
-                          ...
+                        <span key="ellipsis1" className="px-4 py-2 text-sm text-gray-500">
+                          •••
                         </span>
                       );
                     }
-                  }
-
-                  // Show pages around current page
-                  for (
-                    let i = Math.max(1, currentPage - 2);
-                    i <= Math.min(totalPages, currentPage + 2);
-                    i++
-                  ) {
-                    pages.push(
-                      <button
-                        key={i}
-                        onClick={() => onPageChange(i)}
-                        className={`px-3 py-1 text-sm rounded transition-colors ${
-                          i === currentPage
-                            ? "bg-blue-100 text-blue-800 border border-blue-200"
-                            : "border border-gray-300 hover:bg-gray-50"
-                        }`}
-                      >
-                        {i}
-                      </button>
-                    );
-                  }
-
-                  // Always show last page
-                  if (currentPage < totalPages - 2) {
-                    if (currentPage < totalPages - 3) {
+                    
+                    // Add middle pages
+                    for (let i = startPage; i <= endPage; i++) {
                       pages.push(
-                        <span key="ellipsis2" className="px-2 text-gray-500">
-                          ...
+                        <button
+                          key={i}
+                          onClick={() => onPageChange(i)}
+                          className={`pagination-button px-4 py-2 text-sm rounded-lg ${
+                            i === currentPage
+                              ? "bg-blue-600 text-white border border-blue-600 shadow-lg"
+                              : "border border-gray-300 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300"
+                          }`}
+                        >
+                          {i}
+                        </button>
+                      );
+                    }
+                    
+                    // Add ellipsis before last page if needed
+                    if (endPage < totalPages - 1) {
+                      pages.push(
+                        <span key="ellipsis2" className="px-4 py-2 text-sm text-gray-500">
+                          •••
                         </span>
                       );
                     }
-                    pages.push(
-                      <button
-                        key={totalPages}
-                        onClick={() => onPageChange(totalPages)}
-                        className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-                      >
-                        {totalPages}
-                      </button>
-                    );
+                    
+                    // Always show last page
+                    if (totalPages > 1) {
+                      pages.push(
+                        <button
+                          key={totalPages}
+                          onClick={() => onPageChange(totalPages)}
+                          className={`pagination-button px-4 py-2 text-sm rounded-lg ${
+                            totalPages === currentPage
+                              ? "bg-blue-600 text-white border border-blue-600 shadow-lg"
+                              : "border border-gray-300 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300"
+                          }`}
+                        >
+                          {totalPages}
+                        </button>
+                      );
+                    }
                   }
 
                   return pages;
@@ -497,7 +604,7 @@ const InventoryTable = ({
               <button
                 onClick={onNextPage}
                 disabled={!pagination.hasNextPage}
-                className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="pagination-button px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
               >
                 Next
               </button>

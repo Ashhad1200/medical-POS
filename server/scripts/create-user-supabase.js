@@ -2,12 +2,12 @@ const { supabase } = require("../config/supabase");
 require("dotenv").config({ path: "../.env" }); // Load server .env
 
 const createUserInSupabase = async () => {
-const email = "exp@gmail.com";
+const email = "testuser@example.com";
 const password = "counter123"; // Updated password to match documentation
 const username = "expuser";
 const fullName = "Experiment User";
 const role = "counter"; // Default role for the new user
-const defaultOrgCode = "MPS-001"; // Default organization code
+const defaultOrgCode = "MOIZ001"; // Default organization code
 
 try {
   console.log(`Attempting to create user: ${email}`);
@@ -62,7 +62,7 @@ try {
   const { data: existingProfile, error: fetchProfileError } = await supabase
     .from("users")
     .select("id")
-    .eq("supabaseUid", authData.user.id)
+    .eq("supabase_uid", authData.user.id)
     .single();
 
   if (fetchProfileError && fetchProfileError.code !== 'PGRST116') { // PGRST116 means no rows found
@@ -76,16 +76,16 @@ try {
     const { data: profile, error: profileError } = await supabase
       .from("users")
       .insert({
-        supabaseUid: authData.user.id,
+        supabase_uid: authData.user.id,
         username,
         email,
-        fullName: fullName,
+        full_name: fullName,
         role: role,
-        roleInPOS: role, // Assuming roleInPOS is the same as role for simplicity
-        isActive: true,
+        role_in_pos: role, // Assuming role_in_pos is the same as role for simplicity
+        is_active: true,
         permissions: ["medicine:read", "order:create", "order:read"], // Default permissions
-        organizationId: organizationId, // Assign organizationId
-        // createdBy: null, // Assuming this script runs independently, no creator
+        organization_id: organizationId, // Assign organization_id
+        // created_by: null, // Assuming this script runs independently, no creator
       })
       .select()
       .single();

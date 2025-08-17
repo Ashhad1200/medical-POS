@@ -1,17 +1,19 @@
 import React, { useState, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
-import { medicineServices, purchaseOrderServices } from "../../services/api";
+import { medicineServices } from "../../services/api";
+import { useCreatePurchaseOrder } from "../../hooks/usePurchaseOrders";
 
 const CreateOrderModal = ({ show, onClose, supplier }) => {
+  // Early return must be before any hooks to avoid hooks order violation
+  if (!show || !supplier) return null;
+
   const [searchQuery, setSearchQuery] = useState("");
   const [currentOrder, setCurrentOrder] = useState([]);
   const [orderData, setOrderData] = useState({
     expectedDate: "",
     notes: "",
   });
-
-  const queryClient = useQueryClient();
 
   // Fetch medicines for selection
   const { data: medicinesData, isLoading: medicinesLoading } = useQuery({
@@ -23,21 +25,7 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
   });
 
   // Create purchase order mutation
-  const createOrderMutation = useMutation({
-    mutationFn: (orderData) => purchaseOrderServices.create(orderData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
-      toast.success("Purchase order created successfully!");
-      onClose();
-      resetOrder();
-    },
-    onError: (error) => {
-      const message = error.response?.data?.message || "Failed to create order";
-      toast.error(message);
-    },
-  });
-
-  if (!show || !supplier) return null;
+  const createOrderMutation = useCreatePurchaseOrder();
 
   const medicines = medicinesData?.data?.medicines || [];
 
@@ -74,12 +62,11 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
           name: medicine.name,
           manufacturer: medicine.manufacturer,
           quantity: 1,
-          tradePrice: medicine.tradePrice || 0,
+          cost_price: medicine.cost_price || 0,
           notes: "",
         },
       ]);
     }
-    toast.success(`${medicine.name} added to order`);
   };
 
   const updateOrderItem = (medicineId, field, value) => {
@@ -98,25 +85,53 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
 
   const calculateOrderTotal = () => {
     return currentOrder.reduce((total, item) => {
-      return total + item.quantity * item.tradePrice;
+      return total + item.quantity * item.cost_price;
     }, 0);
   };
 
   const handleSubmitOrder = async () => {
+    console.log('Create order button clicked');
+    
     if (currentOrder.length === 0) {
       toast.error("Please add medicines to the order");
       return;
     }
 
+    if (!orderData.expectedDate) {
+      toast.error("Please select an expected delivery date");
+      return;
+    }
+
+    // Transform the order items to match server expectations
+    const transformedItems = currentOrder.map(item => ({
+      medicineId: item.medicineId,
+      quantity: item.quantity,
+      unitCost: item.cost_price || 0,
+    }));
+
     const orderPayload = {
       supplierId: supplier.id,
-      items: currentOrder,
-      expectedDate: orderData.expectedDate,
+      items: transformedItems,
+      expectedDeliveryDate: orderData.expectedDate,
       notes: orderData.notes,
-      total: calculateOrderTotal(),
+      taxAmount: 0,
+      discountAmount: 0,
     };
 
-    await createOrderMutation.mutateAsync(orderPayload);
+    console.log('Order payload:', orderPayload);
+
+    try {
+      const result = await createOrderMutation.mutateAsync(orderPayload);
+      console.log('Order creation result:', result);
+      // Handle success manually since we're not using the hook's onSuccess
+      toast.success("Purchase order created successfully!");
+      onClose();
+      resetOrder();
+    } catch (error) {
+      console.error('Order creation error:', error);
+      console.error('Error details:', error.response?.data);
+      // Error toast is already handled by the hook
+    }
   };
 
   const resetOrder = () => {
@@ -173,7 +188,7 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
             {/* Available Medicines */}
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-white">
+                <h3 className="text-lg font-medium text-gray-900">
                   Available Medicines
                 </h3>
                 <div className="relative">
@@ -182,7 +197,7 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
                     placeholder="Search medicines..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-64 pl-10 pr-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-200 text-sm"
+                    className="w-64 pl-10 pr-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-sm"
                   />
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <svg
@@ -211,24 +226,24 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
                   filteredMedicines.map((medicine) => (
                     <div
                       key={medicine.id}
-                      className="bg-white/5 border border-white/10 rounded-lg p-4 hover:bg-white/10 transition-colors backdrop-blur-sm"
+                      className="bg-gray-50 border border-gray-200 rounded-lg p-4 hover:bg-gray-100 transition-colors"
                     >
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
-                          <h4 className="font-medium text-white">
+                          <h4 className="font-medium text-gray-900">
                             {medicine.name}
                           </h4>
-                          <p className="text-sm text-gray-300">
+                          <p className="text-sm text-gray-600">
                             {medicine.manufacturer}
                           </p>
                           <div className="flex items-center space-x-4 mt-2">
-                            <span className="text-sm text-gray-400">
+                            <span className="text-sm text-gray-500">
                               Batch: {medicine.batch_number}
                             </span>
-                            <span className="text-sm font-medium text-green-400">
-                              Rs. {medicine.tradePrice?.toFixed(2) || "0.00"}
+                            <span className="text-sm font-medium text-green-600">
+                              Rs. {medicine.cost_price?.toFixed(2) || "0.00"}
                             </span>
-                            <span className="text-sm text-gray-400">
+                            <span className="text-sm text-gray-500">
                               Stock: {medicine.quantity}
                             </span>
                           </div>
@@ -264,7 +279,7 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
 
             {/* Order Items */}
             <div>
-              <h3 className="text-lg font-medium text-white mb-4">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
                 Order Items ({currentOrder.length})
               </h3>
 
@@ -273,14 +288,14 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
                   currentOrder.map((item) => (
                     <div
                       key={item.medicineId}
-                      className="bg-white/5 border border-white/10 rounded-lg p-4 backdrop-blur-sm"
+                      className="bg-gray-50 border border-gray-200 rounded-lg p-4"
                     >
                       <div className="flex justify-between items-start mb-3">
                         <div>
-                          <h4 className="font-medium text-white">
+                          <h4 className="font-medium text-gray-900">
                             {item.name}
                           </h4>
-                          <p className="text-sm text-gray-300">
+                          <p className="text-sm text-gray-600">
                             {item.manufacturer}
                           </p>
                         </div>
@@ -306,7 +321,7 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
 
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-xs font-medium text-gray-300 mb-1">
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
                             Quantity
                           </label>
                           <input
@@ -320,32 +335,32 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
                                 parseInt(e.target.value) || 1
                               )
                             }
-                            className="w-full px-2 py-1 bg-white/10 border border-white/20 rounded text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-200"
+                            className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                           />
                         </div>
 
                         <div>
-                          <label className="block text-xs font-medium text-gray-300 mb-1">
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
                             Trade Price
                           </label>
                           <input
                             type="number"
                             step="0.01"
-                            value={item.tradePrice}
+                            value={item.cost_price}
                             onChange={(e) =>
                               updateOrderItem(
                                 item.medicineId,
-                                "tradePrice",
+                                "cost_price",
                                 parseFloat(e.target.value) || 0
                               )
                             }
-                            className="w-full px-2 py-1 bg-white/10 border border-white/20 rounded text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-200"
+                            className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                           />
                         </div>
                       </div>
 
                       <div className="mt-3">
-                        <label className="block text-xs font-medium text-gray-300 mb-1">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
                           Notes
                         </label>
                         <input
@@ -358,21 +373,21 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
                               e.target.value
                             )
                           }
-                          className="w-full px-2 py-1 bg-white/10 border border-white/20 rounded text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-200"
+                          className="w-full px-2 py-1 bg-white border border-gray-300 rounded text-gray-900 placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                           placeholder="Optional notes"
                         />
                       </div>
 
                       <div className="mt-3 text-right">
-                        <span className="font-semibold text-white">
+                        <span className="font-semibold text-gray-900">
                           Subtotal: Rs.
-                          {(item.quantity * item.tradePrice).toFixed(2)}
+                          {(item.quantity * item.cost_price).toFixed(2)}
                         </span>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div className="text-center py-8 text-gray-400">
+                  <div className="text-center py-8 text-gray-500">
                     <p>No items added to order</p>
                   </div>
                 )}
@@ -381,7 +396,7 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
               {/* Order Details */}
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Expected Delivery Date
                   </label>
                   <input
@@ -393,12 +408,12 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
                         expectedDate: e.target.value,
                       })
                     }
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-200 backdrop-blur-sm"
+                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Order Notes
                   </label>
                   <textarea
@@ -407,18 +422,18 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
                       setOrderData({ ...orderData, notes: e.target.value })
                     }
                     rows={3}
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 transition-all duration-200 backdrop-blur-sm"
+                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                     placeholder="Additional notes for this order"
                   />
                 </div>
 
                 {/* Order Total */}
-                <div className="border-t border-white/10 pt-4">
+                <div className="border-t border-gray-200 pt-4">
                   <div className="flex justify-between items-center mb-4">
-                    <span className="text-lg font-semibold text-white">
+                    <span className="text-lg font-semibold text-gray-900">
                       Total Amount:
                     </span>
-                    <span className="text-xl font-bold text-blue-400">
+                    <span className="text-xl font-bold text-blue-600">
                       Rs. {calculateOrderTotal().toFixed(2)}
                     </span>
                   </div>
@@ -426,7 +441,7 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
                   <div className="flex space-x-3">
                     <button
                       onClick={onClose}
-                      className="flex-1 px-4 py-2 text-sm font-medium text-gray-300 bg-white/10 border border-white/20 rounded-lg hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-blue-400/50 transition-all duration-200 backdrop-blur-sm"
+                      className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
                     >
                       Cancel
                     </button>
@@ -436,7 +451,7 @@ const CreateOrderModal = ({ show, onClose, supplier }) => {
                         currentOrder.length === 0 ||
                         createOrderMutation.isLoading
                       }
-                      className="flex-1 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-purple-600 border border-transparent rounded-lg hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-400/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg"
+                      className="flex-1 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-purple-600 border border-transparent rounded-lg hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg"
                     >
                       {createOrderMutation.isLoading ? (
                         <div className="flex items-center justify-center">

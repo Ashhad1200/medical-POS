@@ -1,6 +1,7 @@
 import React from "react";
 import POSButton from "./POSButton";
 import ResetLink from "./ResetLink";
+import { formatCurrency } from "../../utils/currency";
 
 const TotalFooter = ({
   subtotal,
@@ -17,13 +18,13 @@ const TotalFooter = ({
         <div className="flex justify-between">
           <span className="text-gray-600">Subtotal:</span>
           <span className="font-medium text-gray-800">
-            Rs.{subtotal.toFixed(2)}
+            {formatCurrency(subtotal)}
           </span>
         </div>
         <div className="flex justify-between">
           <span className="text-gray-600">Tax:</span>
           <span className="font-medium text-gray-800">
-            Rs.{taxAmount.toFixed(2)}
+            {formatCurrency(taxAmount)}
           </span>
         </div>
         <div className="flex justify-between items-center pt-1 mt-1 border-t border-gray-300">
@@ -31,7 +32,7 @@ const TotalFooter = ({
             Grand Total:
           </span>
           <span className="text-xl font-bold text-blue-600">
-            Rs.{grandTotal.toFixed(2)}
+            {formatCurrency(grandTotal)}
           </span>
         </div>
       </div>

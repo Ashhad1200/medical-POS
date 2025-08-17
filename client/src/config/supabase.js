@@ -34,16 +34,31 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
-// Helper function to get user profile
+// Helper function to get user profile with organization data
 export const getUserProfile = async (userId) => {
   try {
     const { data, error } = await supabase
       .from("users")
-      .select("*")
+      .select(`
+        *,
+        organization:organizations!inner(
+          id,
+          name,
+          access_valid_till,
+          is_active
+        )
+      `)
       .eq("supabase_uid", userId)
       .single();
 
     if (error) throw error;
+    
+    // Flatten organization data for easier access
+    if (data && data.organization) {
+      data.organization_access_valid_till = data.organization.access_valid_till;
+      data.organization_is_active = data.organization.is_active;
+    }
+    
     return data;
   } catch (error) {
     console.error("Error fetching user profile:", error);

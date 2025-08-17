@@ -64,56 +64,16 @@ export const useInventoryStats = () => {
   return useQuery({
     queryKey: inventoryKeys.stats(),
     queryFn: async () => {
-      const [allMedicines, lowStock] = await Promise.all([
-        medicineServices
-          .getAll({ includeExpired: true, limit: 1000 }) // Fetch all medicines
-          .then((res) => res.data),
-        medicineServices.getLowStock().then((res) => res.data),
-      ]);
-
-      const medicines = allMedicines.data?.medicines || [];
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // Reset to start of day
-
-      // Calculate expired medicines
-      const expiredMedicines = medicines.filter((med) => {
-        if (!med.expiry_date) return false;
-        const expiryDate = new Date(med.expiry_date);
-        return expiryDate < today;
-      });
-
-      // Calculate valid medicines (in stock and not expired)
-      const validMedicines = medicines.filter(
-        (med) => med.quantity > 0 && (!med.expiry_date || new Date(med.expiry_date) >= today)
-      );
-
-      // Calculate total inventory value from all medicines
-      const totalValue = medicines.reduce((total, med) => {
-        return total + (med.quantity || 0) * (med.cost_price || 0);
-      }, 0);
-
-      // Calculate expiring soon (within 30 days)
-      const thirtyDaysFromNow = new Date();
-      thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-
-      const expiringSoon = medicines.filter((med) => {
-        if (!med.expiry_date) return false;
-        const expiryDate = new Date(med.expiry_date);
-        return expiryDate > today && expiryDate <= thirtyDaysFromNow;
-      }).length;
-
-      return {
-        total: medicines.length,
-        lowStock: lowStock.data?.medicines?.length || 0,
-        expired: expiredMedicines.length,
-        inStock: validMedicines.length,
-        expiringSoon,
-        totalValue: Math.round(totalValue * 100) / 100, // Round to 2 decimal places
-        outOfStock: medicines.filter((med) => (med.quantity || 0) === 0).length,
-        averageValue:
-          medicines.length > 0
-            ? Math.round((totalValue / medicines.length) * 100) / 100
-            : 0,
+      const response = await medicineServices.getStats();
+      return response.data.data || {
+        total: 0,
+        lowStock: 0,
+        expired: 0,
+        inStock: 0,
+        expiringSoon: 0,
+        totalValue: 0,
+        outOfStock: 0,
+        averageValue: 0,
       };
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -307,7 +267,12 @@ export const useDeleteMedicine = () => {
       queryClient.invalidateQueries({ queryKey: inventoryKeys.medicines() });
       queryClient.invalidateQueries({ queryKey: inventoryKeys.stats() });
 
-      toast.success("Medicine deleted successfully!");
+      // Show appropriate message based on whether it was deleted or archived
+      if (response.data.archived) {
+        toast.success(response.data.message || "Medicine archived successfully!");
+      } else {
+        toast.success("Medicine deleted successfully!");
+      }
     },
     onError: (error, id, context) => {
       // Rollback optimistic update

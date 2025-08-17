@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import QuantityInput from "./QuantityInput";
 import DiscountSelect from "./DiscountSelect";
 import AddToOrderButton from "./AddToOrderButton";
+import { formatCurrency } from "../../utils/currency";
 
 const MedicineCard = ({ medicine, onAddToOrder }) => {
   const [quantity, setQuantity] = useState(1);
@@ -71,7 +72,7 @@ const MedicineCard = ({ medicine, onAddToOrder }) => {
             id={`price-${medicine.id}`}
             className="text-sm text-gray-800 font-medium"
           >
-            Rs.{medicine.unitPrice.toFixed(2)}
+            {formatCurrency(medicine.unitPrice)}
           </p>
         </div>
 

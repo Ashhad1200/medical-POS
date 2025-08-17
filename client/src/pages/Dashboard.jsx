@@ -1,5 +1,6 @@
 import React from "react";
 import { useAuthContext } from "../contexts/AuthContext";
+import AIAnalyticsDashboard from "../components/Dashboard/AIAnalyticsDashboard";
 
 const Dashboard = () => {
   const { profile } = useAuthContext();
@@ -7,27 +8,7 @@ const Dashboard = () => {
   const getDashboardContent = () => {
     switch (profile?.role_in_pos) {
       case "admin":
-        return (
-          <div className="space-y-6">
-            <div className="bg-white p-6 rounded-lg shadow">
-              <h2 className="text-xl font-semibold mb-4">Admin Overview</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-blue-50 p-4 rounded">
-                  <h3 className="font-medium text-blue-800">Total Orders</h3>
-                  <p className="text-2xl font-bold text-blue-600">0</p>
-                </div>
-                <div className="bg-green-50 p-4 rounded">
-                  <h3 className="font-medium text-green-800">Total Sales</h3>
-                  <p className="text-2xl font-bold text-green-600">$0</p>
-                </div>
-                <div className="bg-purple-50 p-4 rounded">
-                  <h3 className="font-medium text-purple-800">Active Users</h3>
-                  <p className="text-2xl font-bold text-purple-600">0</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
+        return <AIAnalyticsDashboard />;
       case "counter":
         return (
           <div className="space-y-6">
@@ -63,6 +44,11 @@ const Dashboard = () => {
         );
     }
   };
+
+  // For admin users, return the full analytics dashboard without wrapper
+  if (profile?.role_in_pos === "admin") {
+    return getDashboardContent();
+  }
 
   return (
     <div className="p-6">

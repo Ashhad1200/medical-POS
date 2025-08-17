@@ -23,9 +23,32 @@ const OrdersPage = () => {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const response = await api.get(`/orders?date=${selectedDate}`);
-      setOrdersData(response.data.data.orders);
-      setSummary(response.data.data.summary);
+      // Convert selectedDate to start and end of day for proper filtering
+      const startDate = new Date(selectedDate);
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = new Date(selectedDate);
+      endDate.setHours(23, 59, 59, 999);
+      
+      const response = await api.get(`/orders?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`);
+      
+      // Map backend data to frontend expected format
+      const mappedOrders = response.data.data.orders.map(order => ({
+        ...order,
+        createdAt: order.created_at,
+        customerName: order.customer_name,
+        total: order.total_amount,
+        items: order.order_items || []
+      }));
+      
+      setOrdersData(mappedOrders);
+      
+      // Calculate summary from the orders data
+      const summary = {
+        totalSales: mappedOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0),
+        totalOrders: mappedOrders.length,
+        totalProfit: mappedOrders.reduce((sum, order) => sum + (order.profit || 0), 0)
+      };
+      setSummary(summary);
     } catch (error) {
       toast.error("Error fetching orders");
       console.error("Error:", error);
@@ -67,7 +90,27 @@ const OrdersPage = () => {
 
     try {
       const response = await api.get(`/orders/${orderId}`);
-      setSelectedOrder(response.data.data.order);
+      const order = response.data.data.order;
+      
+      // Map backend data to frontend expected format
+      const mappedOrder = {
+        ...order,
+        createdAt: order.created_at,
+        customerName: order.customer_name,
+        total: order.total_amount,
+        taxAmount: order.tax_amount,
+        taxPercent: order.tax_percent,
+        items: order.order_items?.map(item => ({
+           ...item,
+           name: item.medicines?.name || 'Unknown Medicine',
+           quantity: item.quantity,
+           selling_price: item.unit_price,
+           totalPrice: item.total_price,
+           discount: item.discount_percent
+         })) || []
+      };
+      
+      setSelectedOrder(mappedOrder);
       setShowOrderModal(true);
     } catch (error) {
       toast.error("Error fetching order details");

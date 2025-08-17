@@ -19,6 +19,7 @@ import OrderReceiptModal from "../components/Suppliers/OrderReceiptModal";
 import SupplierOrderHistory from "../components/Suppliers/SupplierOrderHistory";
 import AddSupplierModal from "../components/Suppliers/AddSupplierModal";
 import OrderQueueModal from "../components/Suppliers/OrderQueueModal";
+import CreateOrderWithoutSupplierModal from "../components/Suppliers/CreateOrderWithoutSupplierModal";
 import { useCreateSupplier } from "../hooks/useSuppliers";
 
 const SuppliersPage = () => {
@@ -30,11 +31,12 @@ const SuppliersPage = () => {
   const [showQuantityModal, setShowQuantityModal] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
-  const [showOrderHistory, setShowOrderHistory] = useState(false);
   const [showOrderQueue, setShowOrderQueue] = useState(false);
+  const [showOrderHistory, setShowOrderHistory] = useState(false);
   const [selectedMedicine, setSelectedMedicine] = useState(null);
+  const [showCreateOrderWithoutSupplier, setShowCreateOrderWithoutSupplier] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState("name");
+  const [sortBy, setSortBy] = useState("quantity");
   const [sortOrder, setSortOrder] = useState("asc");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
@@ -161,7 +163,7 @@ const SuppliersPage = () => {
         manufacturer: selectedMedicine.manufacturer,
         batchNumber: batchNumber || selectedMedicine.batch_number,
         quantity: quantity,
-        tradePrice: selectedMedicine.tradePrice || 0,
+        tradePrice: selectedMedicine.cost_price || 0,
         notes: notes,
         expiryDate: expiryDate,
       };
@@ -201,20 +203,24 @@ const SuppliersPage = () => {
         items: orderCart.map((item) => ({
           medicineId: item.medicineId,
           quantity: item.quantity,
-          unitPrice: item.tradePrice,
+          unitCost: item.tradePrice,
           notes: item.notes || "",
           expiryDate: item.expiryDate,
           batchNumber: item.batchNumber,
         })),
         subtotal: subtotal,
-        taxAmount: taxAmount,
-        totalAmount: totalAmount,
+        taxAmount: subtotal * 0.18, // 18% GST
+        discountAmount: 0,
         notes: orderData.notes || `Stock replenishment order - ${orderCart.length} items`,
         expectedDeliveryDate: orderData.expectedDate || new Date(
           Date.now() + 7 * 24 * 60 * 60 * 1000
-        ).toISOString(),
+        ).toISOString().split('T')[0],
         status: "pending"
       };
+
+      console.log('Order payload:', orderPayload);
+      console.log('Supplier:', supplier);
+      console.log('Order cart:', orderCart);
 
       const response = await createPurchaseOrderMutation.mutateAsync(orderPayload);
       
@@ -256,6 +262,23 @@ const SuppliersPage = () => {
     setOrderCart([]);
     setOrderData({ expectedDate: "", notes: "" });
     toast.success("Cart cleared");
+  };
+
+  // Handle creating order without supplier
+  const handleCreateOrderWithoutSupplier = async (orderData) => {
+    try {
+      const response = await purchaseOrderServices.createWithoutSupplier(orderData);
+      toast.success("Purchase order created successfully!");
+      setShowCreateOrderWithoutSupplier(false);
+      
+      // Optionally refresh data
+      queryClient.invalidateQueries({ queryKey: ["medicines"] });
+      queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
+    } catch (error) {
+      console.error("Error creating purchase order:", error);
+      toast.error("Failed to create purchase order. Please try again.");
+      throw error; // Re-throw to let the modal handle it
+    }
   };
 
   const handlePageChange = (newPage) => {
@@ -338,7 +361,7 @@ const SuppliersPage = () => {
       {/* Header */}
       <div className="bg-white shadow-sm border-b sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between py-4 lg:py-0 lg:h-16 gap-4">
             <div className="flex items-center space-x-4">
               <h1 className="text-2xl font-bold text-gray-900">
                 Supplier Management
@@ -348,12 +371,30 @@ const SuppliersPage = () => {
                 <span>{new Date().toLocaleDateString()}</span>
               </div>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => {
+                  setShowCreateOrderWithoutSupplier(true);
+                }}
+                className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-4 py-2 rounded-xl hover:from-orange-600 hover:to-orange-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center space-x-2 whitespace-nowrap"
+              >
+                <span className="text-lg">📦</span>
+                <span>Create Order (No Supplier)</span>
+              </button>
+              <button
+                onClick={() => {
+                  setShowCreateOrderWithoutSupplier(true);
+                }}
+                className="bg-gradient-to-r from-green-500 to-green-600 text-white px-4 py-2 rounded-xl hover:from-green-600 hover:to-green-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center space-x-2 whitespace-nowrap"
+              >
+                <span className="text-lg">🛒</span>
+                <span>Create Order</span>
+              </button>
               <button
                 onClick={() => {
                   setShowAddSupplierModal(true);
                 }}
-                className="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-6 py-2 rounded-xl hover:from-purple-600 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center space-x-2"
+                className="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-4 py-2 rounded-xl hover:from-purple-600 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center space-x-2 whitespace-nowrap"
               >
                 <span className="text-lg">🏢</span>
                 <span>Add Supplier</span>
@@ -362,7 +403,7 @@ const SuppliersPage = () => {
                 onClick={() => {
                   setShowOrderQueue(true);
                 }}
-                className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-2 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center space-x-2"
+                className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-2 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center space-x-2 whitespace-nowrap"
               >
                 <span className="text-lg">📋</span>
                 <span>Order Queue</span>
@@ -371,7 +412,7 @@ const SuppliersPage = () => {
                 onClick={() => {
                   setShowOrderHistory(true);
                 }}
-                className="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-6 py-2 rounded-xl hover:from-gray-600 hover:to-gray-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center space-x-2"
+                className="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-4 py-2 rounded-xl hover:from-gray-600 hover:to-gray-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center space-x-2 whitespace-nowrap"
               >
                 <span className="text-lg">📊</span>
                 <span>Order History</span>
@@ -626,6 +667,12 @@ const SuppliersPage = () => {
       <OrderQueueModal
         show={showOrderQueue}
         onClose={() => setShowOrderQueue(false)}
+      />
+
+      <CreateOrderWithoutSupplierModal
+        show={showCreateOrderWithoutSupplier}
+        onClose={() => setShowCreateOrderWithoutSupplier(false)}
+        onOrderCreated={handleCreateOrderWithoutSupplier}
       />
     </div>
   );

@@ -352,7 +352,7 @@ const OutOfStockTable = ({
                         </span>
                         <span>
                           <span className="font-medium">Trade Price:</span> Rs.
-                          {medicine.tradePrice?.toFixed(2) || "0.00"}
+                          {medicine.cost_price?.toFixed(2) || "0.00"}
                         </span>
                       </div>
                       <div className="mt-2 flex items-center space-x-4">

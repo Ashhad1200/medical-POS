@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { usePurchaseOrders, useReceivePurchaseOrder, useUpdatePurchaseOrder } from "../../hooks/usePurchaseOrders";
+import { usePurchaseOrders, useReceivePurchaseOrder, useCancelPurchaseOrder } from "../../hooks/usePurchaseOrders";
 import { toast } from "react-hot-toast";
 
 const OrderQueueModal = ({ show, onClose }) => {
@@ -19,7 +19,7 @@ const OrderQueueModal = ({ show, onClose }) => {
   });
 
   const receivePurchaseOrder = useReceivePurchaseOrder();
-  const updatePurchaseOrder = useUpdatePurchaseOrder();
+  const cancelPurchaseOrder = useCancelPurchaseOrder();
 
   if (!show) return null;
 
@@ -79,16 +79,13 @@ const OrderQueueModal = ({ show, onClose }) => {
     }
   };
 
-  const handleUpdateStatus = async (orderId, newStatus) => {
+  const handleCancelOrder = async (orderId) => {
     try {
-      await updatePurchaseOrder.mutateAsync({
-        id: orderId,
-        data: { status: newStatus }
-      });
-      toast.success(`Order status updated to ${newStatus}!`);
+      await cancelPurchaseOrder.mutateAsync(orderId);
+      toast.success("Order cancelled successfully!");
       refetch();
     } catch (error) {
-      toast.error(`Failed to update order status: ${error.message}`);
+      toast.error(`Failed to cancel order: ${error.message}`);
     }
   };
 
@@ -205,11 +202,8 @@ const OrderQueueModal = ({ show, onClose }) => {
                 className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
               >
                 <option value="all">All Status</option>
-                <option value="pending">Pending</option>
                 <option value="ordered">Ordered</option>
-                <option value="shipped">Shipped</option>
                 <option value="received">Received</option>
-                <option value="cancelled">Cancelled</option>
               </select>
             </div>
           </div>
@@ -222,16 +216,10 @@ const OrderQueueModal = ({ show, onClose }) => {
               </span>
               <div className="flex space-x-2">
                 <button
-                  onClick={() => handleBulkStatusUpdate("ordered")}
-                  className="px-3 py-1 text-xs font-medium text-blue-600 bg-blue-100 border border-blue-200 rounded hover:bg-blue-200"
+                  onClick={() => handleBulkStatusUpdate("received")}
+                  className="px-3 py-1 text-xs font-medium text-green-600 bg-green-100 border border-green-200 rounded hover:bg-green-200"
                 >
-                  Mark as Ordered
-                </button>
-                <button
-                  onClick={() => handleBulkStatusUpdate("shipped")}
-                  className="px-3 py-1 text-xs font-medium text-purple-600 bg-purple-100 border border-purple-200 rounded hover:bg-purple-200"
-                >
-                  Mark as Shipped
+                  Mark as Received
                 </button>
                 <button
                   onClick={() => setSelectedOrders([])}
@@ -307,9 +295,15 @@ const OrderQueueModal = ({ show, onClose }) => {
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                             <div>
                               <h4 className="font-medium text-gray-900 mb-1">Supplier</h4>
-                              <p className="text-gray-600">{order.supplier?.name}</p>
-                              <p className="text-gray-500">{order.supplier?.contactPerson}</p>
-                              <p className="text-gray-500">{order.supplier?.phone}</p>
+                              {order.supplier ? (
+                                <>
+                                  <p className="text-gray-600">{order.supplier.name}</p>
+                                  <p className="text-gray-500">{order.supplier.contactPerson}</p>
+                                  <p className="text-gray-500">{order.supplier.phone}</p>
+                                </>
+                              ) : (
+                                <p className="text-gray-500 italic">No supplier assigned</p>
+                              )}
                             </div>
 
                             <div>
@@ -339,40 +333,21 @@ const OrderQueueModal = ({ show, onClose }) => {
 
                       {/* Action Buttons */}
                       <div className="flex flex-col space-y-2 ml-4">
-                        {order.status === "pending" && (
-                          <button
-                            onClick={() => handleUpdateStatus(order.id, "ordered")}
-                            className="px-3 py-1 text-xs font-medium text-blue-600 bg-blue-100 border border-blue-200 rounded hover:bg-blue-200"
-                          >
-                            Mark as Ordered
-                          </button>
-                        )}
-                        
                         {order.status === "ordered" && (
-                          <button
-                            onClick={() => handleUpdateStatus(order.id, "shipped")}
-                            className="px-3 py-1 text-xs font-medium text-purple-600 bg-purple-100 border border-purple-200 rounded hover:bg-purple-200"
-                          >
-                            Mark as Shipped
-                          </button>
-                        )}
-                        
-                        {(order.status === "shipped" || order.status === "ordered") && (
-                          <button
-                            onClick={() => handleMarkAsReceived(order.id)}
-                            className="px-3 py-1 text-xs font-medium text-green-600 bg-green-100 border border-green-200 rounded hover:bg-green-200"
-                          >
-                            ✅ Mark as Received
-                          </button>
-                        )}
-                        
-                        {order.status !== "cancelled" && order.status !== "received" && (
-                          <button
-                            onClick={() => handleUpdateStatus(order.id, "cancelled")}
-                            className="px-3 py-1 text-xs font-medium text-red-600 bg-red-100 border border-red-200 rounded hover:bg-red-200"
-                          >
-                            Cancel Order
-                          </button>
+                          <>
+                            <button
+                              onClick={() => handleMarkAsReceived(order.id)}
+                              className="px-3 py-1 text-xs font-medium text-green-600 bg-green-100 border border-green-200 rounded hover:bg-green-200"
+                            >
+                              ✅ Received
+                            </button>
+                            <button
+                               onClick={() => handleCancelOrder(order.id)}
+                               className="px-3 py-1 text-xs font-medium text-red-600 bg-red-100 border border-red-200 rounded hover:bg-red-200"
+                             >
+                               ❌ Cancel
+                             </button>
+                          </>
                         )}
                       </div>
                     </div>

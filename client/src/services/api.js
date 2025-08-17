@@ -83,7 +83,12 @@ export const medicineServices = {
   update: (id, data) => api.put(`/medicines/${id}`, data),
   delete: (id) => api.delete(`/medicines/${id}`),
   search: (params = {}) => api.get("/medicines/search", { params }),
-  getStats: () => api.get("/medicines/stats"),
+  getStats: () => api.get("/medicines/stats", {
+    headers: {
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache'
+    }
+  }),
   getLowStock: () => api.get("/medicines/low-stock"),
   getExpired: () => api.get("/medicines/expired"),
   getExpiringSoon: () => api.get("/medicines/expiring-soon"),
@@ -126,10 +131,14 @@ export const purchaseOrderServices = {
   getAll: (params = {}) => api.get("/purchase-orders", { params }),
   getById: (id) => api.get(`/purchase-orders/${id}`),
   create: (data) => api.post("/purchase-orders", data),
+  createWithoutSupplier: (data) => api.post("/purchase-orders/without-supplier", data),
   update: (id, data) => api.put(`/purchase-orders/${id}`, data),
   delete: (id) => api.delete(`/purchase-orders/${id}`),
-  receive: (id) => api.post(`/purchase-orders/${id}/receive`),
-  cancel: (id) => api.post(`/purchase-orders/${id}/cancel`),
+  receive: (id) => api.patch(`/purchase-orders/${id}/receive`, { items: [] }),
+  markAsReceived: (id) => api.post(`/purchase-orders/${id}/mark-received`),
+  cancel: (id) => api.patch(`/purchase-orders/${id}/cancel`),
+  approve: (id) => api.patch(`/purchase-orders/${id}/approve`),
+  markAsOrdered: (id) => api.patch(`/purchase-orders/${id}/mark-ordered`),
   getBySupplier: (supplierId) =>
     api.get("/purchase-orders", { params: { supplierId } }),
   getByStatus: (status) => api.get("/purchase-orders", { params: { status } }),

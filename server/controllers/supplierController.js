@@ -9,7 +9,8 @@ const getAllSuppliers = async (req, res) => {
     let query = supabase
       .from("suppliers")
       .select("*")
-      .eq("organization_id", organizationId);
+      .eq("organization_id", organizationId)
+      .eq("is_active", true); // Only show active suppliers by default
 
     // Apply search filter
     if (search) {
@@ -18,9 +19,21 @@ const getAllSuppliers = async (req, res) => {
       );
     }
 
-    // Apply status filter
+    // Apply status filter - override default if explicitly requested
     if (status && status !== "all") {
-      query = query.eq("is_active", status === "active");
+      // Remove the default is_active filter and apply the requested one
+      query = supabase
+        .from("suppliers")
+        .select("*")
+        .eq("organization_id", organizationId)
+        .eq("is_active", status === "active");
+      
+      // Re-apply search filter if needed
+      if (search) {
+        query = query.or(
+          `name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`
+        );
+      }
     }
 
     // Apply sorting and pagination
@@ -185,7 +198,6 @@ const updateSupplier = async (req, res) => {
       .from("suppliers")
       .update({
         ...updateData,
-        updated_by: req.user.id,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)
@@ -219,24 +231,80 @@ const deleteSupplier = async (req, res) => {
     const { id } = req.params;
     const organizationId = req.user.organization_id;
 
-    const { error } = await supabase
-      .from("suppliers")
-      .update({ is_active: false })
-      .eq("id", id)
-      .eq("organization_id", organizationId);
+    // Check if supplier has any associated purchase orders
+    const { data: purchaseOrders, error: poError } = await supabase
+      .from("purchase_orders")
+      .select("id")
+      .eq("supplier_id", id)
+      .eq("organization_id", organizationId)
+      .limit(1);
 
-    if (error) {
+    if (poError) {
       return res.status(500).json({
         success: false,
-        message: "Error deleting supplier",
-        error: error.message,
+        message: "Error checking supplier dependencies",
+        error: poError.message,
       });
     }
 
-    res.json({
-      success: true,
-      message: "Supplier deleted successfully",
-    });
+    // Check if supplier has any associated medicines
+    const { data: medicines, error: medicineError } = await supabase
+      .from("medicines")
+      .select("id")
+      .eq("supplier_id", id)
+      .eq("organization_id", organizationId)
+      .limit(1);
+
+    if (medicineError) {
+      return res.status(500).json({
+        success: false,
+        message: "Error checking medicine dependencies",
+        error: medicineError.message,
+      });
+    }
+
+    // If supplier has purchase orders or medicines, just deactivate instead of deleting
+    if ((purchaseOrders && purchaseOrders.length > 0) || (medicines && medicines.length > 0)) {
+      const { error } = await supabase
+        .from("suppliers")
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .eq("organization_id", organizationId);
+
+      if (error) {
+        return res.status(500).json({
+          success: false,
+          message: "Error deactivating supplier",
+          error: error.message,
+        });
+      }
+
+      const reason = purchaseOrders?.length > 0 ? "has existing purchase orders" : "has associated medicines";
+      res.json({
+        success: true,
+        message: `Supplier deactivated successfully (${reason})`,
+      });
+    } else {
+      // If no dependencies, actually delete the supplier
+      const { error } = await supabase
+        .from("suppliers")
+        .delete()
+        .eq("id", id)
+        .eq("organization_id", organizationId);
+
+      if (error) {
+        return res.status(500).json({
+          success: false,
+          message: "Error deleting supplier",
+          error: error.message,
+        });
+      }
+
+      res.json({
+        success: true,
+        message: "Supplier deleted successfully",
+      });
+    }
   } catch (error) {
     console.error("Delete supplier error:", error);
     res.status(500).json({

@@ -93,7 +93,12 @@ class Medicine {
       }
 
       if (options.lowStock) {
-        query = query.lte("quantity", supabase.raw("low_stock_threshold"));
+        // For low stock filtering, use the RPC function since Supabase doesn't support column-to-column comparison
+        const { data: lowStockData, error: lowStockError } = await supabase
+          .rpc('get_low_stock_medicines', { org_id: organizationId });
+        
+        if (lowStockError) throw lowStockError;
+        return lowStockData ? lowStockData.map((medicine) => new Medicine(medicine)) : [];
       }
 
       if (options.outOfStock) {
@@ -194,24 +199,9 @@ class Medicine {
 
   static async findLowStock(organizationId) {
     try {
+      // Use the RPC function for proper column-to-column comparison
       const { data, error } = await supabase
-        .from("medicines")
-        .select(
-          `
-          *,
-          suppliers (
-            id,
-            name,
-            contactPerson,
-            phone,
-            email
-          )
-        `
-        )
-        .eq("organization_id", organizationId)
-        .eq("is_active", true)
-        .gt("quantity", 0)
-        .lte("quantity", supabase.raw("low_stock_threshold"));
+        .rpc('get_low_stock_medicines', { org_id: organizationId });
 
       if (error) throw error;
       return data ? data.map((medicine) => new Medicine(medicine)) : [];

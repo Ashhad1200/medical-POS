@@ -1,43 +1,45 @@
 const express = require("express");
 const router = express.Router();
 const { auth, checkRole } = require("../middleware/auth");
+const {
+  getInventory,
+  getLowStockItems,
+  getExpiringItems,
+  generateAutoPurchaseOrders,
+  getReorderSuggestions,
+  updateInventoryItem,
+  getInventoryStats
+} = require('../controllers/inventoryController');
 
-// TODO: Import inventory controller
-// const {
-//   getInventory,
-//   getInventoryItem,
-//   updateInventory,
-//   getLowStockItems,
-//   getExpiringItems
-// } = require('../controllers/inventoryController');
-
-// Protected routes - only admin and warehouse roles
+// Protected routes
 router.use(auth);
-router.use(checkRole(["admin", "warehouse"]));
 
-// GET /api/inventory
-router.get("/", (req, res) => {
-  res.json({ message: "Get all inventory items" });
+// GET /api/inventory/stats - Get inventory statistics
+router.get("/stats", checkRole(["admin", "warehouse", "manager"]), async (req, res) => {
+  try {
+    const stats = await getInventoryStats(req.user.organization_id);
+    res.json({ success: true, data: stats });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 });
 
-// GET /api/inventory/:id
-router.get("/:id", (req, res) => {
-  res.json({ message: "Get inventory item by ID" });
-});
+// GET /api/inventory/low-stock - Get low stock items
+router.get("/low-stock", checkRole(["admin", "warehouse", "manager"]), getLowStockItems);
 
-// PUT /api/inventory/:id
-router.put("/:id", (req, res) => {
-  res.json({ message: "Update inventory item" });
-});
+// GET /api/inventory/expiring - Get expiring items
+router.get("/expiring", checkRole(["admin", "warehouse", "manager"]), getExpiringItems);
 
-// GET /api/inventory/low-stock
-router.get("/low-stock", (req, res) => {
-  res.json({ message: "Get low stock items" });
-});
+// GET /api/inventory/reorder-suggestions - Get reorder suggestions
+router.get("/reorder-suggestions", checkRole(["admin", "warehouse", "manager"]), getReorderSuggestions);
 
-// GET /api/inventory/expiring
-router.get("/expiring", (req, res) => {
-  res.json({ message: "Get expiring items" });
-});
+// POST /api/inventory/auto-purchase-orders - Generate automatic purchase orders
+router.post("/auto-purchase-orders", checkRole(["admin", "manager"]), generateAutoPurchaseOrders);
+
+// GET /api/inventory - Get all inventory items with filtering
+router.get("/", checkRole(["admin", "warehouse", "manager", "counter"]), getInventory);
+
+// PUT /api/inventory/:id - Update inventory item
+router.put("/:id", checkRole(["admin", "warehouse", "manager"]), updateInventoryItem);
 
 module.exports = router;

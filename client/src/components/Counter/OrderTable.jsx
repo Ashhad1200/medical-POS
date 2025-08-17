@@ -1,4 +1,5 @@
 import React from "react";
+import { formatCurrency } from "../../utils/currency";
 
 const OrderTable = ({ items, onUpdateItem, onRemoveItem }) => {
   const handleQuantityChange = (medicineId, newQuantity) => {
@@ -91,10 +92,10 @@ const OrderTable = ({ items, onUpdateItem, onRemoveItem }) => {
 
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="text-sm text-gray-900">
-                  Rs.{item.unitPrice.toFixed(2)}
+                  {formatCurrency(item.unitPrice)}
                 </div>
                 <div className="text-xs text-gray-500">
-                  Trade: Rs.{item.cost_price.toFixed(2)}
+                  Trade: {formatCurrency(item.cost_price)}
                 </div>
               </td>
 
@@ -184,21 +185,20 @@ const OrderTable = ({ items, onUpdateItem, onRemoveItem }) => {
 
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="text-sm font-semibold text-gray-900">
-                  Rs.{calculateItemTotal(item).toFixed(2)}
+                  {formatCurrency(calculateItemTotal(item))}
                 </div>
                 {item.discountPercent > 0 && (
                   <div className="text-xs text-gray-500">
                     <span className="line-through">
-                      Rs.{(item.unitPrice * item.quantity).toFixed(2)}
+                      {formatCurrency(item.unitPrice * item.quantity)}
                     </span>
                     <span className="text-red-600 ml-1">
-                      (-Rs.
-                      {(
+                      (-{formatCurrency(
                         (item.unitPrice *
                           item.quantity *
                           item.discountPercent) /
                         100
-                      ).toFixed(2)}
+                      )}
                       )
                     </span>
                   </div>

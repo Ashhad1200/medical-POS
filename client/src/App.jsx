@@ -17,13 +17,16 @@ import AccessExpiredModal from "./components/Auth/AccessExpiredModal";
 
 import Dashboard from "./pages/Dashboard";
 import CounterDashboard from "./pages/CounterDashboard";
-import InventoryPage from "./pages/InventoryPage";
-import MedicinesPage from "./pages/MedicinesPage";
+import AIAnalyticsDashboard from "./components/Dashboard/AIAnalyticsDashboard";
 import OrdersPage from "./pages/OrdersPage";
 import SuppliersPage from "./pages/SuppliersPage";
+import SuppliersListPage from "./pages/SuppliersListPage";
 import UsersPage from "./pages/UsersPage";
 import OrderDetailPage from "./pages/OrderDetailPage";
+import PurchaseOrdersPage from "./pages/PurchaseOrdersPage";
 import Dealers from "./pages/Dealers";
+import SimplifiedOrderPage from "./pages/SimplifiedOrderPage";
+import InventoryPage from "./pages/InventoryPage";
 
 // Startup Screen Component
 const StartupScreen = ({ onContinue }) => {
@@ -277,22 +280,16 @@ const AppRoutes = () => {
           >
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<RoleDashboard />} />
-            <Route
-              path="inventory"
+            <Route 
+              path="dashboard/ai-analytics" 
               element={
-                <ProtectedRoute requiredRoles={["admin", "manager", "warehouse"]}>
-                  <InventoryPage />
+                <ProtectedRoute requiredRoles={["admin"]}>
+                  <AIAnalyticsDashboard />
                 </ProtectedRoute>
-              }
+              } 
             />
-            <Route
-              path="medicines"
-              element={
-                <ProtectedRoute requiredRoles={["admin", "manager", "warehouse"]}>
-                  <MedicinesPage />
-                </ProtectedRoute>
-              }
-            />
+
+
             <Route
               path="dealers"
               element={
@@ -318,13 +315,30 @@ const AppRoutes = () => {
               }
             />
             <Route
-              path="suppliers"
+              path="purchase-orders"
               element={
                 <ProtectedRoute requiredRoles={["admin", "manager", "warehouse"]}>
-                  <SuppliersPage />
+                  <PurchaseOrdersPage />
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="suppliers"
+              element={
+                <ProtectedRoute requiredRoles={["admin", "manager", "warehouse"]}>
+                  <SuppliersListPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="inventory"
+              element={
+                <ProtectedRoute requiredRoles={["admin", "manager", "warehouse"]}>
+                  <InventoryPage />
+                </ProtectedRoute>
+              }
+            />
+
             <Route
               path="users"
               element={

@@ -1,4 +1,5 @@
 import React from "react";
+import { formatCurrency, formatPercentage } from "../../utils/currency";
 
 const OrderSummary = ({
   subtotal,
@@ -20,13 +21,13 @@ const OrderSummary = ({
       <div className="space-y-3 mb-6">
         <div className="flex justify-between items-center py-2">
           <span className="text-gray-600">Subtotal:</span>
-          <span className="font-medium">Rs.{subtotal.toFixed(2)}</span>
+          <span className="font-medium">{formatCurrency(subtotal)}</span>
         </div>
 
         {taxAmount > 0 && (
           <div className="flex justify-between items-center py-2">
             <span className="text-gray-600">Tax:</span>
-            <span className="font-medium">Rs.{taxAmount.toFixed(2)}</span>
+            <span className="font-medium">{formatCurrency(taxAmount)}</span>
           </div>
         )}
 
@@ -36,7 +37,7 @@ const OrderSummary = ({
               Grand Total:
             </span>
             <span className="text-xl font-bold text-green-600">
-              Rs.{grandTotal.toFixed(2)}
+              {formatCurrency(grandTotal)}
             </span>
           </div>
         </div>
@@ -47,7 +48,7 @@ const OrderSummary = ({
               Expected Profit:
             </span>
             <span className="text-lg font-bold text-blue-600">
-              Rs.{profit.toFixed(2)}
+              {formatCurrency(profit)}
             </span>
           </div>
           <p className="text-xs text-blue-600 mt-1">
@@ -181,7 +182,7 @@ const OrderSummary = ({
         <div className="text-center p-3 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg">
           <div className="text-sm font-medium text-blue-800">Profit Margin</div>
           <div className="text-lg font-bold text-blue-600">
-            {subtotal > 0 ? ((profit / subtotal) * 100).toFixed(1) : 0}%
+            {formatPercentage(profit, subtotal)}%
           </div>
         </div>
         <div className="text-center p-3 bg-gradient-to-r from-green-50 to-green-100 rounded-lg">
@@ -189,7 +190,7 @@ const OrderSummary = ({
             Total Savings
           </div>
           <div className="text-lg font-bold text-green-600">
-            Rs.{(grandTotal - subtotal + taxAmount).toFixed(2)}
+            {formatCurrency(grandTotal - subtotal + taxAmount)}
           </div>
         </div>
       </div>

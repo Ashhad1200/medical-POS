@@ -21,19 +21,28 @@ export const useAuth = () => {
   const initializationRef = useRef(false);
   const dispatch = useDispatch();
 
-  // Helper function to check if user access has expired
+  // Helper function to check if organization access has expired
   const checkAccessValidity = useCallback((profileData) => {
-    if (!profileData?.access_valid_till) {
+    // Check if organization is active
+    if (profileData?.organization_is_active === false) {
+      return {
+        isValid: false,
+        message: 'Your organization has been deactivated. Please contact your administrator.'
+      };
+    }
+    
+    // Check organization access expiry
+    if (!profileData?.organization_access_valid_till) {
       return { isValid: true }; // No expiry set, access is valid
     }
     
     const now = new Date();
-    const accessValidTill = new Date(profileData.access_valid_till);
+    const accessValidTill = new Date(profileData.organization_access_valid_till);
     
     if (now > accessValidTill) {
       return {
         isValid: false,
-        message: 'Your access has expired. Please contact your administrator to extend your access.'
+        message: 'Your organization access has expired. Please contact your administrator to extend your access.'
       };
     }
     
@@ -318,7 +327,7 @@ export const useAuth = () => {
     theme: profile?.theme || "light",
     language: profile?.language || "en",
     timezone: profile?.timezone || "UTC",
-    accessValidTill: profile?.access_valid_till,
+    accessValidTill: profile?.organization_access_valid_till,
     isAccessValid: currentAccessCheck.isValid,
     accessExpiredMessage: currentAccessCheck.message,
     hasPermission,

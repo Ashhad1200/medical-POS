@@ -8,7 +8,12 @@ const {
   updatePurchaseOrder,
   receivePurchaseOrder,
   cancelPurchaseOrder,
+  createPurchaseOrderWithoutSupplier,
 } = require("../controllers/purchaseOrderController");
+
+const {
+  markAsReceived,
+} = require("../controllers/refactoredPurchaseOrderController");
 
 // TODO: Import purchase order controller
 // const {
@@ -32,6 +37,9 @@ router.get("/:id", checkRole(["admin", "warehouse"]), getPurchaseOrder);
 // Create purchase order (admin and warehouse)
 router.post("/", checkRole(["admin", "warehouse"]), createPurchaseOrder);
 
+// Create purchase order without supplier (admin and warehouse)
+router.post("/without-supplier", checkRole(["admin", "warehouse"]), createPurchaseOrderWithoutSupplier);
+
 // Update purchase order (admin and warehouse)
 router.put("/:id", checkRole(["admin", "warehouse"]), updatePurchaseOrder);
 
@@ -47,6 +55,13 @@ router.post(
   "/:id/cancel",
   checkRole(["admin", "warehouse"]),
   cancelPurchaseOrder
+);
+
+// Mark purchase order as received (admin and warehouse)
+router.post(
+  "/:id/mark-received",
+  checkRole(["admin", "warehouse"]),
+  markAsReceived
 );
 
 module.exports = router;

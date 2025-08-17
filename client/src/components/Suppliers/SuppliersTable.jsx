@@ -62,13 +62,27 @@ const SuppliersTable = ({
 
   // Pagination component
   const Pagination = () => {
-    if (!pagination || pagination.totalPages <= 1) return null;
+    if (!pagination || !pagination.totalPages || pagination.totalPages <= 1) return null;
 
-    const { currentPage, totalPages, hasNextPage, hasPrevPage } = pagination;
+    const { 
+      currentPage = 1, 
+      totalPages = 1, 
+      hasNextPage = false, 
+      hasPrevPage = false,
+      limit = 12,
+      total = 0
+    } = pagination;
+    
+    // Ensure all values are numbers to prevent NaN
+    const safeCurrentPage = Number(currentPage) || 1;
+    const safeTotalPages = Number(totalPages) || 1;
+    const safeLimit = Number(limit) || 12;
+    const safeTotal = Number(total) || 0;
+    
     const maxVisiblePages = 5;
 
-    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    let startPage = Math.max(1, safeCurrentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(safeTotalPages, startPage + maxVisiblePages - 1);
 
     if (endPage - startPage + 1 < maxVisiblePages) {
       startPage = Math.max(1, endPage - maxVisiblePages + 1);
@@ -102,16 +116,13 @@ const SuppliersTable = ({
             <p className="text-sm text-gray-700">
               Showing{" "}
               <span className="font-medium">
-                {(currentPage - 1) * (pagination.limit || 12) + 1}
+                {(safeCurrentPage - 1) * safeLimit + 1}
               </span>{" "}
               to{" "}
               <span className="font-medium">
-                {Math.min(
-                  currentPage * (pagination.limit || 12),
-                  pagination.total || 0
-                )}
+                {Math.min(safeCurrentPage * safeLimit, safeTotal)}
               </span>{" "}
-              of <span className="font-medium">{pagination.total || 0}</span>{" "}
+              of <span className="font-medium">{safeTotal}</span>{" "}
               results
             </p>
           </div>
@@ -156,7 +167,7 @@ const SuppliersTable = ({
                   key={page}
                   onClick={() => onPageChange(page)}
                   className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                    page === currentPage
+                    page === safeCurrentPage
                       ? "z-10 bg-blue-50 border-blue-500 text-blue-600"
                       : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
                   }`}
@@ -165,18 +176,18 @@ const SuppliersTable = ({
                 </button>
               ))}
 
-              {endPage < totalPages && (
+              {endPage < safeTotalPages && (
                 <>
-                  {endPage < totalPages - 1 && (
+                  {endPage < safeTotalPages - 1 && (
                     <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
                       ...
                     </span>
                   )}
                   <button
-                    onClick={() => onPageChange(totalPages)}
+                    onClick={() => onPageChange(safeTotalPages)}
                     className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
                   >
-                    {totalPages}
+                    {safeTotalPages}
                   </button>
                 </>
               )}

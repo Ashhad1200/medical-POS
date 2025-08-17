@@ -49,15 +49,17 @@ export const useCreateSupplier = () => {
   return useMutation({
     mutationFn: (supplierData) => supplierServices.create(supplierData),
     onSuccess: (response) => {
-      // Invalidate and refetch suppliers list
-      queryClient.invalidateQueries({ queryKey: supplierKeys.lists() });
+      // Invalidate all supplier-related queries to ensure fresh data
+      queryClient.invalidateQueries({ queryKey: supplierKeys.all });
 
-      // Add the new supplier to the cache
-      const newSupplier = response.data.data.supplier;
-      queryClient.setQueryData(supplierKeys.detail(newSupplier.id), {
-        success: true,
-        data: { supplier: newSupplier },
-      });
+      // Add the new supplier to the cache if response has the expected structure
+      if (response?.data?.data?.supplier?.id) {
+        const newSupplier = response.data.data.supplier;
+        queryClient.setQueryData(supplierKeys.detail(newSupplier.id), {
+          success: true,
+          data: { supplier: newSupplier },
+        });
+      }
 
       toast.success("Supplier created successfully!");
     },

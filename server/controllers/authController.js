@@ -190,7 +190,15 @@ const getProfile = async (req, res) => {
   try {
     const { data: profile, error } = await supabase
       .from("users")
-      .select("*")
+      .select(`
+        *,
+        organization:organizations!inner(
+          id,
+          name,
+          access_valid_till,
+          is_active
+        )
+      `)
       .eq("id", req.user.id)
       .single();
 
@@ -198,6 +206,25 @@ const getProfile = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "User not found",
+      });
+    }
+
+    // Check organization access validity
+    const now = new Date();
+    const orgAccessValidTill = profile.organization?.access_valid_till;
+    const isOrgActive = profile.organization?.is_active;
+    
+    if (isOrgActive === false) {
+      return res.status(403).json({
+        success: false,
+        message: "Organization has been deactivated",
+      });
+    }
+    
+    if (orgAccessValidTill && new Date(orgAccessValidTill) < now) {
+      return res.status(403).json({
+        success: false,
+        message: "Organization access has expired",
       });
     }
 
@@ -220,6 +247,9 @@ const getProfile = async (req, res) => {
           timezone: profile.timezone,
           preferences: profile.preferences,
           notificationSettings: profile.notification_settings,
+          organization: profile.organization,
+          organization_access_valid_till: profile.organization?.access_valid_till,
+          organization_is_active: profile.organization?.is_active,
         },
       },
     });

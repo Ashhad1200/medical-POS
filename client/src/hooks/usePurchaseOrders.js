@@ -72,15 +72,17 @@ export const useCreatePurchaseOrder = () => {
 
       // Add the new purchase order to the cache
       const newPurchaseOrder = response.data.data.purchaseOrder;
-      queryClient.setQueryData(purchaseOrderKeys.detail(newPurchaseOrder.id), {
-        success: true,
-        data: { purchaseOrder: newPurchaseOrder },
-      });
+      if (newPurchaseOrder && newPurchaseOrder.id) {
+        queryClient.setQueryData(purchaseOrderKeys.detail(newPurchaseOrder.id), {
+          success: true,
+          data: { purchaseOrder: newPurchaseOrder },
+        });
 
-      // Invalidate supplier-specific queries
-      queryClient.invalidateQueries({
-        queryKey: purchaseOrderKeys.bySupplier(newPurchaseOrder.supplierId),
-      });
+        // Invalidate supplier-specific queries
+        queryClient.invalidateQueries({
+          queryKey: purchaseOrderKeys.bySupplier(newPurchaseOrder.supplierId),
+        });
+      }
 
       toast.success("Purchase order created successfully!");
       return response.data;
@@ -136,6 +138,13 @@ export const useUpdatePurchaseOrder = () => {
 
       // Invalidate lists to show updated data
       queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.lists() });
+      
+      // Invalidate supplier-specific queries
+      if (updatedPurchaseOrder.supplierId) {
+        queryClient.invalidateQueries({
+          queryKey: purchaseOrderKeys.bySupplier(updatedPurchaseOrder.supplierId),
+        });
+      }
 
       toast.success("Purchase order updated successfully!");
     },
@@ -256,6 +265,13 @@ export const useReceivePurchaseOrder = () => {
       // Invalidate related queries
       queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.lists() });
       queryClient.invalidateQueries({ queryKey: ["medicines"] }); // Inventory updated
+      
+      // Invalidate supplier-specific queries
+      if (updatedPurchaseOrder.supplierId) {
+        queryClient.invalidateQueries({
+          queryKey: purchaseOrderKeys.bySupplier(updatedPurchaseOrder.supplierId),
+        });
+      }
 
       toast.success("Purchase order received and inventory updated!");
     },
@@ -317,6 +333,13 @@ export const useCancelPurchaseOrder = () => {
 
       // Invalidate lists to show updated data
       queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.lists() });
+      
+      // Invalidate supplier-specific queries
+      if (updatedPurchaseOrder.supplierId) {
+        queryClient.invalidateQueries({
+          queryKey: purchaseOrderKeys.bySupplier(updatedPurchaseOrder.supplierId),
+        });
+      }
 
       toast.success("Purchase order cancelled successfully!");
     },
@@ -331,6 +354,154 @@ export const useCancelPurchaseOrder = () => {
 
       const message =
         error.response?.data?.message || "Failed to cancel purchase order";
+      toast.error(message);
+    },
+  });
+};
+
+// Note: Approve functionality removed as part of simplified status system
+// Purchase orders now go directly from 'pending' to 'received', 'cancelled', or 'applied'
+
+export const useMarkAsOrderedPurchaseOrder = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id) => purchaseOrderServices.markAsOrdered(id),
+    onMutate: async (id) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({
+        queryKey: purchaseOrderKeys.detail(id),
+      });
+
+      // Snapshot the previous value
+      const previousPurchaseOrder = queryClient.getQueryData(
+        purchaseOrderKeys.detail(id)
+      );
+
+      // Optimistically update status to ordered
+      if (previousPurchaseOrder) {
+        queryClient.setQueryData(purchaseOrderKeys.detail(id), {
+          ...previousPurchaseOrder,
+          data: {
+            purchaseOrder: {
+              ...previousPurchaseOrder.data.purchaseOrder,
+              status: "ordered",
+              updatedAt: new Date().toISOString(),
+            },
+          },
+        });
+      }
+
+      return { previousPurchaseOrder };
+    },
+    onSuccess: (response, id) => {
+      // Update the cache with server response
+      const updatedPurchaseOrder = response.data.data.purchaseOrder;
+      queryClient.setQueryData(purchaseOrderKeys.detail(id), {
+        success: true,
+        data: { purchaseOrder: updatedPurchaseOrder },
+      });
+
+      // Invalidate lists to show updated data
+      queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.lists() });
+      
+      // Invalidate supplier-specific queries
+      if (updatedPurchaseOrder.supplierId) {
+        queryClient.invalidateQueries({
+          queryKey: purchaseOrderKeys.bySupplier(updatedPurchaseOrder.supplierId),
+        });
+      }
+
+      toast.success("Purchase order marked as ordered successfully!");
+    },
+    onError: (error, id, context) => {
+      // Rollback optimistic update
+      if (context?.previousPurchaseOrder) {
+        queryClient.setQueryData(
+          purchaseOrderKeys.detail(id),
+          context.previousPurchaseOrder
+        );
+      }
+
+      const message =
+        error.response?.data?.message || "Failed to mark purchase order as ordered";
+      toast.error(message);
+    },
+  });
+};
+
+export const useMarkAsReceivedPurchaseOrder = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id) => purchaseOrderServices.markAsReceived(id),
+    onMutate: async (id) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({
+        queryKey: purchaseOrderKeys.detail(id),
+      });
+
+      // Snapshot the previous value
+      const previousPurchaseOrder = queryClient.getQueryData(
+        purchaseOrderKeys.detail(id)
+      );
+
+      // Optimistically update status to received
+      if (previousPurchaseOrder) {
+        queryClient.setQueryData(purchaseOrderKeys.detail(id), {
+          ...previousPurchaseOrder,
+          data: {
+            purchaseOrder: {
+              ...previousPurchaseOrder.data.purchaseOrder,
+              status: "received",
+              actualDelivery: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
+          },
+        });
+      }
+
+      return { previousPurchaseOrder };
+    },
+    onSuccess: (response, id) => {
+      // Update the cache with server response
+      const updatedPurchaseOrder = response.data.data.purchaseOrder;
+      queryClient.setQueryData(purchaseOrderKeys.detail(id), {
+        success: true,
+        data: { purchaseOrder: updatedPurchaseOrder },
+      });
+
+      // Invalidate lists to show updated data
+      queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.lists() });
+      
+      // Invalidate supplier-specific queries
+      if (updatedPurchaseOrder.supplierId) {
+        queryClient.invalidateQueries({
+          queryKey: purchaseOrderKeys.bySupplier(updatedPurchaseOrder.supplierId),
+        });
+      }
+
+      // Invalidate status-specific queries
+      queryClient.invalidateQueries({
+        queryKey: purchaseOrderKeys.byStatus("pending"),
+      });
+      queryClient.invalidateQueries({
+        queryKey: purchaseOrderKeys.byStatus("received"),
+      });
+
+      toast.success("Purchase order marked as received successfully!");
+    },
+    onError: (error, id, context) => {
+      // Rollback optimistic update
+      if (context?.previousPurchaseOrder) {
+        queryClient.setQueryData(
+          purchaseOrderKeys.detail(id),
+          context.previousPurchaseOrder
+        );
+      }
+
+      const message =
+        error.response?.data?.message || "Failed to mark purchase order as received";
       toast.error(message);
     },
   });

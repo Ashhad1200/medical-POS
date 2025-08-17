@@ -1,0 +1,160 @@
+/* Inventory Table Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+.animate-slideIn {
+  animation: slideIn 0.3s ease-out forwards;
+}
+
+.animate-pulse-hover:hover {
+  animation: pulse 0.3s ease-in-out;
+}
+
+/* Table container transitions */
+.inventory-table-container {
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+}
+
+/* Pagination button animations */
+.pagination-button {
+  transition: all 0.2s ease-in-out;
+  transform: scale(1);
+}
+
+.pagination-button:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+.pagination-button:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.pagination-button.active {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.3);
+}
+
+/* Loading states */
+.loading-shimmer {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Smooth page transitions */
+.page-transition-enter {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.page-transition-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 300ms ease-in-out, transform 300ms ease-in-out;
+}
+
+.page-transition-exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.page-transition-exit-active {
+  opacity: 0;
+  transform: translateY(-20px);
+  transition: opacity 300ms ease-in-out, transform 300ms ease-in-out;
+}
+
+/* Enhanced hover effects */
+.table-row-hover {
+  transition: all 0.2s ease-in-out;
+}
+
+.table-row-hover:hover {
+  background-color: rgba(59, 130, 246, 0.05);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Button animations */
+.action-button {
+  transition: all 0.2s ease-in-out;
+  transform: scale(1);
+}
+
+.action-button:hover {
+  transform: scale(1.1);
+}
+
+.action-button:active {
+  transform: scale(0.9);
+}
+
+/* Status indicators with animations */
+.status-indicator {
+  transition: all 0.3s ease-in-out;
+}
+
+.status-indicator.low-stock {
+  animation: pulse 2s infinite;
+}
+
+.status-indicator.expired {
+  animation: pulse 1.5s infinite;
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+/* Responsive animations */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fadeIn,
+  .animate-slideIn,
+  .animate-pulse-hover,
+  .pagination-button,
+  .table-row-hover,
+  .action-button {
+    animation: none;
+    transition: none;
+  }
+}

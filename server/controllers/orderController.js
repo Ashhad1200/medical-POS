@@ -15,7 +15,13 @@ const getAllOrders = async (req, res) => {
 
     let query = supabase
       .from("orders")
-      .select("*, order_items(*)")
+      .select(`
+        *,
+        order_items(
+          *,
+          medicines(name)
+        )
+      `)
       .eq("organization_id", organizationId);
 
     // Apply status filter
@@ -80,7 +86,13 @@ const getOrder = async (req, res) => {
 
     const { data: order, error } = await supabase
       .from("orders")
-      .select("*, order_items(*)")
+      .select(`
+        *,
+        order_items(
+          *,
+          medicines(name)
+        )
+      `)
       .eq("id", id)
       .eq("organization_id", organizationId)
       .single();

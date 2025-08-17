@@ -9,6 +9,7 @@ const getAllMedicines = async (req, res) => {
       search,
       category,
       manufacturer,
+      stockFilter = "all",
       sortBy = "name",
       sortOrder = "asc",
     } = req.query;
@@ -37,14 +38,94 @@ const getAllMedicines = async (req, res) => {
       query = query.eq("manufacturer", manufacturer);
     }
 
+    // Apply stock status filter
+    if (stockFilter && stockFilter !== "all") {
+      const currentDate = new Date().toISOString().split('T')[0];
+      const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      
+      switch (stockFilter) {
+        case "in-stock":
+          query = query.gt("quantity", "low_stock_threshold");
+          break;
+        case "low-stock":
+          query = query.lte("quantity", "low_stock_threshold").gt("quantity", 0);
+          break;
+        case "out-of-stock":
+          query = query.eq("quantity", 0);
+          break;
+        case "expired":
+          query = query.lt("expiry_date", currentDate);
+          break;
+        case "expiring-soon":
+          query = query.gte("expiry_date", currentDate).lte("expiry_date", thirtyDaysFromNow);
+          break;
+      }
+    }
+
     // Apply sorting
     query = query.order(sortBy, { ascending: sortOrder === "asc" });
+
+    // Build count query with same filters
+    let countQuery = supabase
+      .from("medicines")
+      .select("*", { count: 'exact', head: true })
+      .eq("organization_id", organizationId)
+      .eq("is_active", true);
+
+    // Apply same filters to count query
+    if (search) {
+      countQuery = countQuery.or(
+        `name.ilike.%${search}%,generic_name.ilike.%${search}%,manufacturer.ilike.%${search}%`
+      );
+    }
+
+    if (category) {
+      countQuery = countQuery.eq("category", category);
+    }
+
+    if (manufacturer) {
+      countQuery = countQuery.eq("manufacturer", manufacturer);
+    }
+
+    // Apply same stock status filter to count query
+    if (stockFilter && stockFilter !== "all") {
+      const currentDate = new Date().toISOString().split('T')[0];
+      const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      
+      switch (stockFilter) {
+        case "in-stock":
+          countQuery = countQuery.gt("quantity", "low_stock_threshold");
+          break;
+        case "low-stock":
+          countQuery = countQuery.lte("quantity", "low_stock_threshold").gt("quantity", 0);
+          break;
+        case "out-of-stock":
+          countQuery = countQuery.eq("quantity", 0);
+          break;
+        case "expired":
+          countQuery = countQuery.lt("expiry_date", currentDate);
+          break;
+        case "expiring-soon":
+          countQuery = countQuery.gte("expiry_date", currentDate).lte("expiry_date", thirtyDaysFromNow);
+          break;
+      }
+    }
+
+    const { count: totalCount, error: countError } = await countQuery;
+
+    if (countError) {
+      return res.status(500).json({
+        success: false,
+        message: "Error counting medicines",
+        error: countError.message,
+      });
+    }
 
     // Apply pagination
     const offset = (page - 1) * limit;
     query = query.range(offset, offset + limit - 1);
 
-    const { data: medicines, error, count } = await query;
+    const { data: medicines, error } = await query;
 
     if (error) {
       return res.status(500).json({
@@ -54,15 +135,20 @@ const getAllMedicines = async (req, res) => {
       });
     }
 
+    const totalPages = Math.ceil(totalCount / limit);
+    const currentPage = parseInt(page);
+
     res.json({
       success: true,
       data: {
         medicines: medicines || [],
         pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total: count || medicines?.length || 0,
-          pages: Math.ceil((count || medicines?.length || 0) / limit),
+          currentPage,
+          itemsPerPage: parseInt(limit),
+          totalItems: totalCount,
+          totalPages,
+          hasNextPage: currentPage < totalPages,
+          hasPrevPage: currentPage > 1,
         },
       },
     });
@@ -403,6 +489,50 @@ const deleteMedicine = async (req, res) => {
       }
     );
 
+    // Check if medicine has any related records
+    const { data: orderItems } = await serviceSupabase
+      .from("order_items")
+      .select("id")
+      .eq("medicine_id", id)
+      .limit(1);
+
+    const { data: purchaseOrderItems } = await serviceSupabase
+      .from("purchase_order_items")
+      .select("id")
+      .eq("medicine_id", id)
+      .limit(1);
+
+    const { data: inventoryTransactions } = await serviceSupabase
+      .from("inventory_transactions")
+      .select("id")
+      .eq("medicine_id", id)
+      .limit(1);
+
+    // If medicine has related records, archive instead of delete
+    if (orderItems?.length > 0 || purchaseOrderItems?.length > 0 || inventoryTransactions?.length > 0) {
+      // Archive the medicine by setting is_active to false
+      const { error: archiveError } = await serviceSupabase
+        .from("medicines")
+        .update({ is_active: false })
+        .eq("id", id)
+        .eq("organization_id", organizationId);
+
+      if (archiveError) {
+        return res.status(500).json({
+          success: false,
+          message: "Error archiving medicine",
+          error: archiveError.message,
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: "Medicine archived successfully (cannot be deleted due to existing transactions)",
+        archived: true,
+      });
+    }
+
+    // If no related records, proceed with deletion
     const { error } = await serviceSupabase
       .from("medicines")
       .delete()
@@ -496,24 +626,34 @@ const getInventoryStats = async (req, res) => {
       });
     }
 
+    const now = new Date();
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
     const stats = {
-      totalMedicines: medicines?.length || 0,
+      total: medicines?.length || 0,
       totalValue:
         medicines?.reduce(
           (sum, med) => sum + med.quantity * med.selling_price,
           0
         ) || 0,
-      lowStockItems:
+      lowStock:
         medicines?.filter((med) => med.quantity <= med.low_stock_threshold)
           .length || 0,
-      outOfStockItems:
+      inStock:
+        medicines?.filter((med) => med.quantity > med.low_stock_threshold)
+          .length || 0,
+      outOfStock:
         medicines?.filter((med) => med.quantity === 0).length || 0,
+      expired:
+        medicines?.filter((med) => {
+          const expiryDate = new Date(med.expiry_date);
+          return expiryDate <= now;
+        }).length || 0,
       expiringSoon:
         medicines?.filter((med) => {
           const expiryDate = new Date(med.expiry_date);
-          const thirtyDaysFromNow = new Date();
-          thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-          return expiryDate <= thirtyDaysFromNow && expiryDate > new Date();
+          return expiryDate <= thirtyDaysFromNow && expiryDate > now;
         }).length || 0,
     };
 

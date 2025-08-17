@@ -60,9 +60,9 @@ export const useDashboard = () => {
   const orderDataQuery = useDashboardOrderData();
 
   return {
-    stats: statsQuery,
-    activities: activitiesQuery,
-    orderData: orderDataQuery,
+    stats: statsQuery.data,
+    activities: activitiesQuery.data,
+    orderData: orderDataQuery.data,
     isLoading:
       statsQuery.isLoading ||
       activitiesQuery.isLoading ||

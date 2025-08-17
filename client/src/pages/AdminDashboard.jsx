@@ -6,6 +6,7 @@ import SalesChart from "../components/Admin/SalesChart";
 import { useDashboard } from "../hooks/useDashboard";
 import { useOrderDashboard } from "../hooks/useOrders";
 import { useMedicines } from "../hooks/useMedicines";
+import { formatCurrency, formatPercentage } from "../utils/currency";
 
 // Modern Enhanced StatCard Component
 const StatCard = ({
@@ -222,16 +223,9 @@ const AdminDashboard = () => {
       color: "bg-gradient-to-r from-green-500 to-green-600",
       stats: `${
         dashboardOrderData?.data.totalOrders
-      } Orders Today | Rs.${dashboardOrderData?.data.totalRevenue?.toFixed(2)} Revenue`,
+      } Orders Today | ${formatCurrency(dashboardOrderData?.data.totalRevenue)} Revenue`,
     },
-    {
-      title: "Inventory Management",
-      description: "Track medicines, stock levels and expiry dates",
-      icon: "📦",
-      link: "/inventory",
-      color: "bg-gradient-to-r from-blue-500 to-blue-600",
-      stats: `${medicines?.data.pagination.total} Medicines | ${lowStockCount} Low Stock`,
-    },
+
     {
       title: "Supplier Management",
       description: "Manage suppliers and purchase orders",
@@ -248,14 +242,7 @@ const AdminDashboard = () => {
       color: "bg-gradient-to-r from-orange-500 to-orange-600",
       stats: `${dashboardStats?.totalUsers} Users`,
     },
-    {
-      title: "Medicines Database",
-      description: "View and search medicine information",
-      icon: "💊",
-      link: "/medicines",
-      color: "bg-gradient-to-r from-red-500 to-red-600",
-      stats: `${medicines?.data.pagination.total} Items`,
-    },
+
     {
       title: "Counter Operations",
       description: "Direct access to sales interface",
@@ -409,7 +396,7 @@ const AdminDashboard = () => {
               <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
                 <div className="text-sm text-blue-200 mb-2 uppercase tracking-wide">Today's Revenue</div>
                 <div className="text-4xl font-bold mb-2">
-                  Rs.{dashboardOrderData?.data.totalRevenue?.toFixed(2) || '0.00'}
+                  {formatCurrency(dashboardOrderData?.data.totalRevenue)}
                 </div>
                 <div className="flex items-center justify-center space-x-2 text-sm">
                   <span className="text-emerald-300">📈</span>
@@ -593,7 +580,7 @@ const AdminDashboard = () => {
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-orange-600">
-                {dashboardStats?.monthlyStats?.growthRate?.toFixed(1) || '0'}%
+                {formatPercentage(dashboardStats?.monthlyStats?.growthRate)}
               </div>
               <div className="text-sm text-gray-500">Growth Rate</div>
             </div>
@@ -661,7 +648,7 @@ const AdminDashboard = () => {
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-bold text-green-600 mb-1">
-                            Rs.{activity.details?.amount?.toFixed(2) || '0.00'}
+                            {formatCurrency(activity.details?.amount)}
                           </p>
                           <span
                             className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${

@@ -12,8 +12,9 @@ const authRoutes = require("./routes/auth");
 const dashboardRoutes = require("./routes/dashboard");
 const medicineRoutes = require("./routes/medicines");
 const orderRoutes = require("./routes/orders");
-const supplierRoutes = require("./routes/suppliers");
-const purchaseOrderRoutes = require("./routes/purchaseOrders");
+// Use refactored routes for suppliers and purchase orders
+const supplierRoutes = require("./routes/refactoredSuppliers");
+const purchaseOrderRoutes = require("./routes/refactoredPurchaseOrders");
 const inventoryRoutes = require("./routes/inventory");
 const userRoutes = require("./routes/users");
 const reportRoutes = require("./routes/reports");

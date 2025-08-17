@@ -5,6 +5,10 @@ const InventoryFilters = ({
   setSearchQuery,
   filterStatus,
   setFilterStatus,
+  category,
+  setCategory,
+  manufacturer,
+  setManufacturer,
   sortBy,
   setSortBy,
   sortOrder,
@@ -31,6 +35,8 @@ const InventoryFilters = ({
   const handleClearFilters = () => {
     setSearchQuery("");
     setFilterStatus("all");
+    setCategory("");
+    setManufacturer("");
     setSortBy("name");
     setSortOrder("asc");
   };
@@ -38,6 +44,8 @@ const InventoryFilters = ({
   const hasActiveFilters =
     searchQuery ||
     filterStatus !== "all" ||
+    category ||
+    manufacturer ||
     sortBy !== "name" ||
     sortOrder !== "asc";
 
@@ -106,9 +114,9 @@ const InventoryFilters = ({
         </div>
 
         {/* Filter Row */}
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col space-y-4">
           {/* Status Filter */}
-          <div className="flex-1">
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Status
             </label>
@@ -131,6 +139,34 @@ const InventoryFilters = ({
                   )}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Category and Manufacturer Filters */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Category
+              </label>
+              <input
+                type="text"
+                placeholder="Filter by category..."
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Manufacturer
+              </label>
+              <input
+                type="text"
+                placeholder="Filter by manufacturer..."
+                value={manufacturer}
+                onChange={(e) => setManufacturer(e.target.value)}
+                className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              />
             </div>
           </div>
 
@@ -219,6 +255,54 @@ const InventoryFilters = ({
                 <button
                   onClick={() => setFilterStatus("all")}
                   className="ml-2 inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-green-200"
+                >
+                  <svg
+                    className="w-3 h-3"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </span>
+            )}
+
+            {category && (
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                Category: "{category}"
+                <button
+                  onClick={() => setCategory("")}
+                  className="ml-2 inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-yellow-200"
+                >
+                  <svg
+                    className="w-3 h-3"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </span>
+            )}
+
+            {manufacturer && (
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                Manufacturer: "{manufacturer}"
+                <button
+                  onClick={() => setManufacturer("")}
+                  className="ml-2 inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-indigo-200"
                 >
                   <svg
                     className="w-3 h-3"

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { purchaseOrderServices } from "../../services/api";
+import { usePurchaseOrdersBySupplier } from "../../hooks/usePurchaseOrders";
 
 const SupplierDetailsModal = ({
   show,
@@ -11,28 +10,23 @@ const SupplierDetailsModal = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({});
+  const [expandedOrders, setExpandedOrders] = useState(new Set());
 
   // Fetch purchase orders for this supplier
-  const { data: ordersData, isLoading: ordersLoading } = useQuery({
-    queryKey: ["purchase-orders", supplier?.id],
-    queryFn: () =>
-      purchaseOrderServices.getBySupplier(supplier.id).then((res) => res.data),
-    enabled: show && !!supplier?.id,
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data: ordersData, isLoading: ordersLoading } = usePurchaseOrdersBySupplier(supplier?.id);
 
   useEffect(() => {
     if (supplier) {
       setEditData({
         name: supplier.name || "",
-        contactPerson: supplier.contactPerson || "",
+        contact_person: supplier.contact_person || "",
         phone: supplier.phone || "",
         email: supplier.email || "",
         address: supplier.address || "",
-        gstNumber: supplier.gstNumber || "",
+        tax_id: supplier.tax_id || "",
         city: supplier.city || "",
         state: supplier.state || "",
-        pincode: supplier.pincode || "",
+        postal_code: supplier.postal_code || "",
         website: supplier.website || "",
         notes: supplier.notes || "",
       });
@@ -42,6 +36,28 @@ const SupplierDetailsModal = ({
   if (!show || !supplier) return null;
 
   const orders = ordersData?.purchaseOrders || [];
+
+  const toggleOrderExpansion = (orderId) => {
+    const newExpanded = new Set(expandedOrders);
+    if (newExpanded.has(orderId)) {
+      newExpanded.delete(orderId);
+    } else {
+      newExpanded.add(orderId);
+    }
+    setExpandedOrders(newExpanded);
+  };
+
+  const formatCurrency = (amount) => {
+    return `Rs. ${(amount || 0).toFixed(2)}`;
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
 
   const handleInputChange = (field, value) => {
     setEditData((prev) => ({
@@ -58,14 +74,14 @@ const SupplierDetailsModal = ({
   const handleCancel = () => {
     setEditData({
       name: supplier.name || "",
-      contactPerson: supplier.contactPerson || "",
+      contact_person: supplier.contact_person || "",
       phone: supplier.phone || "",
       email: supplier.email || "",
       address: supplier.address || "",
-      gstNumber: supplier.gstNumber || "",
+      tax_id: supplier.tax_id || "",
       city: supplier.city || "",
       state: supplier.state || "",
-      pincode: supplier.pincode || "",
+      postal_code: supplier.postal_code || "",
       website: supplier.website || "",
       notes: supplier.notes || "",
     });
@@ -181,15 +197,15 @@ const SupplierDetailsModal = ({
                     {isEditing ? (
                       <input
                         type="text"
-                        value={editData.contactPerson}
+                        value={editData.contact_person}
                         onChange={(e) =>
-                          handleInputChange("contactPerson", e.target.value)
+                          handleInputChange("contact_person", e.target.value)
                         }
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     ) : (
                       <p className="text-gray-900">
-                        {supplier.contactPerson || "N/A"}
+                        {supplier.contact_person || "N/A"}
                       </p>
                     )}
                   </div>
@@ -298,15 +314,15 @@ const SupplierDetailsModal = ({
                     {isEditing ? (
                       <input
                         type="text"
-                        value={editData.pincode}
+                        value={editData.postal_code}
                         onChange={(e) =>
-                          handleInputChange("pincode", e.target.value)
+                          handleInputChange("postal_code", e.target.value)
                         }
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     ) : (
                       <p className="text-gray-900">
-                        {supplier.pincode || "N/A"}
+                        {supplier.postal_code || "N/A"}
                       </p>
                     )}
                   </div>
@@ -321,15 +337,15 @@ const SupplierDetailsModal = ({
                     {isEditing ? (
                       <input
                         type="text"
-                        value={editData.gstNumber}
+                        value={editData.tax_id}
                         onChange={(e) =>
-                          handleInputChange("gstNumber", e.target.value)
+                          handleInputChange("tax_id", e.target.value)
                         }
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     ) : (
                       <p className="text-gray-900">
-                        {supplier.gstNumber || "N/A"}
+                        {supplier.tax_id || "N/A"}
                       </p>
                     )}
                   </div>
@@ -398,38 +414,161 @@ const SupplierDetailsModal = ({
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                   </div>
                 ) : orders.length > 0 ? (
-                  orders.map((order) => (
-                    <div
-                      key={order.id}
-                      className="border rounded-lg p-4 hover:bg-gray-50"
-                    >
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <h4 className="font-medium text-gray-900">
-                            Order #{order.id?.slice(-8)}
-                          </h4>
-                          <p className="text-sm text-gray-600">
-                            {new Date(order.createdAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                            order.status
-                          )}`}
+                  orders.map((order) => {
+                    const isExpanded = expandedOrders.has(order.id);
+                    const items = order.purchase_order_items || [];
+                    
+                    return (
+                      <div
+                        key={order.id}
+                        className="border rounded-lg overflow-hidden"
+                      >
+                        {/* Order Header */}
+                        <div 
+                          className="p-4 hover:bg-gray-50 cursor-pointer"
+                          onClick={() => toggleOrderExpansion(order.id)}
                         >
-                          {order.status}
-                        </span>
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-medium text-gray-900">
+                                  {order.po_number || `Order #${order.id?.slice(-8)}`}
+                                </h4>
+                                <svg
+                                  className={`w-4 h-4 text-gray-500 transition-transform ${
+                                    isExpanded ? 'rotate-180' : ''
+                                  }`}
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M19 9l-7 7-7-7"
+                                  />
+                                </svg>
+                              </div>
+                              <p className="text-sm text-gray-600">
+                                {formatDate(order.created_at)}
+                              </p>
+                              {order.expected_delivery_date && (
+                                <p className="text-xs text-gray-500">
+                                  Expected: {formatDate(order.expected_delivery_date)}
+                                </p>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <span
+                                className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
+                                  order.status
+                                )}`}
+                              >
+                                {order.status}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-gray-600">
+                              {items.length} item{items.length !== 1 ? 's' : ''}
+                            </span>
+                            <span className="font-semibold text-gray-900">
+                              {formatCurrency(order.total_amount)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Expanded Order Details */}
+                        {isExpanded && (
+                          <div className="border-t bg-gray-50">
+                            <div className="p-4">
+                              {order.notes && (
+                                <div className="mb-4">
+                                  <h5 className="text-sm font-medium text-gray-700 mb-1">Notes:</h5>
+                                  <p className="text-sm text-gray-600">{order.notes}</p>
+                                </div>
+                              )}
+                              
+                              <h5 className="text-sm font-medium text-gray-700 mb-3">Order Items:</h5>
+                              
+                              {items.length > 0 ? (
+                                <div className="space-y-2">
+                                  {items.map((item, index) => (
+                                    <div
+                                      key={index}
+                                      className="bg-white rounded-lg p-3 border border-gray-200"
+                                    >
+                                      <div className="flex justify-between items-start">
+                                        <div className="flex-1">
+                                          <h6 className="font-medium text-gray-900">
+                                            {item.medicine?.name || 'Unknown Medicine'}
+                                          </h6>
+                                          {item.medicine?.manufacturer && (
+                                            <p className="text-sm text-gray-600">
+                                              {item.medicine.manufacturer}
+                                            </p>
+                                          )}
+                                          <div className="flex items-center gap-4 mt-1 text-sm text-gray-500">
+                                            {item.medicine?.category && (
+                                              <span>Category: {item.medicine.category}</span>
+                                            )}
+                                            {item.medicine?.unit && (
+                                              <span>Unit: {item.medicine.unit}</span>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <div className="text-right ml-4">
+                                          <div className="text-sm text-gray-600">
+                                            Qty: {item.quantity}
+                                          </div>
+                                          <div className="text-sm text-gray-600">
+                                            Unit Cost: {formatCurrency(item.unit_cost)}
+                                          </div>
+                                          <div className="font-medium text-gray-900">
+                                            Total: {formatCurrency(item.total_cost)}
+                                          </div>
+                                          {item.received_quantity !== undefined && (
+                                            <div className="text-xs text-green-600 mt-1">
+                                              Received: {item.received_quantity}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-sm text-gray-500 italic">No items found</p>
+                              )}
+                              
+                              {/* Order Summary */}
+                              <div className="mt-4 pt-3 border-t border-gray-200">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-sm font-medium text-gray-700">Order Total:</span>
+                                  <span className="text-lg font-semibold text-gray-900">
+                                    {formatCurrency(order.total_amount)}
+                                  </span>
+                                </div>
+                                {order.tax_amount && order.tax_amount > 0 && (
+                                  <div className="flex justify-between items-center text-sm text-gray-600">
+                                    <span>Tax:</span>
+                                    <span>{formatCurrency(order.tax_amount)}</span>
+                                  </div>
+                                )}
+                                {order.discount_amount && order.discount_amount > 0 && (
+                                  <div className="flex justify-between items-center text-sm text-gray-600">
+                                    <span>Discount:</span>
+                                    <span>-{formatCurrency(order.discount_amount)}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">
-                          {order.items?.length || 0} items
-                        </span>
-                        <span className="font-semibold text-gray-900">
-                          Rs. {order.total?.toFixed(2) || "0.00"}
-                        </span>
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <div className="text-center py-8">
                     <svg
