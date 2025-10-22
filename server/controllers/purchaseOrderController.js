@@ -1,46 +1,61 @@
-const { supabase } = require("../config/supabase");
+const { query, withTransaction } = require("../config/database");
 
-// Get all purchase orders
+/**
+ * Get all purchase orders
+ */
 const getAllPurchaseOrders = async (req, res) => {
   try {
     const { page = 1, limit = 10, status, supplierId } = req.query;
     const organizationId = req.user.organization_id;
 
-    let query = supabase
-      .from("purchase_orders")
-      .select("*, supplier:suppliers(name, contact_person), created_by_user:users!created_by(username, full_name), purchase_order_items(*, medicine:medicines(id, name, manufacturer, unit, category))", { count: 'exact' })
-      .eq("organization_id", organizationId);
+    // Build WHERE clause
+    let whereCondition = "po.organization_id = $1";
+    let params = [organizationId];
+    let paramIndex = 2;
 
     if (status) {
-      query = query.eq("status", status);
+      whereCondition += ` AND po.status = $${paramIndex}`;
+      params.push(status);
+      paramIndex++;
     }
 
     if (supplierId) {
-      query = query.eq("supplier_id", supplierId);
+      whereCondition += ` AND po.supplier_id = $${paramIndex}`;
+      params.push(supplierId);
+      paramIndex++;
     }
 
+    // Get total count
+    const countResult = await query(
+      `SELECT COUNT(*) as total FROM purchase_orders po WHERE ${whereCondition}`,
+      params
+    );
+    const totalCount = parseInt(countResult.rows[0].total);
+
+    // Get paginated data
     const offset = (page - 1) * limit;
-    query = query.range(offset, offset + limit - 1).order('created_at', { ascending: false });
+    const result = await query(
+      `SELECT po.*, s.name as supplier_name, u.username as created_by_user
+       FROM purchase_orders po
+       LEFT JOIN suppliers s ON po.supplier_id = s.id
+       LEFT JOIN users u ON po.created_by = u.id
+       WHERE ${whereCondition}
+       ORDER BY po.created_at DESC
+       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+      [...params, limit, offset]
+    );
 
-    const { data: purchaseOrders, error, count } = await query;
-
-    if (error) {
-      return res.status(500).json({
-        success: false,
-        message: "Error fetching purchase orders",
-        error: error.message,
-      });
-    }
+    const totalPages = Math.ceil(totalCount / limit);
 
     res.json({
       success: true,
       data: {
-        purchaseOrders: purchaseOrders || [],
+        purchaseOrders: result.rows || [],
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
-          total: count || purchaseOrders?.length || 0,
-          pages: Math.ceil((count || purchaseOrders?.length || 0) / limit),
+          total: totalCount,
+          pages: totalPages,
         },
       },
     });
@@ -53,20 +68,28 @@ const getAllPurchaseOrders = async (req, res) => {
   }
 };
 
-// Get single purchase order
+/**
+ * Get single purchase order
+ */
 const getPurchaseOrder = async (req, res) => {
   try {
     const { id } = req.params;
     const organizationId = req.user.organization_id;
 
-    const { data: purchaseOrder, error } = await supabase
-      .from("purchase_orders")
-      .select("*, supplier:suppliers(*), created_by_user:users!created_by(*), purchase_order_items(*, medicine:medicines(id, name, manufacturer, unit, category))")
-      .eq("id", id)
-      .eq("organization_id", organizationId)
-      .single();
+    const result = await query(
+      `SELECT po.*, s.name as supplier_name, u.username as created_by_user,
+              json_agg(json_build_object('id', poi.id, 'medicine_id', poi.medicine_id, 'quantity', poi.quantity, 'unit_price', poi.unit_price, 'total_price', poi.total_price, 'medicine_name', m.name)) as items
+       FROM purchase_orders po
+       LEFT JOIN suppliers s ON po.supplier_id = s.id
+       LEFT JOIN users u ON po.created_by = u.id
+       LEFT JOIN purchase_order_items poi ON po.id = poi.purchase_order_id
+       LEFT JOIN medicines m ON poi.medicine_id = m.id
+       WHERE po.id = $1 AND po.organization_id = $2
+       GROUP BY po.id, s.name, u.username`,
+      [id, organizationId]
+    );
 
-    if (error || !purchaseOrder) {
+    if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: "Purchase order not found",
@@ -75,7 +98,7 @@ const getPurchaseOrder = async (req, res) => {
 
     res.json({
       success: true,
-      data: { purchaseOrder },
+      data: { purchaseOrder: result.rows[0] },
     });
   } catch (error) {
     console.error("Get purchase order error:", error);
@@ -86,159 +109,127 @@ const getPurchaseOrder = async (req, res) => {
   }
 };
 
-// Create purchase order
+/**
+ * Create purchase order
+ */
 const createPurchaseOrder = async (req, res) => {
   try {
+    console.log(
+      "🔍 Received purchase order request body:",
+      JSON.stringify(req.body, null, 2)
+    );
+
+    // Handle both camelCase (from validation middleware) and snake_case
     const {
+      supplierId,
       supplier_id,
       items,
+      expectedDeliveryDate,
       expected_delivery_date,
       notes,
+      taxPercent,
       tax_percent = 0,
+      discountAmount,
       discount_amount = 0,
     } = req.body;
+
+    // Use camelCase values if provided (from validation middleware), else fall back to snake_case
+    const finalSupplierId = supplierId || supplier_id;
+    const finalExpectedDeliveryDate =
+      expectedDeliveryDate || expected_delivery_date;
+    const finalTaxPercent = taxPercent !== undefined ? taxPercent : tax_percent;
+    const finalDiscountAmount =
+      discountAmount !== undefined ? discountAmount : discount_amount;
+
+    console.log("📋 Extracted values:", {
+      supplierId,
+      supplier_id,
+      finalSupplierId,
+      items,
+      itemsLength: items?.length,
+      expectedDeliveryDate,
+      expected_delivery_date,
+      finalExpectedDeliveryDate,
+    });
+
     const organizationId = req.user.organization_id;
+    const userId = req.user.id;
 
-    // Validate supplier exists (only if supplier_id is provided)
-    let supplier = null;
-    if (supplier_id) {
-      const { data: supplierData, error: supplierError } = await supabase
-        .from("suppliers")
-        .select("id, name")
-        .eq("id", supplier_id)
-        .eq("organization_id", organizationId)
-        .single();
-
-      if (supplierError || !supplierData) {
-        return res.status(404).json({
-          success: false,
-          message: "Supplier not found",
-        });
-      }
-      supplier = supplierData;
-    }
-
-    // Validate and process items
-    let subtotal = 0;
-    const processedItems = [];
-    
-    for (const item of items) {
-      let medicineId = item.medicine_id;
-      
-      // If medicine_id is null or undefined, create a new medicine
-      if (!medicineId && item.medicineName) {
-        const { data: newMedicine, error: createError } = await supabase
-          .from("medicines")
-          .insert({
-            name: item.medicineName,
-            manufacturer: "Unknown",
-            category: "General",
-            unit: "Piece",
-            trade_price: item.unit_cost || 0,
-            mrp: (item.unit_cost || 0) * 1.2, // 20% markup as default
-            stock_quantity: 0,
-            min_stock_level: 10,
-            organization_id: organizationId,
-            created_by: req.user.id
-          })
-          .select("id")
-          .single();
-          
-        if (createError) {
-          return res.status(400).json({
-            success: false,
-            message: `Error creating medicine ${item.medicineName}: ${createError.message}`,
-          });
-        }
-        
-        medicineId = newMedicine.id;
-      } else if (medicineId) {
-        // Validate existing medicine
-        const { data: medicine, error: medicineError } = await supabase
-          .from("medicines")
-          .select("id, name, manufacturer")
-          .eq("id", medicineId)
-          .eq("organization_id", organizationId)
-          .single();
-
-        if (medicineError || !medicine) {
-          return res.status(404).json({
-            success: false,
-            message: `Medicine with ID ${medicineId} not found`,
-          });
-        }
-      } else {
-        return res.status(400).json({
-          success: false,
-          message: "Either medicine_id or medicineName must be provided",
-        });
-      }
-      
-      processedItems.push({
-        ...item,
-        medicine_id: medicineId,
-        unit_price: item.unit_cost || item.unit_price
+    if (!finalSupplierId || !items || items.length === 0) {
+      console.error("❌ Validation failed:", {
+        finalSupplierId: !!finalSupplierId,
+        items: !!items,
+        itemsLength: items?.length,
       });
-      
-      subtotal += item.quantity * (item.unit_cost || item.unit_price);
-    }
-
-    // Calculate totals
-    const taxAmount = (subtotal * parseFloat(tax_percent)) / 100;
-    const total = subtotal + taxAmount - parseFloat(discount_amount);
-
-    // Create purchase order
-    const { data: purchaseOrder, error: poError } = await supabase
-      .from("purchase_orders")
-      .insert({
-        po_number: `PO-${Date.now()}`,
-        supplier_id: supplier_id || null,
-        total_amount: total,
-        tax_amount: taxAmount,
-        discount: parseFloat(discount_amount),
-        status: 'pending', // Default to pending status
-        expected_delivery: expected_delivery_date,
-        notes,
-        organization_id: organizationId,
-        created_by: req.user.id,
-      })
-      .select()
-      .single();
-
-    if (poError) {
       return res.status(400).json({
         success: false,
-        message: "Error creating purchase order",
-        error: poError.message,
+        message: "Supplier and items are required",
       });
     }
 
-    // Create purchase order items
-    const purchaseOrderItems = processedItems.map((item) => ({
-      purchase_order_id: purchaseOrder.id,
-      medicine_id: item.medicine_id,
+    // Generate unique PO number
+    const poNumber = `PO-${organizationId.substring(0, 8)}-${Date.now()}`;
+
+    // Convert items to use snake_case field names
+    const processedItems = items.map((item) => ({
+      medicineId: item.medicineId || item.medicine_id,
       quantity: item.quantity,
-      unit_cost: item.unit_price,
-      total_cost: item.quantity * item.unit_price,
+      unitCost: item.unitCost || item.unit_price,
     }));
 
-    const { error: itemsError } = await supabase
-      .from("purchase_order_items")
-      .insert(purchaseOrderItems);
+    // Calculate totals
+    const subtotal = processedItems.reduce(
+      (sum, item) => sum + item.quantity * item.unitCost,
+      0
+    );
+    const tax_amount = (subtotal * finalTaxPercent) / 100;
+    const total_amount = subtotal + tax_amount - finalDiscountAmount;
 
-    if (itemsError) {
-      // Rollback purchase order creation if items fail
-      await supabase.from("purchase_orders").delete().eq("id", purchaseOrder.id);
-      return res.status(400).json({
-        success: false,
-        message: "Error creating purchase order items",
-        error: itemsError.message,
+    // Create purchase order with transaction
+    await withTransaction(async (client) => {
+      const poResult = await client.query(
+        `INSERT INTO purchase_orders (
+          po_number, supplier_id, organization_id, status, expected_delivery_date, notes,
+          total_amount, tax_amount, discount, created_by, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
+        RETURNING *`,
+        [
+          poNumber,
+          finalSupplierId,
+          organizationId,
+          "pending",
+          finalExpectedDeliveryDate || null,
+          notes || null,
+          total_amount,
+          tax_amount,
+          finalDiscountAmount,
+          userId,
+        ]
+      );
+
+      const po = poResult.rows[0];
+
+      // Insert items
+      for (const item of processedItems) {
+        await client.query(
+          `INSERT INTO purchase_order_items (
+            purchase_order_id, medicine_id, quantity, unit_cost, total_cost, created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+          [
+            po.id,
+            item.medicineId,
+            item.quantity,
+            item.unitCost,
+            item.quantity * item.unitCost,
+          ]
+        );
+      }
+
+      res.status(201).json({
+        success: true,
+        message: "Purchase order created successfully",
+        data: { purchaseOrder: po },
       });
-    }
-
-    res.status(201).json({
-      success: true,
-      data: { purchaseOrder },
     });
   } catch (error) {
     console.error("Create purchase order error:", error);
@@ -249,114 +240,36 @@ const createPurchaseOrder = async (req, res) => {
   }
 };
 
-// Update purchase order
-const updatePurchaseOrder = async (req, res) => {
+/**
+ * Update purchase order status
+ */
+const updatePurchaseOrderStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const {
-      supplier_id,
-      items,
-      expected_delivery_date,
-      notes,
-      tax_percent,
-      discount_amount,
-      status,
-    } = req.body;
+    const { status } = req.body;
     const organizationId = req.user.organization_id;
 
-    // Fetch the existing purchase order
-    const { data: existingOrder, error: fetchError } = await supabase
-      .from("purchase_orders")
-      .select("*")
-      .eq("id", id)
-      .eq("organization_id", organizationId)
-      .single();
+    const result = await query(
+      `UPDATE purchase_orders SET status = $1, updated_at = NOW()
+       WHERE id = $2 AND organization_id = $3
+       RETURNING *`,
+      [status, id, organizationId]
+    );
 
-    if (fetchError || !existingOrder) {
+    if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: "Purchase order not found",
       });
     }
 
-    if (existingOrder.status !== "pending") {
-      return res.status(400).json({
-        success: false,
-        message: "Cannot update a purchase order that is not pending",
-      });
-    }
-
-    // Prepare update data
-    const updateData = {
-      supplier_id,
-      expected_delivery: expected_delivery_date,
-      notes,
-      discount: discount_amount,
-      status,
-    };
-
-    // If items are being updated, recalculate totals
-    if (items) {
-      let subtotal = 0;
-      for (const item of items) {
-        subtotal += item.quantity * item.unit_price;
-      }
-      const taxAmount = (subtotal * parseFloat(tax_percent)) / 100;
-      const total = subtotal + taxAmount - parseFloat(discount_amount);
-      updateData.subtotal = subtotal;
-      updateData.tax_amount = taxAmount;
-      updateData.total_amount = total;
-    }
-
-    // Update the purchase order
-    const { data: purchaseOrder, error: updateError } = await supabase
-      .from("purchase_orders")
-      .update(updateData)
-      .eq("id", id)
-      .select()
-      .single();
-
-    if (updateError) {
-      return res.status(400).json({
-        success: false,
-        message: "Error updating purchase order",
-        error: updateError.message,
-      });
-    }
-
-    // Update purchase order items
-    if (items) {
-      // Delete existing items
-      await supabase.from("purchase_order_items").delete().eq("purchase_order_id", id);
-
-      // Insert new items
-      const purchaseOrderItems = items.map((item) => ({
-        purchase_order_id: id,
-        medicine_id: item.medicine_id,
-        quantity: item.quantity,
-        unit_cost: item.unit_price,
-        total_cost: item.quantity * item.unit_price,
-      }));
-
-      const { error: itemsError } = await supabase
-        .from("purchase_order_items")
-        .insert(purchaseOrderItems);
-
-      if (itemsError) {
-        return res.status(400).json({
-          success: false,
-          message: "Error updating purchase order items",
-          error: itemsError.message,
-        });
-      }
-    }
-
     res.json({
       success: true,
-      data: { purchaseOrder },
+      message: "Purchase order status updated",
+      data: { purchaseOrder: result.rows[0] },
     });
   } catch (error) {
-    console.error("Update purchase order error:", error);
+    console.error("Update purchase order status error:", error);
     res.status(500).json({
       success: false,
       message: "Error updating purchase order",
@@ -364,373 +277,52 @@ const updatePurchaseOrder = async (req, res) => {
   }
 };
 
-// Mark purchase order as received and update inventory
-const receivePurchaseOrder = async (req, res) => {
+/**
+ * Delete purchase order (if pending)
+ */
+const deletePurchaseOrder = async (req, res) => {
   try {
     const { id } = req.params;
-    const { items } = req.body;
     const organizationId = req.user.organization_id;
 
-    const { data: purchaseOrder, error: fetchError } = await supabase
-      .from("purchase_orders")
-      .select("*")
-      .eq("id", id)
-      .eq("organization_id", organizationId)
-      .single();
+    // Only delete if pending
+    const checkResult = await query(
+      "SELECT status FROM purchase_orders WHERE id = $1 AND organization_id = $2",
+      [id, organizationId]
+    );
 
-    if (fetchError || !purchaseOrder) {
+    if (checkResult.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: "Purchase order not found",
       });
     }
 
-    if (purchaseOrder.status !== "ordered") {
+    if (checkResult.rows[0].status !== "pending") {
       return res.status(400).json({
         success: false,
-        message: "Purchase order must be ordered to be received",
+        message: "Cannot delete non-pending purchase orders",
       });
     }
 
-    for (const item of items) {
-      await supabase.rpc("update_medicine_stock", {
-        med_id: item.medicine_id,
-        org_id: organizationId,
-        quantity_change: item.quantity,
-      });
-    }
+    // Delete items first
+    await query(
+      "DELETE FROM purchase_order_items WHERE purchase_order_id = $1",
+      [id]
+    );
 
-    const { data: updatedOrder, error: updateError } = await supabase
-      .from("purchase_orders")
-      .update({ status: "received", received_at: new Date().toISOString() })
-      .eq("id", id)
-      .select()
-      .single();
-
-    if (updateError) {
-      return res.status(500).json({
-        success: false,
-        message: "Error updating purchase order status",
-        error: updateError.message,
-      });
-    }
+    // Delete purchase order
+    await query("DELETE FROM purchase_orders WHERE id = $1", [id]);
 
     res.json({
       success: true,
-      data: { purchaseOrder: updatedOrder },
+      message: "Purchase order deleted successfully",
     });
   } catch (error) {
-    console.error("Receive purchase order error:", error);
+    console.error("Delete purchase order error:", error);
     res.status(500).json({
       success: false,
-      message: "Error receiving purchase order",
-    });
-  }
-};
-
-// Cancel purchase order
-const cancelPurchaseOrder = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const organizationId = req.user.organization_id;
-
-    const { data: updatedOrder, error } = await supabase
-      .from("purchase_orders")
-      .update({ status: "cancelled" })
-      .eq("id", id)
-      .eq("organization_id", organizationId)
-      .select()
-      .single();
-
-    if (error || !updatedOrder) {
-      return res.status(404).json({
-        success: false,
-        message: "Purchase order not found or could not be cancelled",
-      });
-    }
-
-    res.json({
-      success: true,
-      data: { purchaseOrder: updatedOrder },
-    });
-  } catch (error) {
-    console.error("Cancel purchase order error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error cancelling purchase order",
-    });
-  }
-};
-
-// Mark purchase order as ordered
-const markAsOrdered = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const organizationId = req.user.organization_id;
-
-    const { data: updatedOrder, error } = await supabase
-      .from("purchase_orders")
-      .update({ status: "ordered" })
-      .eq("id", id)
-      .eq("organization_id", organizationId)
-      .eq("status", "pending")
-      .select()
-      .single();
-
-    if (error || !updatedOrder) {
-      return res.status(404).json({
-        success: false,
-        message: "Purchase order not found or not in pending state",
-      });
-    }
-
-    res.json({
-      success: true,
-      data: { purchaseOrder: updatedOrder },
-    });
-  } catch (error) {
-    console.error("Mark as ordered error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error marking purchase order as ordered",
-    });
-  }
-};
-
-// Get overdue purchase orders
-const getOverduePurchaseOrders = async (req, res) => {
-  try {
-    const organizationId = req.user.organization_id;
-    const today = new Date().toISOString();
-
-    const { data: purchaseOrders, error } = await supabase
-      .from("purchase_orders")
-      .select("*")
-      .eq("organization_id", organizationId)
-      .eq("status", "pending")
-      .lt("expected_delivery_date", today);
-
-    if (error) {
-      return res.status(500).json({
-        success: false,
-        message: "Error fetching overdue purchase orders",
-        error: error.message,
-      });
-    }
-
-    res.json({
-      success: true,
-      data: { purchaseOrders: purchaseOrders || [] },
-    });
-  } catch (error) {
-    console.error("Get overdue purchase orders error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error fetching overdue purchase orders",
-    });
-  }
-};
-
-// Create purchase order without supplier
-const createPurchaseOrderWithoutSupplier = async (req, res) => {
-  try {
-    const {
-      items,
-      expected_delivery_date,
-      notes,
-      tax_percent = 0,
-      discount_amount = 0,
-    } = req.body;
-    const organizationId = req.user.organization_id;
-
-    // Validate and process items
-    let subtotal = 0;
-    const processedItems = [];
-    
-    for (const item of items) {
-      let medicineId = item.medicine_id;
-      
-      // If medicine_id is null or undefined, create a new medicine
-      if (!medicineId && item.medicineName) {
-        const { data: newMedicine, error: createError } = await supabase
-          .from("medicines")
-          .insert({
-            name: item.medicineName,
-            manufacturer: "Unknown",
-            category: "General",
-            unit: "Piece",
-            trade_price: item.unit_cost || 0,
-            mrp: (item.unit_cost || 0) * 1.2, // 20% markup as default
-            stock_quantity: 0,
-            min_stock_level: 10,
-            organization_id: organizationId,
-            created_by: req.user.id
-          })
-          .select("id")
-          .single();
-          
-        if (createError) {
-          return res.status(400).json({
-            success: false,
-            message: `Error creating medicine ${item.medicineName}: ${createError.message}`,
-          });
-        }
-        
-        medicineId = newMedicine.id;
-      } else if (medicineId) {
-        // Validate existing medicine
-        const { data: medicine, error: medicineError } = await supabase
-          .from("medicines")
-          .select("id, name, manufacturer")
-          .eq("id", medicineId)
-          .eq("organization_id", organizationId)
-          .single();
-
-        if (medicineError || !medicine) {
-          return res.status(404).json({
-            success: false,
-            message: `Medicine with ID ${medicineId} not found`,
-          });
-        }
-      } else {
-        return res.status(400).json({
-          success: false,
-          message: "Either medicine_id or medicineName must be provided",
-        });
-      }
-      
-      processedItems.push({
-        ...item,
-        medicine_id: medicineId,
-        unit_price: item.unit_cost || item.unit_price
-      });
-      
-      subtotal += item.quantity * (item.unit_cost || item.unit_price);
-    }
-
-    // Calculate totals
-    const taxAmount = (subtotal * parseFloat(tax_percent)) / 100;
-    const total = subtotal + taxAmount - parseFloat(discount_amount);
-
-    // Create purchase order without supplier
-    const { data: purchaseOrder, error: poError } = await supabase
-      .from("purchase_orders")
-      .insert({
-        po_number: `PO-${Date.now()}`,
-        supplier_id: null,
-        total_amount: total,
-        tax_amount: taxAmount,
-        discount: parseFloat(discount_amount),
-        status: 'pending', // Always start with pending status
-        expected_delivery: expected_delivery_date,
-        notes: notes || 'Order created without supplier',
-        organization_id: organizationId,
-        created_by: req.user.id,
-      })
-      .select()
-      .single();
-
-    if (poError) {
-      return res.status(400).json({
-        success: false,
-        message: "Error creating purchase order",
-        error: poError.message,
-      });
-    }
-
-    // Create purchase order items
-    const purchaseOrderItems = processedItems.map((item) => ({
-      purchase_order_id: purchaseOrder.id,
-      medicine_id: item.medicine_id,
-      quantity: item.quantity,
-      unit_cost: item.unit_price,
-      total_cost: item.quantity * item.unit_price,
-    }));
-
-    const { error: itemsError } = await supabase
-      .from("purchase_order_items")
-      .insert(purchaseOrderItems);
-
-    if (itemsError) {
-      // Rollback purchase order creation if items fail
-      await supabase.from("purchase_orders").delete().eq("id", purchaseOrder.id);
-      return res.status(400).json({
-        success: false,
-        message: "Error creating purchase order items",
-        error: itemsError.message,
-      });
-    }
-
-    res.status(201).json({
-      success: true,
-      data: { purchaseOrder },
-    });
-  } catch (error) {
-    console.error("Create purchase order without supplier error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error creating purchase order without supplier",
-    });
-  }
-};
-
-// Mark purchase order as received (simplified workflow)
-const markAsReceived = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const organizationId = req.user.organization_id;
-
-    // Get purchase order
-    const { data: purchaseOrder, error: fetchError } = await supabase
-      .from("purchase_orders")
-      .select("*")
-      .eq("id", id)
-      .eq("organization_id", organizationId)
-      .single();
-
-    if (fetchError || !purchaseOrder) {
-      return res.status(404).json({
-        success: false,
-        message: "Purchase order not found",
-      });
-    }
-
-    if (purchaseOrder.status !== "pending") {
-      return res.status(400).json({
-        success: false,
-        message: "Purchase order must be pending to be marked as received",
-      });
-    }
-
-    // Update status to received
-    const { data: updatedOrder, error: updateError } = await supabase
-      .from("purchase_orders")
-      .update({ 
-        status: "received", 
-        actual_delivery: new Date().toISOString().split('T')[0] // Set delivery date to today
-      })
-      .eq("id", id)
-      .select()
-      .single();
-
-    if (updateError) {
-      return res.status(500).json({
-        success: false,
-        message: "Error updating purchase order status",
-        error: updateError.message,
-      });
-    }
-
-    res.json({
-      success: true,
-      data: { purchaseOrder: updatedOrder },
-      message: "Purchase order marked as received successfully",
-    });
-  } catch (error) {
-    console.error("Mark as received error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error marking purchase order as received",
+      message: "Error deleting purchase order",
     });
   }
 };
@@ -739,11 +331,6 @@ module.exports = {
   getAllPurchaseOrders,
   getPurchaseOrder,
   createPurchaseOrder,
-  updatePurchaseOrder,
-  receivePurchaseOrder,
-  cancelPurchaseOrder,
-  markAsOrdered,
-  getOverduePurchaseOrders,
-  createPurchaseOrderWithoutSupplier,
-  markAsReceived,
+  updatePurchaseOrderStatus,
+  deletePurchaseOrder,
 };

@@ -1,6 +1,5 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../services/api";
-import { supabase } from "../../config/supabase";
 
 // Async thunks
 export const loginUser = createAsyncThunk(
@@ -8,11 +7,12 @@ export const loginUser = createAsyncThunk(
   async ({ email, password }, { rejectWithValue }) => {
     try {
       const response = await api.post("/auth/login", { email, password });
-      const { session, user } = response.data.data;
+      const { token, user } = response.data.data;
 
-      // Set Supabase session
-      const { error } = await supabase.auth.setSession(session);
-      if (error) throw error;
+      // Store token in localStorage (PostgreSQL auth)
+      if (token) {
+        localStorage.setItem("token", token);
+      }
 
       return { user };
     } catch (error) {

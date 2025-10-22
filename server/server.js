@@ -1,10 +1,16 @@
 const express = require("express");
-const { connectDB } = require("./config/supabase");
+const { query } = require("./config/database");
 const cors = require("cors");
 const helmet = require("helmet");
 const compression = require("compression");
 const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
+const {
+  sanitizeResponse,
+  removeServerHeaders,
+  addSecurityHeaders,
+  sanitizeErrors,
+} = require("./middleware/securityHeaders");
 require("dotenv").config();
 
 // Import routes
@@ -19,16 +25,59 @@ const inventoryRoutes = require("./routes/inventory");
 const userRoutes = require("./routes/users");
 const reportRoutes = require("./routes/reports");
 const customerRoutes = require("./routes/customers");
+const securityTestRoutes = require("./routes/security-test");
 
 const app = express();
 
 // Trust proxy (for production deployment behind reverse proxy)
 app.set("trust proxy", 1);
 
-// Security middleware
+// Disable x-powered-by header to hide Express
+app.disable("x-powered-by");
+
+// Enhanced Security middleware with helmet
 app.use(
   helmet({
+    // Hide X-Powered-By header
+    hidePoweredBy: true,
+    
+    // Set Content-Security-Policy
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'"],
+        imgSrc: ["'self'", "data:", "https:"],
+      },
+    },
+    
+    // Set X-Content-Type-Options to prevent MIME sniffing
+    noSniff: true,
+    
+    // Set X-Frame-Options to prevent clickjacking
+    frameguard: { action: "deny" },
+    
+    // Set Strict-Transport-Security for HTTPS
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
+    },
+    
+    // Allow cross-origin resource sharing
     crossOriginResourcePolicy: { policy: "cross-origin" },
+    
+    // Set X-DNS-Prefetch-Control
+    dnsPrefetchControl: { allow: false },
+    
+    // Set X-Download-Options for IE8+
+    ieNoOpen: true,
+    
+    // Set Referrer-Policy
+    referrerPolicy: { policy: "no-referrer" },
+    
+    // Set X-XSS-Protection for older browsers
+    xssFilter: true,
   })
 );
 
@@ -48,6 +97,7 @@ const corsOptions = {
     // List of allowed origins
     const allowedOrigins = [
       "http://localhost:5173",
+      "http://localhost:5174", // Added for current Vite dev server
       "http://localhost:3000",
       "https://medical-orpin-mu.vercel.app",
       "https://medical-osg7l4ms2-syed-ashhads-projects.vercel.app",
@@ -98,16 +148,11 @@ const corsOptions = {
   optionsSuccessStatus: 200,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: [
-    "Origin",
-    "X-Requested-With",
     "Content-Type",
-    "Accept",
     "Authorization",
-    "Cache-Control",
-    "X-Forwarded-For",
-    "X-Real-IP",
   ],
-  exposedHeaders: ["X-Total-Count", "X-RateLimit-Remaining"],
+  // Only expose essential headers, hide everything else
+  exposedHeaders: ["X-Total-Count"],
 };
 app.use(cors(corsOptions));
 
@@ -133,21 +178,30 @@ const authLimiter = rateLimit({
 });
 app.use("/api/auth/login", authLimiter);
 
-// Logging middleware
+// Apply security middleware
+app.use(removeServerHeaders);
+app.use(addSecurityHeaders);
+app.use(sanitizeResponse);
+
+// Logging middleware (sanitized in production)
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 } else {
-  app.use(morgan("combined"));
+  // In production, use combined format but don't log sensitive data
+  app.use(morgan("combined", {
+    skip: (req, res) => {
+      // Skip logging for health checks
+      return req.url === "/health";
+    }
+  }));
 }
 
-// Health check endpoint
+// Health check endpoint (minimal information for security)
 app.get("/health", (req, res) => {
   res.json({
     success: true,
-    message: "Medical POS API is running",
+    status: "OK",
     timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    database: "Supabase PostgreSQL",
   });
 });
 
@@ -163,11 +217,19 @@ app.use("/api/users", userRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/customers", customerRoutes);
 
+// Security test routes (for development/testing only)
+if (process.env.NODE_ENV !== 'production') {
+  app.use("/api/security-test", securityTestRoutes);
+}
+
+// Apply error sanitization middleware
+app.use(sanitizeErrors);
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
 
-  // Supabase/PostgreSQL specific errors
+  // PostgreSQL specific errors
   if (err.code === "23505") {
     // Unique violation
     return res.status(400).json({
@@ -200,12 +262,22 @@ app.use((err, req, res, next) => {
     });
   }
 
-  // Default error
-  res.status(err.statusCode || 500).json({
+  // Default error - hide sensitive information in production
+  const statusCode = err.statusCode || 500;
+  const response = {
     success: false,
-    message: err.message || "Internal Server Error",
-    ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
-  });
+    message: statusCode === 500 && process.env.NODE_ENV === "production" 
+      ? "An error occurred. Please try again later." 
+      : (err.message || "Internal Server Error"),
+  };
+
+  // Only include stack trace in development
+  if (process.env.NODE_ENV === "development") {
+    response.stack = err.stack;
+    response.details = err.details || undefined;
+  }
+
+  res.status(statusCode).json(response);
 });
 
 // 404 handler
@@ -232,13 +304,13 @@ const PORT = process.env.PORT || 3001;
 // Start server
 const startServer = async () => {
   try {
-    // Test Supabase connection
-    await connectDB();
+    // Test database connection
+    await query("SELECT NOW()");
 
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
       console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
-      console.log(`Database: Supabase PostgreSQL`);
+      console.log(`Database: PostgreSQL`);
     });
   } catch (error) {
     console.error("Failed to start server:", error);
@@ -247,4 +319,3 @@ const startServer = async () => {
 };
 
 startServer();
-// Force redeploy - Thu Jun 12 13:04:15 PKT 2025

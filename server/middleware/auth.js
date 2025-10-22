@@ -1,6 +1,8 @@
-const jwt = require('jsonwebtoken');
-const { createClient } = require('@supabase/supabase-js');
-const { supabase } = require('../config/supabase');
+const jwt = require("jsonwebtoken");
+const { query } = require("../config/database");
+
+const JWT_SECRET =
+  process.env.JWT_SECRET || "your-secret-key-change-in-production";
 
 const auth = async (req, res, next) => {
   try {
@@ -13,38 +15,46 @@ const auth = async (req, res, next) => {
       });
     }
 
-    // Verify token with Supabase
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser(token);
-
-    if (error || !user) {
+    // Verify JWT token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+    } catch (error) {
       return res.status(401).json({
         success: false,
         message: "Invalid token",
+        code: "INVALID_TOKEN",
       });
     }
 
     // Get user profile from database with organization data
-    const { data: profile, error: profileError } = await supabase
-      .from("users")
-      .select(`
-        *,
-        organization:organizations!inner(
-          id,
-          name,
-          access_valid_till,
-          is_active
-        )
-      `)
-      .eq("supabase_uid", user.id)
-      .single();
+    const result = await query(
+      `SELECT u.*, o.id as org_id, o.name as org_name, o.access_valid_till, o.is_active as org_is_active
+       FROM users u
+       LEFT JOIN organizations o ON u.organization_id = o.id
+       WHERE u.id = $1`,
+      [decoded.userId]
+    );
 
-    if (profileError || !profile) {
+    const profile = result.rows[0];
+
+    if (!profile) {
+      console.error("User profile not found for ID:", decoded.userId);
       return res.status(401).json({
         success: false,
-        message: "User profile not found",
+        message: "User profile not found. Your session may be invalid. Please log out and log in again.",
+        code: "USER_PROFILE_NOT_FOUND",
+      });
+    }
+
+    // SINGLE SESSION CHECK: Verify session token matches
+    if (decoded.sessionToken !== profile.session_token) {
+      console.warn(`⚠️ Session token mismatch for user ${profile.username}. User logged in from another location.`);
+      return res.status(401).json({
+        success: false,
+        message: "Your session has been invalidated because you logged in from another device or browser.",
+        code: "SESSION_INVALIDATED",
+        requiresLogout: true,
       });
     }
 
@@ -57,16 +67,16 @@ const auth = async (req, res, next) => {
 
     // Check organization access validity
     const now = new Date();
-    const orgAccessValidTill = profile.organization?.access_valid_till;
-    const isOrgActive = profile.organization?.is_active;
-    
+    const orgAccessValidTill = profile.access_valid_till;
+    const isOrgActive = profile.org_is_active;
+
     if (isOrgActive === false) {
       return res.status(403).json({
         success: false,
         message: "Organization has been deactivated",
       });
     }
-    
+
     if (orgAccessValidTill && new Date(orgAccessValidTill) < now) {
       return res.status(403).json({
         success: false,
@@ -74,17 +84,25 @@ const auth = async (req, res, next) => {
       });
     }
 
-    // For server-side operations, we'll use the service role client
-    // which has full access and doesn't require user sessions
-    req.supabase = supabase;
     req.token = token;
-    req.user = profile;
-    
-    console.log('Auth middleware - Using service role client for user:', {
-      userId: user.id,
-      organizationId: profile.organization_id,
-      clientType: 'service_role'
-    });
+    req.user = {
+      id: profile.id,
+      username: profile.username,
+      email: profile.email,
+      full_name: profile.full_name,
+      role: profile.role,
+      role_in_pos: profile.role_in_pos,
+      organization_id: profile.organization_id,
+      permissions: profile.permissions,
+      is_active: profile.is_active,
+      organization: {
+        id: profile.org_id,
+        name: profile.org_name,
+        access_valid_till: profile.access_valid_till,
+        is_active: profile.org_is_active,
+      },
+    };
+
     next();
   } catch (error) {
     console.error("Auth middleware error:", error);
@@ -120,37 +138,52 @@ const optionalAuth = async (req, res, next) => {
     const token = req.header("Authorization")?.replace("Bearer ", "");
 
     if (token) {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser(token);
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
 
-      if (!error && user) {
-        const { data: profile } = await supabase
-          .from("users")
-          .select(`
-            *,
-            organization:organizations!inner(
-              id,
-              name,
-              access_valid_till,
-              is_active
-            )
-          `)
-          .eq("supabase_uid", user.id)
-          .single();
+        const result = await query(
+          `SELECT u.*, o.id as org_id, o.name as org_name, o.access_valid_till, o.is_active as org_is_active
+           FROM users u
+           LEFT JOIN organizations o ON u.organization_id = o.id
+           WHERE u.id = $1`,
+          [decoded.userId]
+        );
+
+        const profile = result.rows[0];
 
         if (profile && profile.is_active) {
           // Check organization access validity for optional auth too
           const now = new Date();
-          const orgAccessValidTill = profile.organization?.access_valid_till;
-          const isOrgActive = profile.organization?.is_active;
-          
-          if (isOrgActive !== false && (!orgAccessValidTill || new Date(orgAccessValidTill) >= now)) {
+          const orgAccessValidTill = profile.access_valid_till;
+          const isOrgActive = profile.org_is_active;
+
+          if (
+            isOrgActive !== false &&
+            (!orgAccessValidTill || new Date(orgAccessValidTill) >= now)
+          ) {
             req.token = token;
-            req.user = profile;
+            req.user = {
+              id: profile.id,
+              username: profile.username,
+              email: profile.email,
+              full_name: profile.full_name,
+              role: profile.role,
+              role_in_pos: profile.role_in_pos,
+              organization_id: profile.organization_id,
+              permissions: profile.permissions,
+              is_active: profile.is_active,
+              organization: {
+                id: profile.org_id,
+                name: profile.org_name,
+                access_valid_till: profile.access_valid_till,
+                is_active: profile.org_is_active,
+              },
+            };
           }
         }
+      } catch (error) {
+        // Continue without auth if token is invalid
+        console.log("Optional auth - token invalid, continuing without auth");
       }
     }
 

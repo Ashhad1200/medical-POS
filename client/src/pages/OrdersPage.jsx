@@ -28,25 +28,33 @@ const OrdersPage = () => {
       startDate.setHours(0, 0, 0, 0);
       const endDate = new Date(selectedDate);
       endDate.setHours(23, 59, 59, 999);
-      
-      const response = await api.get(`/orders?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`);
-      
+
+      const response = await api.get(
+        `/orders?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`
+      );
+
       // Map backend data to frontend expected format
-      const mappedOrders = response.data.data.orders.map(order => ({
+      const mappedOrders = response.data.data.orders.map((order) => ({
         ...order,
         createdAt: order.created_at,
         customerName: order.customer_name,
         total: order.total_amount,
-        items: order.order_items || []
+        items: order.order_items || [],
       }));
-      
+
       setOrdersData(mappedOrders);
-      
+
       // Calculate summary from the orders data
       const summary = {
-        totalSales: mappedOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0),
+        totalSales: mappedOrders.reduce(
+          (sum, order) => sum + (order.total_amount || 0),
+          0
+        ),
         totalOrders: mappedOrders.length,
-        totalProfit: mappedOrders.reduce((sum, order) => sum + (order.profit || 0), 0)
+        totalProfit: mappedOrders.reduce(
+          (sum, order) => sum + (order.profit || 0),
+          0
+        ),
       };
       setSummary(summary);
     } catch (error) {
@@ -91,7 +99,7 @@ const OrdersPage = () => {
     try {
       const response = await api.get(`/orders/${orderId}`);
       const order = response.data.data.order;
-      
+
       // Map backend data to frontend expected format
       const mappedOrder = {
         ...order,
@@ -100,16 +108,17 @@ const OrdersPage = () => {
         total: order.total_amount,
         taxAmount: order.tax_amount,
         taxPercent: order.tax_percent,
-        items: order.order_items?.map(item => ({
-           ...item,
-           name: item.medicines?.name || 'Unknown Medicine',
-           quantity: item.quantity,
-           selling_price: item.unit_price,
-           totalPrice: item.total_price,
-           discount: item.discount_percent
-         })) || []
+        items:
+          order.order_items?.map((item) => ({
+            ...item,
+            name: item.medicines?.name || "Unknown Medicine",
+            quantity: item.quantity,
+            selling_price: item.unit_price,
+            totalPrice: item.total_price,
+            discount: item.discount_percent,
+          })) || [],
       };
-      
+
       setSelectedOrder(mappedOrder);
       setShowOrderModal(true);
     } catch (error) {
@@ -211,7 +220,7 @@ const OrdersPage = () => {
                       </h4>
                       <p className="text-sm text-gray-600">
                         Quantity: {item?.quantity ?? 0} | Unit Price: Rs.
-                        {(item?.selling_price ?? 0).toFixed(2)}
+                        {(parseFloat(item?.selling_price) || 0).toFixed(2)}
                       </p>
                       {(item?.discount ?? 0) > 0 && (
                         <p className="text-sm text-green-600">
@@ -222,7 +231,7 @@ const OrdersPage = () => {
                     <div className="text-right">
                       <p className="font-semibold text-gray-900">
                         Rs.
-                        {(item?.totalPrice ?? 0).toFixed(2)}
+                        {(parseFloat(item?.totalPrice) || 0).toFixed(2)}
                       </p>
                     </div>
                   </div>
@@ -272,21 +281,25 @@ const OrdersPage = () => {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span>Subtotal:</span>
-                  <span>Rs.{(order?.subtotal ?? 0).toFixed(2)}</span>
+                  <span>
+                    Rs.{(parseFloat(order?.subtotal) || 0).toFixed(2)}
+                  </span>
                 </div>
-                {(order?.taxAmount ?? 0) > 0 && (
+                {(parseFloat(order?.taxAmount) || 0) > 0 && (
                   <div className="flex justify-between">
                     <span>Tax ({order?.taxPercent ?? 0}%):</span>
-                    <span>Rs.{(order?.taxAmount ?? 0).toFixed(2)}</span>
+                    <span>
+                      Rs.{(parseFloat(order?.taxAmount) || 0).toFixed(2)}
+                    </span>
                   </div>
                 )}
                 <div className="flex justify-between font-semibold text-lg border-t pt-2">
                   <span>Grand Total:</span>
-                  <span>Rs.{(order?.total ?? 0).toFixed(2)}</span>
+                  <span>Rs.{(parseFloat(order?.total) || 0).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-blue-600 font-semibold">
                   <span>Profit:</span>
-                  <span>Rs.{(order?.profit ?? 0).toFixed(2)}</span>
+                  <span>Rs.{(parseFloat(order?.profit) || 0).toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -394,7 +407,7 @@ const OrdersPage = () => {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-500">Total Sales</p>
                 <p className="text-2xl font-semibold text-gray-900">
-                  Rs.{(summary?.totalSales ?? 0).toFixed(2)}
+                  Rs.{(parseFloat(summary?.totalSales) || 0).toFixed(2)}
                 </p>
               </div>
             </div>
@@ -422,7 +435,7 @@ const OrdersPage = () => {
                   Total Profit
                 </p>
                 <p className="text-2xl font-semibold text-gray-900">
-                  Rs.{(summary?.totalProfit ?? 0).toFixed(2)}
+                  Rs.{(parseFloat(summary?.totalProfit) || 0).toFixed(2)}
                 </p>
               </div>
             </div>
@@ -504,10 +517,10 @@ const OrdersPage = () => {
                           {order?.items?.length ?? 0} items
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                          Rs.{(order?.total ?? 0).toFixed(2)}
+                          Rs.{(parseFloat(order?.total) || 0).toFixed(2)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
-                          Rs.{(order?.profit ?? 0).toFixed(2)}
+                          Rs.{(parseFloat(order?.profit) || 0).toFixed(2)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span

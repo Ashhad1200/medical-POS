@@ -1,4 +1,31 @@
-const { supabase } = require("../config/supabase");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
+const { query } = require("../config/database");
+
+const JWT_SECRET =
+  process.env.JWT_SECRET || "your-secret-key-change-in-production";
+const JWT_EXPIRY = process.env.JWT_EXPIRY || "7d";
+
+// Generate unique session token
+const generateSessionToken = () => {
+  return crypto.randomBytes(32).toString('hex');
+};
+
+// Generate JWT token with session token
+const generateToken = (userId, sessionToken) => {
+  return jwt.sign({ userId, sessionToken }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
+};
+
+// Verify password
+const verifyPassword = async (plainPassword, hashedPassword) => {
+  return bcrypt.compare(plainPassword, hashedPassword);
+};
+
+// Hash password
+const hashPassword = async (password) => {
+  return bcrypt.hash(password, 10);
+};
 
 const login = async (req, res) => {
   try {
@@ -11,31 +38,33 @@ const login = async (req, res) => {
       });
     }
 
-    // Sign in with Supabase
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    // Query user from PostgreSQL
+    const result = await query(
+      `SELECT u.*, o.id as org_id, o.name as org_name, o.access_valid_till, o.is_active as org_is_active
+       FROM users u
+       LEFT JOIN organizations o ON u.organization_id = o.id
+       WHERE u.email = $1`,
+      [email]
+    );
 
-    if (error) {
-      console.error("Supabase signInWithPassword error:", error.message); // Log the specific error
+    const profile = result.rows[0];
+
+    if (!profile) {
       return res.status(401).json({
         success: false,
-        message: error.message || "Invalid credentials",
+        message: "Invalid credentials",
       });
     }
 
-    // Get user profile from database
-    const { data: profile, error: profileError } = await supabase
-      .from("users")
-      .select("*")
-      .eq("email", email) // Changed from supabaseUid to email for profile lookup
-      .single();
-
-    if (profileError || !profile) {
+    // Verify password
+    const isPasswordValid = await verifyPassword(
+      password,
+      profile.password_hash
+    );
+    if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
-        message: "User profile not found",
+        message: "Invalid credentials",
       });
     }
 
@@ -54,11 +83,38 @@ const login = async (req, res) => {
       });
     }
 
-    // Update last login
-    await supabase
-      .from("users")
-      .update({ last_login: new Date().toISOString() })
-      .eq("id", profile.id);
+    // Check organization access validity
+    const now = new Date();
+    if (profile.org_is_active === false) {
+      return res.status(403).json({
+        success: false,
+        message: "Organization has been deactivated",
+      });
+    }
+
+    if (
+      profile.access_valid_till &&
+      new Date(profile.access_valid_till) < now
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Organization access has expired",
+      });
+    }
+
+    // Generate new session token (this will invalidate previous session)
+    const sessionToken = generateSessionToken();
+    
+    // Update last login and store new session token
+    await query(
+      "UPDATE users SET last_login = NOW(), session_token = $1, session_created_at = NOW() WHERE id = $2", 
+      [sessionToken, profile.id]
+    );
+
+    // Generate JWT token with session token embedded
+    const token = generateToken(profile.id, sessionToken);
+
+    console.log(`✅ User ${profile.username} logged in from new session. Previous sessions invalidated.`);
 
     res.json({
       success: true,
@@ -69,11 +125,12 @@ const login = async (req, res) => {
           email: profile.email,
           fullName: profile.full_name,
           role: profile.role,
+          role_in_pos: profile.role_in_pos,
           roleInPos: profile.role_in_pos,
           organizationId: profile.organization_id,
           permissions: profile.permissions || [],
         },
-        session: data.session,  // Changed from token to full session
+        token,
       },
     });
   } catch (error) {
@@ -98,68 +155,58 @@ const register = async (req, res) => {
     }
 
     // Check if user already exists
-    const { data: existingUser, error: checkError } = await supabase
-      .from("users")
-      .select("id")
-      .or(`username.eq.${username},email.eq.${email}`)
-      .single();
+    const existingUser = await query(
+      "SELECT id FROM users WHERE username = $1 OR email = $2",
+      [username, email]
+    );
 
-    if (existingUser) {
+    if (existingUser.rows.length > 0) {
       return res.status(400).json({
         success: false,
         message: "Username or email already exists",
       });
     }
 
-    // Create user in Supabase Auth
-    const { data: authData, error: authError } =
-      await supabase.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: {
-          username,
-          full_name: fullName,
-          role: role || "user",
-        },
-      });
+    // Hash password
+    const passwordHash = await hashPassword(password);
 
-    if (authError) {
-      return res.status(400).json({
-        success: false,
-        message: authError.message,
-      });
-    }
+    // Create user in database
+    const permissions =
+      role === "admin"
+        ? ["all"]
+        : ["medicine:read", "order:create", "order:read"];
 
-    // Create user profile in database
-    const { data: profile, error: profileError } = await supabase
-      .from("users")
-      .insert({
-        supabase_uid: authData.user.id,
+    const result = await query(
+      `INSERT INTO users (username, email, password_hash, full_name, role, role_in_pos, organization_id, is_active, permissions, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING id, username, email, full_name, role, role_in_pos, organization_id, permissions`,
+      [
         username,
         email,
-        full_name: fullName,
-        role: role || "user",
-        role_in_pos: role === "admin" ? "admin" : "counter", // Set default POS role
-        organization_id: organizationId,
-        is_active: true,
-        permissions:
-          role === "admin"
-            ? ["all"]
-            : ["medicine:read", "order:create", "order:read"],
-        created_by: req.user?.id,
-      })
-      .select()
-      .single();
+        passwordHash,
+        fullName,
+        role || "user",
+        role === "admin" ? "admin" : "counter",
+        organizationId,
+        true,
+        JSON.stringify(permissions),
+        req.user?.id || null,
+      ]
+    );
 
-    if (profileError) {
-      // Clean up auth user if profile creation fails
-      await supabase.auth.admin.deleteUser(authData.user.id);
-      return res.status(500).json({
-        success: false,
-        message: "Error creating user profile",
-      });
-    }
+    const profile = result.rows[0];
+
+    // Generate session token for new user
+    const sessionToken = generateSessionToken();
+    
+    // Store session token
+    await query(
+      "UPDATE users SET session_token = $1, session_created_at = NOW() WHERE id = $2",
+      [sessionToken, profile.id]
+    );
+
+    // Generate JWT token with session token
+    const token = generateToken(profile.id, sessionToken);
 
     res.status(201).json({
       success: true,
@@ -170,11 +217,12 @@ const register = async (req, res) => {
           email: profile.email,
           fullName: profile.full_name,
           role: profile.role,
+          role_in_pos: profile.role_in_pos,
           roleInPos: profile.role_in_pos,
           organizationId: profile.organization_id,
           permissions: profile.permissions || [],
         },
-        token: authData.user.id, // Return user ID as token for now
+        token,
       },
     });
   } catch (error) {
@@ -188,21 +236,17 @@ const register = async (req, res) => {
 
 const getProfile = async (req, res) => {
   try {
-    const { data: profile, error } = await supabase
-      .from("users")
-      .select(`
-        *,
-        organization:organizations!inner(
-          id,
-          name,
-          access_valid_till,
-          is_active
-        )
-      `)
-      .eq("id", req.user.id)
-      .single();
+    const result = await query(
+      `SELECT u.*, o.id as org_id, o.name as org_name, o.access_valid_till, o.is_active as org_is_active
+       FROM users u
+       LEFT JOIN organizations o ON u.organization_id = o.id
+       WHERE u.id = $1`,
+      [req.user.id]
+    );
 
-    if (error || !profile) {
+    const profile = result.rows[0];
+
+    if (!profile) {
       return res.status(404).json({
         success: false,
         message: "User not found",
@@ -211,17 +255,17 @@ const getProfile = async (req, res) => {
 
     // Check organization access validity
     const now = new Date();
-    const orgAccessValidTill = profile.organization?.access_valid_till;
-    const isOrgActive = profile.organization?.is_active;
-    
-    if (isOrgActive === false) {
+    if (profile.org_is_active === false) {
       return res.status(403).json({
         success: false,
         message: "Organization has been deactivated",
       });
     }
-    
-    if (orgAccessValidTill && new Date(orgAccessValidTill) < now) {
+
+    if (
+      profile.access_valid_till &&
+      new Date(profile.access_valid_till) < now
+    ) {
       return res.status(403).json({
         success: false,
         message: "Organization access has expired",
@@ -237,6 +281,7 @@ const getProfile = async (req, res) => {
           email: profile.email,
           fullName: profile.full_name,
           role: profile.role,
+          role_in_pos: profile.role_in_pos,
           roleInPos: profile.role_in_pos,
           organizationId: profile.organization_id,
           permissions: profile.permissions || [],
@@ -247,9 +292,14 @@ const getProfile = async (req, res) => {
           timezone: profile.timezone,
           preferences: profile.preferences,
           notificationSettings: profile.notification_settings,
-          organization: profile.organization,
-          organization_access_valid_till: profile.organization?.access_valid_till,
-          organization_is_active: profile.organization?.is_active,
+          organization: {
+            id: profile.org_id,
+            name: profile.org_name,
+            access_valid_till: profile.access_valid_till,
+            is_active: profile.org_is_active,
+          },
+          organization_access_valid_till: profile.access_valid_till,
+          organization_is_active: profile.org_is_active,
         },
       },
     });
@@ -267,23 +317,73 @@ const updateProfile = async (req, res) => {
     const { fullName, phone, email, theme, language, timezone, preferences } =
       req.body;
 
-    const updateData = {};
-    if (fullName) updateData.full_name = fullName;
-    if (phone) updateData.phone = phone;
-    if (email) updateData.email = email;
-    if (theme) updateData.theme = theme;
-    if (language) updateData.language = language;
-    if (timezone) updateData.timezone = timezone;
-    if (preferences) updateData.preferences = preferences;
+    // Check if email is already taken by another user
+    if (email) {
+      const existingEmail = await query(
+        "SELECT id FROM users WHERE email = $1 AND id != $2",
+        [email, req.user.id]
+      );
 
-    const { data: profile, error } = await supabase
-      .from("users")
-      .update(updateData)
-      .eq("id", req.user.id)
-      .select()
-      .single();
+      if (existingEmail.rows.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Email already in use",
+        });
+      }
+    }
 
-    if (error || !profile) {
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (fullName) {
+      updates.push(`full_name = $${paramCount++}`);
+      values.push(fullName);
+    }
+    if (phone) {
+      updates.push(`phone = $${paramCount++}`);
+      values.push(phone);
+    }
+    if (email) {
+      updates.push(`email = $${paramCount++}`);
+      values.push(email);
+    }
+    if (theme) {
+      updates.push(`theme = $${paramCount++}`);
+      values.push(theme);
+    }
+    if (language) {
+      updates.push(`language = $${paramCount++}`);
+      values.push(language);
+    }
+    if (timezone) {
+      updates.push(`timezone = $${paramCount++}`);
+      values.push(timezone);
+    }
+    if (preferences) {
+      updates.push(`preferences = $${paramCount++}`);
+      values.push(preferences);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No fields to update",
+      });
+    }
+
+    values.push(req.user.id);
+
+    const result = await query(
+      `UPDATE users SET ${updates.join(
+        ", "
+      )}, updated_at = NOW() WHERE id = $${paramCount} RETURNING id, username, email, full_name, role, role_in_pos, organization_id, permissions, phone, avatar, theme, language, timezone, preferences, notification_settings`,
+      values
+    );
+
+    const profile = result.rows[0];
+
+    if (!profile) {
       return res.status(404).json({
         success: false,
         message: "User not found",
@@ -299,6 +399,7 @@ const updateProfile = async (req, res) => {
           email: profile.email,
           fullName: profile.full_name,
           role: profile.role,
+          role_in_pos: profile.role_in_pos,
           roleInPos: profile.role_in_pos,
           organizationId: profile.organization_id,
           permissions: profile.permissions || [],
@@ -323,29 +424,53 @@ const updateProfile = async (req, res) => {
 
 const changePassword = async (req, res) => {
   try {
-    const { password } = req.body;
+    const { currentPassword, newPassword } = req.body;
 
-    if (!password) {
+    if (!currentPassword || !newPassword) {
       return res.status(400).json({
         success: false,
-        message: "Password is required",
+        message: "Current password and new password are required",
       });
     }
 
-    const { error } = await supabase.auth.updateUser({
-      password,
-    });
+    // Get user from database
+    const result = await query(
+      "SELECT password_hash FROM users WHERE id = $1",
+      [req.user.id]
+    );
 
-    if (error) {
-      return res.status(400).json({
+    if (result.rows.length === 0) {
+      return res.status(404).json({
         success: false,
-        message: error.message,
+        message: "User not found",
       });
     }
+
+    // Verify current password
+    const isPasswordValid = await verifyPassword(
+      currentPassword,
+      result.rows[0].password_hash
+    );
+
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: "Current password is incorrect",
+      });
+    }
+
+    // Hash new password
+    const newPasswordHash = await hashPassword(newPassword);
+
+    // Update password
+    await query(
+      "UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2",
+      [newPasswordHash, req.user.id]
+    );
 
     res.json({
       success: true,
-      message: "Password updated successfully",
+      message: "Password changed successfully",
     });
   } catch (error) {
     console.error("Change password error:", error);
@@ -356,77 +481,49 @@ const changePassword = async (req, res) => {
   }
 };
 
-const forgotPassword = async (req, res) => {
+// Logout - invalidate current session
+const logout = async (req, res) => {
   try {
-    const { email } = req.body;
+    // Clear session token from database
+    await query(
+      "UPDATE users SET session_token = NULL, session_created_at = NULL WHERE id = $1",
+      [req.user.id]
+    );
 
-    if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: "Email is required",
-      });
-    }
-
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
-
-    if (error) {
-      return res.status(400).json({
-        success: false,
-        message: error.message,
-      });
-    }
+    console.log(`✅ User ${req.user.username} logged out successfully`);
 
     res.json({
       success: true,
-      message: "Password reset link sent to your email",
+      message: "Logged out successfully",
     });
   } catch (error) {
-    console.error("Forgot password error:", error);
+    console.error("Logout error:", error);
     res.status(500).json({
       success: false,
-      message: "Error sending password reset link",
+      message: "Error logging out",
     });
   }
 };
 
+// Placeholder functions for password reset (requires email service setup)
+const forgotPassword = async (req, res) => {
+  res.json({
+    success: true,
+    message: "Password reset functionality coming soon",
+  });
+};
+
 const resetPassword = async (req, res) => {
-  try {
-    const { password } = req.body;
-
-    if (!password) {
-      return res.status(400).json({
-        success: false,
-        message: "Password is required",
-      });
-    }
-
-    const { error } = await supabase.auth.updateUser({
-      password,
-    });
-
-    if (error) {
-      return res.status(400).json({
-        success: false,
-        message: error.message,
-      });
-    }
-
-    res.json({
-      success: true,
-      message: "Password reset successfully",
-    });
-  } catch (error) {
-    console.error("Reset password error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error resetting password",
-    });
-  }
+  res.json({
+    success: true,
+    message: "Password reset functionality coming soon",
+  });
 };
 
 module.exports = {
   login,
   register,
+  logout,
   getProfile,
   updateProfile,
   changePassword,

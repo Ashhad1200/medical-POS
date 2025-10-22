@@ -1,5 +1,4 @@
 import axios from "axios";
-import { supabase } from "../config/supabase";
 import { API_CONFIG } from "../config/constants";
 import { log } from "../utils/logger";
 
@@ -15,12 +14,12 @@ const api = axios.create({
   timeout: API_CONFIG.TIMEOUT,
 });
 
-// Request interceptor to add auth token
+// Request interceptor to add auth token from localStorage (PostgreSQL)
 api.interceptors.request.use(
-  async (config) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      config.headers.Authorization = `Bearer ${session.access_token}`;
+  (config) => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
@@ -83,19 +82,21 @@ export const medicineServices = {
   update: (id, data) => api.put(`/medicines/${id}`, data),
   delete: (id) => api.delete(`/medicines/${id}`),
   search: (params = {}) => api.get("/medicines/search", { params }),
-  getStats: () => api.get("/medicines/stats", {
-    headers: {
-      'Cache-Control': 'no-cache',
-      'Pragma': 'no-cache'
-    }
-  }),
+  getStats: () =>
+    api.get("/medicines/stats", {
+      headers: {
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+      },
+    }),
   getLowStock: () => api.get("/medicines/low-stock"),
   getExpired: () => api.get("/medicines/expired"),
   getExpiringSoon: () => api.get("/medicines/expiring-soon"),
   updateStock: (id, data) => api.patch(`/medicines/${id}/stock`, data),
-  bulkImport: (formData) => api.post("/medicines/bulk-import", formData, {
-    headers: { "Content-Type": "multipart/form-data" }
-  }),
+  bulkImport: (formData) =>
+    api.post("/medicines/bulk-import", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
   exportInventory: () => api.get("/medicines/export", { responseType: "blob" }),
   test: () => api.get("/medicines/test"),
 };
@@ -131,7 +132,8 @@ export const purchaseOrderServices = {
   getAll: (params = {}) => api.get("/purchase-orders", { params }),
   getById: (id) => api.get(`/purchase-orders/${id}`),
   create: (data) => api.post("/purchase-orders", data),
-  createWithoutSupplier: (data) => api.post("/purchase-orders/without-supplier", data),
+  createWithoutSupplier: (data) =>
+    api.post("/purchase-orders/without-supplier", data),
   update: (id, data) => api.put(`/purchase-orders/${id}`, data),
   delete: (id) => api.delete(`/purchase-orders/${id}`),
   receive: (id) => api.patch(`/purchase-orders/${id}/receive`, { items: [] }),

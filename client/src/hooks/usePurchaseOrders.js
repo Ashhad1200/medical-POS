@@ -23,7 +23,7 @@ export const usePurchaseOrders = (filters = {}) => {
   return useQuery({
     queryKey: purchaseOrderKeys.list(filters),
     queryFn: () =>
-      purchaseOrderServices.getAll(filters).then((res) => res.data),
+      purchaseOrderServices.getAll(filters).then((res) => res.data.data),
     staleTime: 2 * 60 * 1000, // 2 minutes
     keepPreviousData: true,
   });
@@ -32,7 +32,8 @@ export const usePurchaseOrders = (filters = {}) => {
 export const usePurchaseOrder = (id) => {
   return useQuery({
     queryKey: purchaseOrderKeys.detail(id),
-    queryFn: () => purchaseOrderServices.getById(id).then((res) => res.data),
+    queryFn: () =>
+      purchaseOrderServices.getById(id).then((res) => res.data.data),
     enabled: !!id,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
@@ -42,7 +43,9 @@ export const usePurchaseOrdersBySupplier = (supplierId) => {
   return useQuery({
     queryKey: purchaseOrderKeys.bySupplier(supplierId),
     queryFn: () =>
-      purchaseOrderServices.getBySupplier(supplierId).then((res) => res.data),
+      purchaseOrderServices
+        .getBySupplier(supplierId)
+        .then((res) => res.data.data),
     enabled: !!supplierId,
     staleTime: 2 * 60 * 1000,
   });
@@ -52,7 +55,7 @@ export const usePurchaseOrdersByStatus = (status) => {
   return useQuery({
     queryKey: purchaseOrderKeys.byStatus(status),
     queryFn: () =>
-      purchaseOrderServices.getByStatus(status).then((res) => res.data),
+      purchaseOrderServices.getByStatus(status).then((res) => res.data.data),
     enabled: !!status,
     staleTime: 2 * 60 * 1000,
   });
@@ -67,20 +70,32 @@ export const useCreatePurchaseOrder = () => {
     mutationFn: (purchaseOrderData) =>
       purchaseOrderServices.create(purchaseOrderData),
     onSuccess: (response) => {
-      // Invalidate and refetch purchase orders list
-      queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.lists() });
+      console.log("✅ Order created successfully. Response:", response);
+
+      // Immediately invalidate ALL purchase order queries to force refetch
+      queryClient.invalidateQueries({
+        queryKey: purchaseOrderKeys.all,
+        refetchType: "active",
+      });
 
       // Add the new purchase order to the cache
-      const newPurchaseOrder = response.data.data.purchaseOrder;
+      const newPurchaseOrder = response.data.data?.purchaseOrder;
+      console.log("New purchase order:", newPurchaseOrder);
+
       if (newPurchaseOrder && newPurchaseOrder.id) {
-        queryClient.setQueryData(purchaseOrderKeys.detail(newPurchaseOrder.id), {
-          success: true,
-          data: { purchaseOrder: newPurchaseOrder },
-        });
+        queryClient.setQueryData(
+          purchaseOrderKeys.detail(newPurchaseOrder.id),
+          {
+            success: true,
+            data: { purchaseOrder: newPurchaseOrder },
+          }
+        );
 
         // Invalidate supplier-specific queries
         queryClient.invalidateQueries({
-          queryKey: purchaseOrderKeys.bySupplier(newPurchaseOrder.supplierId),
+          queryKey: purchaseOrderKeys.bySupplier(
+            newPurchaseOrder.supplier_id || newPurchaseOrder.supplierId
+          ),
         });
       }
 
@@ -88,6 +103,7 @@ export const useCreatePurchaseOrder = () => {
       return response.data;
     },
     onError: (error) => {
+      console.error("❌ Error creating purchase order:", error);
       const message =
         error.response?.data?.message || "Failed to create purchase order";
       toast.error(message);
@@ -138,11 +154,13 @@ export const useUpdatePurchaseOrder = () => {
 
       // Invalidate lists to show updated data
       queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.lists() });
-      
+
       // Invalidate supplier-specific queries
       if (updatedPurchaseOrder.supplierId) {
         queryClient.invalidateQueries({
-          queryKey: purchaseOrderKeys.bySupplier(updatedPurchaseOrder.supplierId),
+          queryKey: purchaseOrderKeys.bySupplier(
+            updatedPurchaseOrder.supplierId
+          ),
         });
       }
 
@@ -265,11 +283,13 @@ export const useReceivePurchaseOrder = () => {
       // Invalidate related queries
       queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.lists() });
       queryClient.invalidateQueries({ queryKey: ["medicines"] }); // Inventory updated
-      
+
       // Invalidate supplier-specific queries
       if (updatedPurchaseOrder.supplierId) {
         queryClient.invalidateQueries({
-          queryKey: purchaseOrderKeys.bySupplier(updatedPurchaseOrder.supplierId),
+          queryKey: purchaseOrderKeys.bySupplier(
+            updatedPurchaseOrder.supplierId
+          ),
         });
       }
 
@@ -333,11 +353,13 @@ export const useCancelPurchaseOrder = () => {
 
       // Invalidate lists to show updated data
       queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.lists() });
-      
+
       // Invalidate supplier-specific queries
       if (updatedPurchaseOrder.supplierId) {
         queryClient.invalidateQueries({
-          queryKey: purchaseOrderKeys.bySupplier(updatedPurchaseOrder.supplierId),
+          queryKey: purchaseOrderKeys.bySupplier(
+            updatedPurchaseOrder.supplierId
+          ),
         });
       }
 
@@ -404,11 +426,13 @@ export const useMarkAsOrderedPurchaseOrder = () => {
 
       // Invalidate lists to show updated data
       queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.lists() });
-      
+
       // Invalidate supplier-specific queries
       if (updatedPurchaseOrder.supplierId) {
         queryClient.invalidateQueries({
-          queryKey: purchaseOrderKeys.bySupplier(updatedPurchaseOrder.supplierId),
+          queryKey: purchaseOrderKeys.bySupplier(
+            updatedPurchaseOrder.supplierId
+          ),
         });
       }
 
@@ -424,7 +448,8 @@ export const useMarkAsOrderedPurchaseOrder = () => {
       }
 
       const message =
-        error.response?.data?.message || "Failed to mark purchase order as ordered";
+        error.response?.data?.message ||
+        "Failed to mark purchase order as ordered";
       toast.error(message);
     },
   });
@@ -473,11 +498,13 @@ export const useMarkAsReceivedPurchaseOrder = () => {
 
       // Invalidate lists to show updated data
       queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.lists() });
-      
+
       // Invalidate supplier-specific queries
       if (updatedPurchaseOrder.supplierId) {
         queryClient.invalidateQueries({
-          queryKey: purchaseOrderKeys.bySupplier(updatedPurchaseOrder.supplierId),
+          queryKey: purchaseOrderKeys.bySupplier(
+            updatedPurchaseOrder.supplierId
+          ),
         });
       }
 
@@ -501,7 +528,8 @@ export const useMarkAsReceivedPurchaseOrder = () => {
       }
 
       const message =
-        error.response?.data?.message || "Failed to mark purchase order as received";
+        error.response?.data?.message ||
+        "Failed to mark purchase order as received";
       toast.error(message);
     },
   });

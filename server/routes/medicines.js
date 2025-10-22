@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { auth, checkRole } = require("../middleware/auth");
+const { validateUserMiddleware } = require("../utils/userValidation");
 const {
   getAllMedicines,
   getInventoryStats,
@@ -24,8 +25,6 @@ const upload = multer({ storage });
 
 // Protected routes
 router.use(auth);
-
-
 
 // Search medicines route (must be before /:id route)
 router.get("/search", searchMedicines);
@@ -56,6 +55,7 @@ router.get("/export", checkRole(["admin", "warehouse"]), exportInventory);
 router.post(
   "/bulk-import",
   checkRole(["admin", "warehouse"]),
+  validateUserMiddleware(),
   upload.single("file"),
   bulkImport
 );
@@ -64,7 +64,12 @@ router.post(
 router.get("/:id", getMedicine);
 
 // Create medicine (admin and warehouse only)
-router.post("/", checkRole(["admin", "warehouse"]), createMedicine);
+router.post(
+  "/",
+  checkRole(["admin", "warehouse"]),
+  validateUserMiddleware(),
+  createMedicine
+);
 
 // Update medicine (admin and warehouse only)
 router.put("/:id", checkRole(["admin", "warehouse"]), updateMedicine);

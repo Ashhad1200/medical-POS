@@ -1,15 +1,12 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { supabase, getUserProfile } from "../config/supabase";
 import { toast } from "react-hot-toast";
 import { useDispatch } from "react-redux";
+import api from "../services/api";
 import { setUserProfile, clearUserProfile } from "../store/slices/authSlice";
 import { AUTH_CONFIG, ROLE_HIERARCHY } from "../config/constants";
 import { log } from "../utils/logger";
 
-log.auth("Supabase config initialized", {
-  url: import.meta.env.VITE_SUPABASE_URL ? "Set" : "Missing",
-  anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY ? "Set" : "Missing",
-});
+log.auth("PostgreSQL API initialized for authentication");
 
 export const useAuth = () => {
   const [user, setUser] = useState(null);
@@ -27,54 +24,62 @@ export const useAuth = () => {
     if (profileData?.organization_is_active === false) {
       return {
         isValid: false,
-        message: 'Your organization has been deactivated. Please contact your administrator.'
+        message:
+          "Your organization has been deactivated. Please contact your administrator.",
       };
     }
-    
+
     // Check organization access expiry
     if (!profileData?.organization_access_valid_till) {
       return { isValid: true }; // No expiry set, access is valid
     }
-    
+
     const now = new Date();
-    const accessValidTill = new Date(profileData.organization_access_valid_till);
-    
+    const accessValidTill = new Date(
+      profileData.organization_access_valid_till
+    );
+
     if (now > accessValidTill) {
       return {
         isValid: false,
-        message: 'Your organization access has expired. Please contact your administrator to extend your access.'
+        message:
+          "Your organization access has expired. Please contact your administrator to extend your access.",
       };
     }
-    
+
     return { isValid: true };
   }, []);
 
   const fetchAndSetUserProfile = useCallback(
-    async (supabaseUser) => {
-      if (!supabaseUser) {
+    async (userData) => {
+      if (!userData) {
         setProfile(null);
         setUser(null);
         return null;
       }
       try {
         // Add timeout to profile fetch to prevent hanging
-        const profilePromise = getUserProfile(supabaseUser.id);
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Profile fetch timeout')), AUTH_CONFIG.PROFILE_FETCH_TIMEOUT)
+        const profilePromise = api.get("/auth/profile");
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error("Profile fetch timeout")),
+            AUTH_CONFIG.PROFILE_FETCH_TIMEOUT
+          )
         );
-        
-        const profileData = await Promise.race([profilePromise, timeoutPromise]);
-        
+
+        const response = await Promise.race([profilePromise, timeoutPromise]);
+        const profileData = response.data.data.user || response.data.data;
+
         if (!profileData) {
-          throw new Error('Profile not found');
+          throw new Error("Profile not found");
         }
-        
+
         // Check if user access has expired
         const accessCheck = checkAccessValidity(profileData);
         if (!accessCheck.isValid) {
           toast.error(accessCheck.message);
-          // Force sign out for expired access
-          await supabase.auth.signOut();
+          // Clear token for expired access
+          localStorage.removeItem("token");
           setError(accessCheck.message);
           setIsAuthenticated(false);
           setUser(null);
@@ -82,25 +87,25 @@ export const useAuth = () => {
           dispatch(clearUserProfile());
           return null;
         }
-        
+
         setProfile(profileData);
-        setUser(supabaseUser);
+        setUser(userData);
         setIsAuthenticated(true);
         setError(null);
-        dispatch(setUserProfile({ user: supabaseUser, profile: profileData }));
+        dispatch(setUserProfile({ user: userData, profile: profileData }));
         return profileData;
       } catch (error) {
-        log.error('Profile fetch failed:', error);
-        
-        if (error.message === 'Profile fetch timeout') {
-          toast.error('Profile loading timed out. Please try again.');
+        log.error("Profile fetch failed:", error);
+
+        if (error.message === "Profile fetch timeout") {
+          toast.error("Profile loading timed out. Please try again.");
         } else {
-          toast.error('Session invalid. Please log in again.');
+          toast.error("Session invalid. Please log in again.");
         }
-        
-        // Force sign out on failure
-        await supabase.auth.signOut();
-        setError('Failed to fetch user profile. Please log in again.');
+
+        // Clear auth on failure
+        localStorage.removeItem("token");
+        setError("Failed to fetch user profile. Please log in again.");
         setIsAuthenticated(false);
         setUser(null);
         setProfile(null);
@@ -116,36 +121,38 @@ export const useAuth = () => {
       try {
         setIsAuthLoading(true);
         setError(null);
-        const { data, error: signInError } =
-          await supabase.auth.signInWithPassword({
-            email,
-            password,
-          });
-        if (signInError) throw signInError;
-        // Don't call fetchAndSetUserProfile here - let onAuthStateChange handle it
-        // This prevents duplicate profile fetches during login
+        const response = await api.post("/auth/login", { email, password });
+        const { token, user: userData } = response.data.data;
+
+        if (token) {
+          localStorage.setItem("token", token);
+        }
+
+        // Fetch user profile after setting token
+        await fetchAndSetUserProfile(userData);
         toast.success("Successfully signed in!");
-        return data.user;
+        return userData;
       } catch (error) {
-        setError(error.message);
+        const errorMsg = error.response?.data?.message || error.message;
+        setError(errorMsg);
         setIsAuthenticated(false);
         setUser(null);
         setProfile(null);
         dispatch(clearUserProfile());
-        toast.error(error.message);
+        toast.error(errorMsg);
         throw error;
       } finally {
         setIsAuthLoading(false);
       }
     },
-    [dispatch]
+    [dispatch, fetchAndSetUserProfile]
   );
 
   const signOut = useCallback(async () => {
     try {
       setIsAuthLoading(true);
-      const { error: signOutError } = await supabase.auth.signOut();
-      if (signOutError) throw signOutError;
+      await api.post("/auth/logout");
+      localStorage.removeItem("token");
       setUser(null);
       setProfile(null);
       setIsAuthenticated(false);
@@ -153,8 +160,9 @@ export const useAuth = () => {
       dispatch(clearUserProfile());
       toast.success("Successfully signed out!");
     } catch (error) {
-      setError(error.message);
-      toast.error(error.message);
+      const errorMsg = error.response?.data?.message || error.message;
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setIsAuthLoading(false);
     }
@@ -164,118 +172,85 @@ export const useAuth = () => {
     if (initializationRef.current) return;
     initializationRef.current = true;
     setIsAuthLoading(true);
-    log.auth('Starting initialization...');
-    
+    log.auth("Starting authentication initialization...");
+
     const initializeAuth = async () => {
       try {
-        log.auth('Getting session...');
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Initialization timeout')), AUTH_CONFIG.INITIALIZATION_TIMEOUT));
-        const { data: { session }, error: sessionError } = await Promise.race([sessionPromise, timeoutPromise]);
-        
-        if (sessionError) {
-          log.error('Session error:', sessionError);
-          throw sessionError;
-        }
-        
-        log.auth('Session retrieved:', !!session?.user);
-        
-        if (session?.user) {
-          log.auth('Fetching user profile...');
-          await fetchAndSetUserProfile(session.user);
-          log.auth('Profile fetch completed');
-        } else {
-          log.auth('No session found, setting unauthenticated state');
+        log.auth("Checking for existing token...");
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+          log.auth("No token found, setting unauthenticated state");
           setIsAuthenticated(false);
           setUser(null);
           setProfile(null);
           setError(null);
           dispatch(clearUserProfile());
+          return;
         }
+
+        log.auth("Token found, fetching user profile...");
+
+        // Add timeout to prevent hanging
+        const profilePromise = api.get("/auth/profile");
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error("Initialization timeout")),
+            AUTH_CONFIG.INITIALIZATION_TIMEOUT
+          )
+        );
+
+        const response = await Promise.race([profilePromise, timeoutPromise]);
+        const profileData = response.data.data.user || response.data.data;
+
+        // Create a minimal user object
+        const userData = { id: profileData.id, email: profileData.email };
+
+        // Check access validity
+        const accessCheck = checkAccessValidity(profileData);
+        if (!accessCheck.isValid) {
+          log.auth("User access expired:", accessCheck.message);
+          localStorage.removeItem("token");
+          setError(accessCheck.message);
+          setIsAuthenticated(false);
+          setUser(null);
+          setProfile(null);
+          dispatch(clearUserProfile());
+          return;
+        }
+
+        setProfile(profileData);
+        setUser(userData);
+        setIsAuthenticated(true);
+        setError(null);
+        dispatch(setUserProfile({ user: userData, profile: profileData }));
+        log.auth("Profile fetch completed");
       } catch (error) {
-        log.error('Initialization error:', error);
-        
-        if (error.message === 'Initialization timeout') {
-          log.auth('Initialization timed out, signing out');
-          await supabase.auth.signOut();
-          toast.error('Authentication initialization timed out. Please log in again.');
-        }
-        
-        setError(error.message || 'An unexpected error occurred during initialization.');
+        log.error("Initialization error:", error);
+
+        // Clear invalid token
+        localStorage.removeItem("token");
+
+        setError(
+          error.message || "An unexpected error occurred during initialization."
+        );
         setIsAuthenticated(false);
         setUser(null);
         setProfile(null);
         dispatch(clearUserProfile());
-        
-        try {
-          await supabase.auth.signOut();
-        } catch (signOutError) {
-          log.error('Sign out error:', signOutError);
-        }
-        
-        if (error.message !== 'Initialization timeout') {
-          toast.error('Initialization failed. Please try logging in.');
+
+        if (error.message !== "Initialization timeout") {
+          toast.error("Initialization failed. Please try logging in.");
         }
       } finally {
-        log.auth('Initialization completed, setting initialized=true');
+        log.auth("Initialization completed");
         setInitialized(true);
         setIsAuthLoading(false);
       }
     };
-    // Add absolute safety timeout to prevent infinite loading
-    const safetyTimeout = setTimeout(() => {
-      log.warn('Safety timeout triggered - forcing initialization completion');
-      if (!initializationRef.current) {
-        setInitialized(true);
-        setIsAuthLoading(false);
-      }
-    }, AUTH_CONFIG.SAFETY_TIMEOUT); // Safety timeout from config
-    
-    initializeAuth().finally(() => {
-      clearTimeout(safetyTimeout);
-    });
-    
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Skip auth state changes during initialization to prevent conflicts
-      if (!initialized) {
-        log.auth('Skipping auth state change during initialization:', event);
-        return;
-      }
-      
-      log.auth('Auth state change:', event, !!session?.user);
-      setIsAuthLoading(true);
-      try {
-        if (event === "SIGNED_IN" && session?.user) {
-          log.auth('Processing SIGNED_IN event');
-          await fetchAndSetUserProfile(session.user);
-        } else if (event === "SIGNED_OUT") {
-          log.auth('Processing SIGNED_OUT event');
-          setUser(null);
-          setProfile(null);
-          setIsAuthenticated(false);
-          setError(null);
-          dispatch(clearUserProfile());
-        } else if (session?.user) {
-          log.auth('Processing session with user');
-          await fetchAndSetUserProfile(session.user);
-        } else {
-          log.auth('Processing session without user');
-          setUser(null);
-          setProfile(null);
-          setIsAuthenticated(false);
-          dispatch(clearUserProfile());
-        }
-      } catch (err) {
-        log.error('Auth state change error:', err);
-        setError(err.message || "An error occurred during auth state change.");
-      } finally {
-        setIsAuthLoading(false);
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, []);
+
+    initializeAuth();
+  }, [dispatch, checkAccessValidity]);
 
   const refreshProfile = useCallback(async () => {
     if (!isAuthenticated || !user) return;
@@ -300,7 +275,7 @@ export const useAuth = () => {
 
   // Check current access validity
   const currentAccessCheck = checkAccessValidity(profile);
-  
+
   return {
     user,
     profile,

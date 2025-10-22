@@ -1,500 +1,352 @@
-const { supabase } = require('../config/supabase');
-const RefactoredPurchaseOrder = require('../models/RefactoredPurchaseOrder');
-const RefactoredSupplier = require('../models/RefactoredSupplier');
-const { asyncHandler, createSuccessResponse, createErrorResponse, AppError } = require('../utils/errors');
-const { validateRequiredFields, sanitizeString } = require('../utils/validators');
+const { query, withTransaction } = require("../config/database");
 
-// Get all inventory items with low stock filtering
-const getInventory = asyncHandler(async (req, res) => {
-  const {
-    page = 1,
-    limit = 10,
-    search = '',
-    stockFilter = 'all', // all, low-stock, out-of-stock, critical
-    sortBy = 'name',
-    sortOrder = 'asc',
-    supplierId = null
-  } = req.query;
-  
-  const organizationId = req.user.organization_id;
-  
-  let query = supabase
-    .from('medicines')
-    .select(`
-      *,
-      supplier:suppliers(id, name, contact_person, phone, email)
-    `, { count: 'exact' })
-    .eq('organization_id', organizationId)
-    .eq('is_active', true);
-  
-  // Apply search filter
-  if (search) {
-    const searchTerm = sanitizeString(search, { trim: true, removeHtml: true });
-    query = query.or(`
-      name.ilike.%${searchTerm}%,
-      generic_name.ilike.%${searchTerm}%,
-      manufacturer.ilike.%${searchTerm}%,
-      batch_number.ilike.%${searchTerm}%
-    `);
-  }
-  
-  // Apply supplier filter
-  if (supplierId) {
-    query = query.eq('supplier_id', supplierId);
-  }
-  
-  // Apply stock filters
-  switch (stockFilter) {
-    case 'out-of-stock':
-      query = query.eq('quantity', 0);
-      break;
-    case 'low-stock':
-      query = query.filter('quantity', 'gt', 0)
-                   .filter('quantity', 'lte', 'low_stock_threshold');
-      break;
-    case 'critical':
-      query = query.filter('quantity', 'lte', 5); // Critical threshold
-      break;
-    case 'needs-reorder':
-      query = query.filter('quantity', 'lte', 'low_stock_threshold');
-      break;
-  }
-  
-  // Apply sorting
-  query = query.order(sortBy, { ascending: sortOrder === 'asc' });
-  
-  // Apply pagination
-  const offset = (page - 1) * limit;
-  query = query.range(offset, offset + limit - 1);
-  
-  const { data: medicines, error, count } = await query;
-  
-  if (error) {
-    throw new AppError('Failed to fetch inventory: ' + error.message, 500);
-  }
-  
-  // Calculate inventory statistics
-  const stats = await getInventoryStats(organizationId);
-  
-  const pagination = {
-    page: parseInt(page),
-    limit: parseInt(limit),
-    total: count,
-    totalPages: Math.ceil(count / limit)
-  };
-  
-  res.json(createSuccessResponse(
-    medicines || [],
-    'Inventory fetched successfully',
-    { pagination, stats }
-  ));
-});
-
-// Get inventory statistics
-const getInventoryStats = async (organizationId) => {
+/**
+ * Get inventory summary
+ */
+const getInventorySummary = async (req, res) => {
   try {
-    const { data: stats, error } = await supabase
-      .from('medicines')
-      .select('quantity, low_stock_threshold, expiry_date')
-      .eq('organization_id', organizationId)
-      .eq('is_active', true);
-    
-    if (error) throw error;
-    
-    const now = new Date();
-    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-    
-    const totalItems = stats.length;
-    const outOfStock = stats.filter(item => item.quantity === 0).length;
-    const lowStock = stats.filter(item => 
-      item.quantity > 0 && item.quantity <= item.low_stock_threshold
-    ).length;
-    const critical = stats.filter(item => item.quantity <= 5).length;
-    const expiringSoon = stats.filter(item => {
-      const expiryDate = new Date(item.expiry_date);
-      return expiryDate <= thirtyDaysFromNow && expiryDate > now;
-    }).length;
-    const expired = stats.filter(item => {
-      const expiryDate = new Date(item.expiry_date);
-      return expiryDate <= now;
-    }).length;
-    
-    return {
-      totalItems,
-      outOfStock,
-      lowStock,
-      critical,
-      expiringSoon,
-      expired,
-      needsReorder: outOfStock + lowStock
-    };
-  } catch (error) {
-    console.error('Error calculating inventory stats:', error);
-    return {
-      totalItems: 0,
-      outOfStock: 0,
-      lowStock: 0,
-      critical: 0,
-      expiringSoon: 0,
-      expired: 0,
-      needsReorder: 0
-    };
-  }
-};
+    const organizationId = req.user.organization_id;
 
-// Get low stock items
-const getLowStockItems = asyncHandler(async (req, res) => {
-  const { limit = 50 } = req.query;
-  const organizationId = req.user.organization_id;
-  
-  const { data: lowStockItems, error } = await supabase
-    .rpc('get_low_stock_medicines', { org_id: organizationId })
-    .limit(parseInt(limit));
-  
-  if (error) {
-    throw new AppError('Failed to fetch low stock items: ' + error.message, 500);
-  }
-  
-  res.json(createSuccessResponse(
-    lowStockItems || [],
-    'Low stock items fetched successfully'
-  ));
-});
+    const result = await query(
+      `SELECT 
+        COUNT(*) as total_items,
+        SUM(quantity_in_stock) as total_quantity,
+        SUM(CAST(reorder_level AS DECIMAL)) as total_value,
+        COUNT(CASE WHEN quantity_in_stock < reorder_level THEN 1 END) as low_stock_count,
+        COUNT(CASE WHEN expiry_date <= CURRENT_DATE THEN 1 END) as expired_count,
+        COUNT(CASE WHEN expiry_date <= CURRENT_DATE + INTERVAL '30 days' AND expiry_date > CURRENT_DATE THEN 1 END) as expiring_soon_count
+       FROM medicines
+       WHERE organization_id = $1 AND is_active = true`,
+      [organizationId]
+    );
 
-// Get expiring items
-const getExpiringItems = asyncHandler(async (req, res) => {
-  const { days = 30, limit = 50 } = req.query;
-  const organizationId = req.user.organization_id;
-  
-  const futureDate = new Date();
-  futureDate.setDate(futureDate.getDate() + parseInt(days));
-  
-  const { data: expiringItems, error } = await supabase
-    .from('medicines')
-    .select(`
-      *,
-      supplier:suppliers(id, name, contact_person)
-    `)
-    .eq('organization_id', organizationId)
-    .eq('is_active', true)
-    .lte('expiry_date', futureDate.toISOString().split('T')[0])
-    .gte('expiry_date', new Date().toISOString().split('T')[0])
-    .order('expiry_date', { ascending: true })
-    .limit(parseInt(limit));
-  
-  if (error) {
-    throw new AppError('Failed to fetch expiring items: ' + error.message, 500);
-  }
-  
-  res.json(createSuccessResponse(
-    expiringItems || [],
-    'Expiring items fetched successfully'
-  ));
-});
-
-// Generate automatic purchase orders for low stock items
-const generateAutoPurchaseOrders = asyncHandler(async (req, res) => {
-  const { 
-    groupBySupplier = true,
-    minOrderValue = 100,
-    autoApprove = false 
-  } = req.body;
-  
-  const organizationId = req.user.organization_id;
-  const userId = req.user.id;
-  
-  try {
-    // Get low stock items with supplier information
-    const { data: lowStockItems, error: lowStockError } = await supabase
-      .from('medicines')
-      .select(`
-        *,
-        supplier:suppliers!inner(*)
-      `)
-      .eq('organization_id', organizationId)
-      .eq('is_active', true)
-      .filter('quantity', 'lte', 'low_stock_threshold')
-      .eq('suppliers.is_active', true);
-    
-    if (lowStockError) {
-      throw new AppError('Failed to fetch low stock items: ' + lowStockError.message, 500);
-    }
-    
-    if (!lowStockItems || lowStockItems.length === 0) {
-      return res.json(createSuccessResponse(
-        [],
-        'No low stock items found that require reordering'
-      ));
-    }
-    
-    const createdOrders = [];
-    
-    if (groupBySupplier) {
-      // Group items by supplier
-      const supplierGroups = lowStockItems.reduce((groups, item) => {
-        const supplierId = item.supplier.id;
-        if (!groups[supplierId]) {
-          groups[supplierId] = {
-            supplier: item.supplier,
-            items: []
-          };
-        }
-        groups[supplierId].items.push(item);
-        return groups;
-      }, {});
-      
-      // Create purchase orders for each supplier
-      for (const [supplierId, group] of Object.entries(supplierGroups)) {
-        const orderItems = group.items.map(item => ({
-          medicineId: item.id,
-          quantity: calculateReorderQuantity(item),
-          unitCost: item.cost_price || 0,
-          totalCost: (item.cost_price || 0) * calculateReorderQuantity(item)
-        }));
-        
-        const totalValue = orderItems.reduce((sum, item) => sum + item.totalCost, 0);
-        
-        // Only create order if it meets minimum value threshold
-        if (totalValue >= minOrderValue) {
-          const purchaseOrderData = {
-            supplierId: supplierId,
-            items: orderItems,
-            notes: `Auto-generated purchase order for low stock items. Generated on ${new Date().toLocaleDateString()}`,
-            status: autoApprove ? 'approved' : 'pending',
-            organizationId,
-            orderDate: new Date().toISOString().split('T')[0],
-            createdBy: userId,
-            expectedDeliveryDate: calculateExpectedDeliveryDate(group.supplier.payment_terms || 7)
-          };
-          
-          const purchaseOrder = new RefactoredPurchaseOrder(purchaseOrderData);
-          await purchaseOrder.save(userId);
-          
-          createdOrders.push({
-            id: purchaseOrder.id,
-            poNumber: purchaseOrder.poNumber,
-            supplier: group.supplier.name,
-            totalAmount: purchaseOrder.totalAmount,
-            itemCount: orderItems.length,
-            status: purchaseOrder.status
-          });
-        }
-      }
-    } else {
-      // Create individual orders for each item
-      for (const item of lowStockItems) {
-        const orderItems = [{
-          medicineId: item.id,
-          quantity: calculateReorderQuantity(item),
-          unitCost: item.cost_price || 0,
-          totalCost: (item.cost_price || 0) * calculateReorderQuantity(item)
-        }];
-        
-        const totalValue = orderItems[0].totalCost;
-        
-        if (totalValue >= minOrderValue) {
-          const purchaseOrderData = {
-            supplierId: item.supplier.id,
-            items: orderItems,
-            notes: `Auto-generated purchase order for ${item.name} (Low Stock Alert)`,
-            status: autoApprove ? 'approved' : 'pending',
-            organizationId,
-            orderDate: new Date().toISOString().split('T')[0],
-            createdBy: userId,
-            expectedDeliveryDate: calculateExpectedDeliveryDate(item.supplier.payment_terms || 7)
-          };
-          
-          const purchaseOrder = new RefactoredPurchaseOrder(purchaseOrderData);
-          await purchaseOrder.save(userId);
-          
-          createdOrders.push({
-            id: purchaseOrder.id,
-            poNumber: purchaseOrder.poNumber,
-            supplier: item.supplier.name,
-            totalAmount: purchaseOrder.totalAmount,
-            itemCount: 1,
-            status: purchaseOrder.status
-          });
-        }
-      }
-    }
-    
-    res.json(createSuccessResponse(
-      createdOrders,
-      `Successfully generated ${createdOrders.length} automatic purchase orders`,
-      {
-        totalItemsProcessed: lowStockItems.length,
-        ordersCreated: createdOrders.length,
-        groupedBySupplier: groupBySupplier,
-        autoApproved: autoApprove
-      }
-    ));
-    
-  } catch (error) {
-    console.error('Error generating auto purchase orders:', error);
-    throw new AppError('Failed to generate automatic purchase orders: ' + error.message, 500);
-  }
-});
-
-// Helper function to calculate reorder quantity
-const calculateReorderQuantity = (item) => {
-  // Calculate reorder quantity based on:
-  // 1. Current stock level
-  // 2. Low stock threshold
-  // 3. Average monthly sales (if available)
-  // 4. Lead time considerations
-  
-  const currentStock = item.quantity || 0;
-  const lowStockThreshold = item.low_stock_threshold || 10;
-  const safetyStock = Math.max(lowStockThreshold * 2, 50); // 2x threshold or minimum 50
-  
-  // Calculate how much we need to reach safety stock level
-  const reorderQuantity = Math.max(safetyStock - currentStock, lowStockThreshold);
-  
-  // Round up to nearest 10 for practical ordering
-  return Math.ceil(reorderQuantity / 10) * 10;
-};
-
-// Helper function to calculate expected delivery date
-const calculateExpectedDeliveryDate = (paymentTerms) => {
-  const deliveryDays = paymentTerms || 7; // Default 7 days
-  const expectedDate = new Date();
-  expectedDate.setDate(expectedDate.getDate() + deliveryDays);
-  return expectedDate.toISOString().split('T')[0];
-};
-
-// Get reorder suggestions
-const getReorderSuggestions = asyncHandler(async (req, res) => {
-  const organizationId = req.user.organization_id;
-  
-  const { data: suggestions, error } = await supabase
-    .from('medicines')
-    .select(`
-      *,
-      supplier:suppliers(*)
-    `)
-    .eq('organization_id', organizationId)
-    .eq('is_active', true)
-    .filter('quantity', 'lte', 'low_stock_threshold')
-    .eq('suppliers.is_active', true)
-    .order('quantity', { ascending: true });
-  
-  if (error) {
-    throw new AppError('Failed to fetch reorder suggestions: ' + error.message, 500);
-  }
-  
-  // Group suggestions by supplier and calculate totals
-  const supplierSuggestions = suggestions.reduce((groups, item) => {
-    const supplierId = item.supplier?.id;
-    if (!supplierId) return groups;
-    
-    if (!groups[supplierId]) {
-      groups[supplierId] = {
-        supplier: item.supplier,
-        items: [],
-        totalValue: 0,
-        totalItems: 0
-      };
-    }
-    
-    const reorderQty = calculateReorderQuantity(item);
-    const itemValue = (item.cost_price || 0) * reorderQty;
-    
-    groups[supplierId].items.push({
-      ...item,
-      suggestedQuantity: reorderQty,
-      estimatedCost: itemValue
+    res.json({
+      success: true,
+      data: {
+        summary: {
+          totalItems: parseInt(result.rows[0].total_items || 0),
+          totalQuantity: parseInt(result.rows[0].total_quantity || 0),
+          lowStockCount: parseInt(result.rows[0].low_stock_count || 0),
+          expiredCount: parseInt(result.rows[0].expired_count || 0),
+          expiringSoonCount: parseInt(result.rows[0].expiring_soon_count || 0),
+        },
+      },
     });
-    groups[supplierId].totalValue += itemValue;
-    groups[supplierId].totalItems += 1;
-    
-    return groups;
-  }, {});
-  
-  res.json(createSuccessResponse(
-    Object.values(supplierSuggestions),
-    'Reorder suggestions fetched successfully'
-  ));
-});
+  } catch (error) {
+    console.error("Get inventory summary error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching inventory summary",
+    });
+  }
+};
 
-// Update inventory item
-const updateInventoryItem = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const { 
-    quantity, 
-    low_stock_threshold, 
-    cost_price, 
-    selling_price,
-    notes 
-  } = req.body;
-  
-  const organizationId = req.user.organization_id;
-  const userId = req.user.id;
-  
-  // Validate the medicine exists and belongs to the organization
-  const { data: existingMedicine, error: fetchError } = await supabase
-    .from('medicines')
-    .select('*')
-    .eq('id', id)
-    .eq('organization_id', organizationId)
-    .single();
-  
-  if (fetchError || !existingMedicine) {
-    throw new AppError('Medicine not found', 404);
+/**
+ * Get inventory adjustments
+ */
+const getInventoryAdjustments = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, medicineId } = req.query;
+    const organizationId = req.user.organization_id;
+
+    let whereCondition = "ia.organization_id = $1";
+    let params = [organizationId];
+    let paramIndex = 2;
+
+    if (medicineId) {
+      whereCondition += ` AND ia.medicine_id = $${paramIndex}`;
+      params.push(medicineId);
+      paramIndex++;
+    }
+
+    const countResult = await query(
+      `SELECT COUNT(*) as total FROM inventory_adjustments ia WHERE ${whereCondition}`,
+      params
+    );
+    const totalCount = parseInt(countResult.rows[0].total);
+
+    const offset = (page - 1) * limit;
+    const result = await query(
+      `SELECT ia.*, m.name as medicine_name, u.username as adjusted_by_user
+       FROM inventory_adjustments ia
+       LEFT JOIN medicines m ON ia.medicine_id = m.id
+       LEFT JOIN users u ON ia.adjusted_by = u.id
+       WHERE ${whereCondition}
+       ORDER BY ia.created_at DESC
+       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+      [...params, limit, offset]
+    );
+
+    const totalPages = Math.ceil(totalCount / limit);
+
+    res.json({
+      success: true,
+      data: {
+        adjustments: result.rows || [],
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: totalCount,
+          pages: totalPages,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Get inventory adjustments error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching inventory adjustments",
+    });
   }
-  
-  const updateData = {
-    updated_at: new Date().toISOString()
-  };
-  
-  if (quantity !== undefined) updateData.quantity = quantity;
-  if (low_stock_threshold !== undefined) updateData.low_stock_threshold = low_stock_threshold;
-  if (cost_price !== undefined) updateData.cost_price = cost_price;
-  if (selling_price !== undefined) updateData.selling_price = selling_price;
-  
-  const { data: updatedMedicine, error: updateError } = await supabase
-    .from('medicines')
-    .update(updateData)
-    .eq('id', id)
-    .eq('organization_id', organizationId)
-    .select()
-    .single();
-  
-  if (updateError) {
-    throw new AppError('Failed to update inventory item: ' + updateError.message, 500);
-  }
-  
-  // Log inventory transaction if quantity changed
-  if (quantity !== undefined && quantity !== existingMedicine.quantity) {
-    const quantityChange = quantity - existingMedicine.quantity;
-    
-    await supabase
-      .from('inventory_transactions')
-      .insert({
-        medicine_id: id,
-        organization_id: organizationId,
-        transaction_type: quantityChange > 0 ? 'adjustment_in' : 'adjustment_out',
-        quantity: Math.abs(quantityChange),
-        unit_price: cost_price || existingMedicine.cost_price,
-        total_amount: Math.abs(quantityChange) * (cost_price || existingMedicine.cost_price),
-        reference_type: 'manual_adjustment',
-        notes: notes || 'Manual inventory adjustment',
-        created_by: userId
+};
+
+/**
+ * Create inventory adjustment
+ */
+const createInventoryAdjustment = async (req, res) => {
+  try {
+    const {
+      medicine_id,
+      adjustment_type,
+      quantity,
+      reason,
+      notes,
+    } = req.body;
+
+    const organizationId = req.user.organization_id;
+    const userId = req.user.id;
+
+    if (!medicine_id || !adjustment_type || !quantity) {
+      return res.status(400).json({
+        success: false,
+        message: "Medicine, adjustment type, and quantity are required",
       });
+    }
+
+    // Validate adjustment type
+    const validTypes = ['add', 'subtract', 'correction'];
+    if (!validTypes.includes(adjustment_type)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid adjustment type",
+      });
+    }
+
+    // Create adjustment and update medicine stock with transaction
+    await withTransaction(async (client) => {
+      // Create adjustment record
+      const adjResult = await client.query(
+        `INSERT INTO inventory_adjustments (
+          medicine_id, organization_id, adjustment_type, quantity, reason, notes,
+          adjusted_by, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+        RETURNING *`,
+        [medicine_id, organizationId, adjustment_type, quantity, reason || null, notes || null, userId]
+      );
+
+      // Update medicine quantity
+      let quantityChange = quantity;
+      if (adjustment_type === 'subtract') {
+        quantityChange = -quantity;
+      }
+
+      const medicineResult = await client.query(
+        `UPDATE medicines 
+         SET quantity_in_stock = quantity_in_stock + $1, updated_at = NOW()
+         WHERE id = $2 AND organization_id = $3
+         RETURNING *`,
+        [quantityChange, medicine_id, organizationId]
+      );
+
+      if (medicineResult.rows.length === 0) {
+        throw new Error("Medicine not found");
+      }
+
+      res.status(201).json({
+        success: true,
+        message: "Inventory adjustment created",
+        data: {
+          adjustment: adjResult.rows[0],
+          medicine: medicineResult.rows[0],
+        },
+      });
+    });
+  } catch (error) {
+    console.error("Create inventory adjustment error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error creating inventory adjustment",
+    });
   }
-  
-  res.json(createSuccessResponse(
-    updatedMedicine,
-    'Inventory item updated successfully'
-  ));
-});
+};
+
+/**
+ * Get stock movements
+ */
+const getStockMovements = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, medicineId, startDate, endDate } = req.query;
+    const organizationId = req.user.organization_id;
+
+    let whereCondition = "sm.organization_id = $1";
+    let params = [organizationId];
+    let paramIndex = 2;
+
+    if (medicineId) {
+      whereCondition += ` AND sm.medicine_id = $${paramIndex}`;
+      params.push(medicineId);
+      paramIndex++;
+    }
+
+    if (startDate) {
+      whereCondition += ` AND sm.created_at >= $${paramIndex}`;
+      params.push(startDate);
+      paramIndex++;
+    }
+
+    if (endDate) {
+      whereCondition += ` AND sm.created_at <= $${paramIndex}`;
+      params.push(endDate);
+      paramIndex++;
+    }
+
+    const countResult = await query(
+      `SELECT COUNT(*) as total FROM stock_movements sm WHERE ${whereCondition}`,
+      params
+    );
+    const totalCount = parseInt(countResult.rows[0].total);
+
+    const offset = (page - 1) * limit;
+    const result = await query(
+      `SELECT sm.*, m.name as medicine_name, u.username as user_name
+       FROM stock_movements sm
+       LEFT JOIN medicines m ON sm.medicine_id = m.id
+       LEFT JOIN users u ON sm.user_id = u.id
+       WHERE ${whereCondition}
+       ORDER BY sm.created_at DESC
+       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+      [...params, limit, offset]
+    );
+
+    const totalPages = Math.ceil(totalCount / limit);
+
+    res.json({
+      success: true,
+      data: {
+        movements: result.rows || [],
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: totalCount,
+          pages: totalPages,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Get stock movements error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching stock movements",
+    });
+  }
+};
+
+/**
+ * Get expiry report
+ */
+const getExpiryReport = async (req, res) => {
+  try {
+    const organizationId = req.user.organization_id;
+
+    const result = await query(
+      `SELECT 
+        m.id, m.name, m.batch_number, m.quantity_in_stock, m.expiry_date,
+        CASE 
+          WHEN m.expiry_date <= CURRENT_DATE THEN 'expired'
+          WHEN m.expiry_date <= CURRENT_DATE + INTERVAL '30 days' THEN 'expiring_soon'
+          ELSE 'valid'
+        END as status
+       FROM medicines m
+       WHERE m.organization_id = $1 AND m.is_active = true
+       AND m.expiry_date <= CURRENT_DATE + INTERVAL '90 days'
+       ORDER BY m.expiry_date ASC`,
+      [organizationId]
+    );
+
+    const expired = result.rows.filter(m => m.status === 'expired');
+    const expiringSoon = result.rows.filter(m => m.status === 'expiring_soon');
+    const valid = result.rows.filter(m => m.status === 'valid');
+
+    res.json({
+      success: true,
+      data: {
+        expired,
+        expiringSoon,
+        valid,
+        summary: {
+          expiredCount: expired.length,
+          expiringSoonCount: expiringSoon.length,
+          validCount: valid.length,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Get expiry report error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching expiry report",
+    });
+  }
+};
+
+/**
+ * Update reorder level
+ */
+const updateReorderLevel = async (req, res) => {
+  try {
+    const { medicineId, reorderLevel } = req.body;
+    const organizationId = req.user.organization_id;
+
+    if (!medicineId || reorderLevel === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: "Medicine ID and reorder level are required",
+      });
+    }
+
+    const result = await query(
+      `UPDATE medicines SET reorder_level = $1, updated_at = NOW()
+       WHERE id = $2 AND organization_id = $3
+       RETURNING *`,
+      [reorderLevel, medicineId, organizationId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Medicine not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Reorder level updated",
+      data: { medicine: result.rows[0] },
+    });
+  } catch (error) {
+    console.error("Update reorder level error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error updating reorder level",
+    });
+  }
+};
 
 module.exports = {
-  getInventory,
-  getLowStockItems,
-  getExpiringItems,
-  generateAutoPurchaseOrders,
-  getReorderSuggestions,
-  updateInventoryItem,
-  getInventoryStats
+  getInventorySummary,
+  getInventoryAdjustments,
+  createInventoryAdjustment,
+  getStockMovements,
+  getExpiryReport,
+  updateReorderLevel,
 };

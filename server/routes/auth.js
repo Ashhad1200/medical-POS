@@ -4,8 +4,12 @@ const { auth } = require("../middleware/auth");
 const {
   register,
   login,
+  logout,
   getProfile,
   updateProfile,
+  changePassword,
+  forgotPassword,
+  resetPassword,
 } = require("../controllers/authController");
 
 // Public routes
@@ -24,6 +28,12 @@ router.post("/register", register);
 // POST /api/auth/login
 router.post("/login", login);
 
+// POST /api/auth/forgot-password
+router.post("/forgot-password", forgotPassword);
+
+// POST /api/auth/reset-password
+router.post("/reset-password", resetPassword);
+
 // POST /api/auth/refresh
 router.post("/refresh", (req, res) => {
   res.json({
@@ -33,15 +43,8 @@ router.post("/refresh", (req, res) => {
 });
 
 // Protected routes
-// router.use(auth);
-
 // POST /api/auth/logout
-router.post("/logout", auth, (req, res) => {
-  res.json({
-    success: true,
-    message: "User logged out successfully",
-  });
-});
+router.post("/logout", auth, logout);
 
 // GET /api/auth/profile
 router.get("/profile", auth, getProfile);
@@ -49,12 +52,7 @@ router.get("/profile", auth, getProfile);
 // PUT /api/auth/profile
 router.put("/profile", auth, updateProfile);
 
-// PUT /api/auth/change-password
-router.put("/change-password", auth, (req, res) => {
-  res.json({
-    success: false,
-    message: "Change password functionality not implemented yet",
-  });
-});
+// POST /api/auth/change-password
+router.post("/change-password", auth, changePassword);
 
 module.exports = router;

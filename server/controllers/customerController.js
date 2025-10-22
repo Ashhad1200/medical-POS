@@ -1,126 +1,112 @@
-const { supabase } = require("../config/supabase");
+const { query, withTransaction } = require("../config/database");
 
-// Search customers
+/**
+ * Search customers with pagination and filtering
+ */
 const searchCustomers = async (req, res) => {
   try {
     const {
       page = 1,
       limit = 10,
-      query = '',
+      q = '',
       sortBy = 'name',
       sortOrder = 'asc'
     } = req.query;
     const organizationId = req.user.organization_id;
-    const client = req.supabase || supabase;
 
-    let supabaseQuery = client
-      .from("customers")
-      .select("*")
-      .eq("organization_id", organizationId);
+    // Build WHERE clause with search
+    let whereCondition = "organization_id = $1";
+    let params = [organizationId];
 
-    // Apply search filter
-    if (query && query.trim()) {
-      supabaseQuery = supabaseQuery.or(
-        `name.ilike.%${query}%,phone.ilike.%${query}%,email.ilike.%${query}%`
-      );
+    if (q && q.trim()) {
+      whereCondition += ` AND (name ILIKE $2 OR phone ILIKE $2 OR email ILIKE $2)`;
+      params.push(`%${q}%`);
     }
 
-    // Apply sorting
-    supabaseQuery = supabaseQuery.order(sortBy, { ascending: sortOrder === 'asc' });
+    // Get total count
+    const countResult = await query(
+      `SELECT COUNT(*) as total FROM customers WHERE ${whereCondition}`,
+      params
+    );
+    const totalCount = parseInt(countResult.rows[0].total);
 
-    // Apply pagination
+    // Get paginated data
     const offset = (page - 1) * limit;
-    supabaseQuery = supabaseQuery.range(offset, offset + limit - 1);
+    const sortColumn = ["name", "phone", "email", "created_at"].includes(sortBy) ? sortBy : "name";
+    const sortDirection = sortOrder === "asc" ? "ASC" : "DESC";
 
-    const { data: customers, error, count } = await supabaseQuery;
+    const paramCount = params.length + 1;
+    const result = await query(
+      `SELECT * FROM customers WHERE ${whereCondition}
+       ORDER BY ${sortColumn} ${sortDirection}
+       LIMIT $${paramCount} OFFSET $${paramCount + 1}`,
+      [...params, limit, offset]
+    );
 
-    if (error) {
-      console.error("Error searching customers:", error);
-      return res.status(500).json({
-        success: false,
-        message: "Failed to search customers",
-        error: error.message,
-      });
-    }
-
-    // Get total count for pagination
-    const { count: totalCount } = await supabase
-      .from("customers")
-      .select("*", { count: 'exact', head: true })
-      .eq("organization_id", organizationId);
+    const totalPages = Math.ceil(totalCount / limit);
 
     res.json({
       success: true,
       data: {
-        customers: customers || [],
+        customers: result.rows || [],
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
-          total: totalCount || 0,
-          pages: Math.ceil((totalCount || 0) / limit)
+          total: totalCount,
+          pages: totalPages
         }
       }
     });
   } catch (error) {
-    console.error("Error in searchCustomers:", error);
+    console.error("Error searching customers:", error);
     res.status(500).json({
       success: false,
-      message: "Internal server error",
-      error: error.message,
+      message: "Failed to search customers"
     });
   }
 };
 
-// Get customer by ID
+/**
+ * Get customer by ID
+ */
 const getCustomer = async (req, res) => {
   try {
     const { id } = req.params;
     const organizationId = req.user.organization_id;
-    const client = req.supabase || supabase;
 
-    const { data: customer, error } = await client
-      .from("customers")
-      .select("*")
-      .eq("id", id)
-      .eq("organization_id", organizationId)
-      .single();
+    const result = await query(
+      "SELECT * FROM customers WHERE id = $1 AND organization_id = $2",
+      [id, organizationId]
+    );
 
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return res.status(404).json({
-          success: false,
-          message: "Customer not found"
-        });
-      }
-      console.error("Error fetching customer:", error);
-      return res.status(500).json({
+    if (result.rows.length === 0) {
+      return res.status(404).json({
         success: false,
-        message: "Failed to fetch customer",
-        error: error.message,
+        message: "Customer not found"
       });
     }
 
     res.json({
       success: true,
-      data: { customer }
+      data: { customer: result.rows[0] }
     });
   } catch (error) {
-    console.error("Error in getCustomer:", error);
+    console.error("Error fetching customer:", error);
     res.status(500).json({
       success: false,
-      message: "Internal server error",
-      error: error.message,
+      message: "Failed to fetch customer"
     });
   }
 };
 
-// Create new customer
+/**
+ * Create new customer
+ */
 const createCustomer = async (req, res) => {
   try {
     const { name, phone, email, address, date_of_birth, gender, allergies, emergency_contact, emergency_phone } = req.body;
     const organizationId = req.user.organization_id;
     const userId = req.user.id;
-    const client = req.supabase || supabase;
 
     // Validate required fields
     if (!name || !phone) {
@@ -131,489 +117,403 @@ const createCustomer = async (req, res) => {
     }
 
     // Check if customer with same phone already exists
-    const { data: existingCustomer } = await client
-      .from("customers")
-      .select("id")
-      .eq("phone", phone)
-      .eq("organization_id", organizationId)
-      .single();
+    const existingResult = await query(
+      "SELECT id FROM customers WHERE phone = $1 AND organization_id = $2",
+      [phone, organizationId]
+    );
 
-    if (existingCustomer) {
+    if (existingResult.rows.length > 0) {
       return res.status(400).json({
         success: false,
         message: "Customer with this phone number already exists"
       });
     }
 
-    const customerData = {
-      name,
-      phone,
-      email: email || null,
-      address: address || null,
-      date_of_birth: date_of_birth || null,
-      gender: gender || null,
-      allergies: allergies || null,
-      emergency_contact: emergency_contact || null,
-      emergency_phone: emergency_phone || null,
-      organization_id: organizationId,
-      created_by: userId
-    };
-
-    const { data: customer, error } = await client
-      .from("customers")
-      .insert(customerData)
-      .select()
-      .single();
-
-    if (error) {
-      console.error("Error creating customer:", error);
-      return res.status(500).json({
-        success: false,
-        message: "Failed to create customer",
-        error: error.message,
-      });
-    }
+    // Create customer
+    const result = await query(
+      `INSERT INTO customers (
+        name, phone, email, address, date_of_birth, gender, allergies,
+        emergency_contact, emergency_phone, organization_id, created_by, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+      RETURNING *`,
+      [
+        name,
+        phone,
+        email || null,
+        address || null,
+        date_of_birth || null,
+        gender || null,
+        allergies || null,
+        emergency_contact || null,
+        emergency_phone || null,
+        organizationId,
+        userId
+      ]
+    );
 
     res.status(201).json({
       success: true,
       message: "Customer created successfully",
-      data: { customer }
+      data: { customer: result.rows[0] }
     });
   } catch (error) {
-    console.error("Error in createCustomer:", error);
+    console.error("Error creating customer:", error);
+
+    if (error.code === "23505") {
+      return res.status(409).json({
+        success: false,
+        message: "Customer with this phone already exists"
+      });
+    }
+
     res.status(500).json({
       success: false,
-      message: "Internal server error",
-      error: error.message,
+      message: "Failed to create customer"
     });
   }
 };
 
-// Update customer
+/**
+ * Update customer
+ */
 const updateCustomer = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, phone, email, address, date_of_birth, gender, allergies, emergency_contact, emergency_phone } = req.body;
     const organizationId = req.user.organization_id;
-    const client = req.supabase || supabase;
 
     // Check if customer exists
-    const { data: existingCustomer, error: fetchError } = await client
-      .from("customers")
-      .select("id")
-      .eq("id", id)
-      .eq("organization_id", organizationId)
-      .single();
+    const checkResult = await query(
+      "SELECT id FROM customers WHERE id = $1 AND organization_id = $2",
+      [id, organizationId]
+    );
 
-    if (fetchError || !existingCustomer) {
+    if (checkResult.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: "Customer not found"
       });
     }
 
-    const updateData = {
-      name,
-      phone,
-      email: email || null,
-      address: address || null,
-      date_of_birth: date_of_birth || null,
-      gender: gender || null,
-      allergies: allergies || null,
-      emergency_contact: emergency_contact || null,
-      emergency_phone: emergency_phone || null,
-      updated_at: new Date().toISOString()
-    };
-
-    const { data: customer, error } = await client
-      .from("customers")
-      .update(updateData)
-      .eq("id", id)
-      .eq("organization_id", organizationId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error("Error updating customer:", error);
-      return res.status(500).json({
-        success: false,
-        message: "Failed to update customer",
-        error: error.message,
-      });
-    }
+    // Update customer
+    const result = await query(
+      `UPDATE customers SET
+        name = $1, phone = $2, email = $3, address = $4, date_of_birth = $5,
+        gender = $6, allergies = $7, emergency_contact = $8, emergency_phone = $9,
+        updated_at = NOW()
+       WHERE id = $10 AND organization_id = $11
+       RETURNING *`,
+      [
+        name,
+        phone,
+        email || null,
+        address || null,
+        date_of_birth || null,
+        gender || null,
+        allergies || null,
+        emergency_contact || null,
+        emergency_phone || null,
+        id,
+        organizationId
+      ]
+    );
 
     res.json({
       success: true,
       message: "Customer updated successfully",
-      data: { customer }
+      data: { customer: result.rows[0] }
     });
   } catch (error) {
-    console.error("Error in updateCustomer:", error);
+    console.error("Error updating customer:", error);
     res.status(500).json({
       success: false,
-      message: "Internal server error",
-      error: error.message,
+      message: "Failed to update customer"
     });
   }
 };
 
-// Delete customer
+/**
+ * Delete customer
+ */
 const deleteCustomer = async (req, res) => {
   try {
     const { id } = req.params;
     const organizationId = req.user.organization_id;
-    const client = req.supabase || supabase;
 
-    // Check if customer has any orders (using customer name and phone since customer_id doesn't exist)
-    const { data: customerData } = await client
-      .from("customers")
-      .select("name, phone")
-      .eq("id", id)
-      .single();
+    // Check if customer has any orders
+    const ordersResult = await query(
+      "SELECT id FROM orders WHERE customer_id = $1 LIMIT 1",
+      [id]
+    );
 
-    const { data: orders, error: ordersError } = await client
-      .from("orders")
-      .select("id")
-      .eq("customer_name", customerData?.name)
-      .eq("customer_phone", customerData?.phone)
-      .eq("organization_id", organizationId)
-      .limit(1);
-
-    if (ordersError) {
-      console.error("Error checking customer orders:", ordersError);
-      return res.status(500).json({
-        success: false,
-        message: "Failed to check customer orders",
-        error: ordersError.message,
-      });
-    }
-
-    if (orders && orders.length > 0) {
+    if (ordersResult.rows.length > 0) {
       return res.status(400).json({
         success: false,
         message: "Cannot delete customer with existing orders"
       });
     }
 
-    const { error } = await client
-      .from("customers")
-      .delete()
-      .eq("id", id)
-      .eq("organization_id", organizationId);
-
-    if (error) {
-      console.error("Error deleting customer:", error);
-      return res.status(500).json({
-        success: false,
-        message: "Failed to delete customer",
-        error: error.message,
-      });
-    }
+    // Delete customer
+    await query(
+      "DELETE FROM customers WHERE id = $1 AND organization_id = $2",
+      [id, organizationId]
+    );
 
     res.json({
       success: true,
       message: "Customer deleted successfully"
     });
   } catch (error) {
-    console.error("Error in deleteCustomer:", error);
+    console.error("Error deleting customer:", error);
     res.status(500).json({
       success: false,
-      message: "Internal server error",
-      error: error.message,
+      message: "Failed to delete customer"
     });
   }
 };
 
-// Get customer order history
+/**
+ * Get customer order history
+ */
 const getCustomerOrderHistory = async (req, res) => {
   try {
     const { id } = req.params;
     const { page = 1, limit = 10 } = req.query;
     const organizationId = req.user.organization_id;
-    const client = req.supabase || supabase;
 
-    // Verify customer exists and belongs to organization
-    const { data: customer, error: customerError } = await client
-      .from("customers")
-      .select("id, name, phone")
-      .eq("id", id)
-      .eq("organization_id", organizationId)
-      .single();
+    // Verify customer exists
+    const customerResult = await query(
+      "SELECT id FROM customers WHERE id = $1 AND organization_id = $2",
+      [id, organizationId]
+    );
 
-    if (customerError || !customer) {
+    if (customerResult.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: "Customer not found"
-      });
-    }
-
-    const offset = (page - 1) * limit;
-
-    const { data: orders, error } = await client
-      .from("orders")
-      .select(`
-        *,
-        order_items (
-          id,
-          medicine_id,
-          quantity,
-          unit_price,
-          total_price,
-          medicines (name, generic_name)
-        )
-      `)
-      .eq("customer_name", customer.name)
-      .eq("customer_phone", customer.phone)
-      .eq("organization_id", organizationId)
-      .order("created_at", { ascending: false })
-      .range(offset, offset + limit - 1);
-
-    if (error) {
-      console.error("Error fetching customer order history:", error);
-      return res.status(500).json({
-        success: false,
-        message: "Failed to fetch customer order history",
-        error: error.message,
       });
     }
 
     // Get total count
-    const { count: totalCount } = await client
-      .from("orders")
-      .select("*", { count: 'exact', head: true })
-      .eq("customer_name", customer.name)
-      .eq("customer_phone", customer.phone)
-      .eq("organization_id", organizationId);
+    const countResult = await query(
+      "SELECT COUNT(*) as total FROM orders WHERE customer_id = $1",
+      [id]
+    );
+    const totalCount = parseInt(countResult.rows[0].total);
+
+    // Get paginated orders
+    const offset = (page - 1) * limit;
+    const result = await query(
+      `SELECT o.*, json_agg(
+        json_build_object(
+          'id', oi.id,
+          'medicine_id', oi.medicine_id,
+          'quantity', oi.quantity,
+          'unit_price', oi.unit_price,
+          'total_price', oi.total_price,
+          'medicine_name', m.name
+        )
+      ) as order_items
+       FROM orders o
+       LEFT JOIN order_items oi ON o.id = oi.order_id
+       LEFT JOIN medicines m ON oi.medicine_id = m.id
+       WHERE o.customer_id = $1
+       GROUP BY o.id
+       ORDER BY o.created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [id, limit, offset]
+    );
+
+    const totalPages = Math.ceil(totalCount / limit);
 
     res.json({
       success: true,
       data: {
-        orders: orders || [],
+        orders: result.rows || [],
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
-          total: totalCount || 0,
-          pages: Math.ceil((totalCount || 0) / limit)
+          total: totalCount,
+          pages: totalPages
         }
       }
     });
   } catch (error) {
-    console.error("Error in getCustomerOrderHistory:", error);
+    console.error("Error fetching customer order history:", error);
     res.status(500).json({
       success: false,
-      message: "Internal server error",
-      error: error.message,
+      message: "Failed to fetch customer order history"
     });
   }
 };
 
-// Get customer pending balance
+/**
+ * Get customer pending balance
+ */
 const getCustomerPendingBalance = async (req, res) => {
   try {
     const { id } = req.params;
     const organizationId = req.user.organization_id;
-    const client = req.supabase || supabase;
 
     // Verify customer exists
-    const { data: customer, error: customerError } = await client
-      .from("customers")
-      .select("id, name, phone")
-      .eq("id", id)
-      .eq("organization_id", organizationId)
-      .single();
+    const customerResult = await query(
+      "SELECT id FROM customers WHERE id = $1 AND organization_id = $2",
+      [id, organizationId]
+    );
 
-    if (customerError || !customer) {
+    if (customerResult.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: "Customer not found"
       });
     }
 
-    // Calculate pending balance from unpaid orders (using customer name/phone since customer_id doesn't exist)
-    // Since paid_amount column doesn't exist, we'll consider all non-completed orders as pending
-    const { data: pendingOrders, error } = await client
-      .from("orders")
-      .select("total_amount")
-      .eq("customer_name", customer.name)
-      .eq("customer_phone", customer.phone)
-      .eq("organization_id", organizationId)
-      .neq("status", "cancelled")
-      .neq("status", "completed");
+    // Calculate pending balance from unpaid/pending orders
+    const result = await query(
+      `SELECT SUM(total_amount) as pending_balance FROM orders
+       WHERE customer_id = $1 AND status IN ('pending', 'unpaid')`,
+      [id]
+    );
 
-    if (error) {
-      console.error("Error calculating pending balance:", error);
-      return res.status(500).json({
-        success: false,
-        message: "Failed to calculate pending balance",
-        error: error.message,
-      });
-    }
-
-    let pendingBalance = 0;
-    if (pendingOrders) {
-      pendingBalance = pendingOrders.reduce((total, order) => {
-        return total + (order.total_amount || 0);
-      }, 0);
-    }
+    const pendingBalance = parseFloat(result.rows[0].pending_balance || 0);
 
     res.json({
       success: true,
       data: {
-        pendingBalance: parseFloat(pendingBalance.toFixed(2))
+        pendingBalance: pendingBalance.toFixed(2)
       }
     });
   } catch (error) {
-    console.error("Error in getCustomerPendingBalance:", error);
+    console.error("Error calculating pending balance:", error);
     res.status(500).json({
       success: false,
-      message: "Internal server error",
-      error: error.message,
+      message: "Failed to calculate pending balance"
     });
   }
 };
 
-// Get customer statistics
+/**
+ * Get customer statistics
+ */
 const getCustomerStats = async (req, res) => {
   try {
     const { id } = req.params;
     const organizationId = req.user.organization_id;
-    const client = req.supabase || supabase;
 
     // Verify customer exists
-    const { data: customer, error: customerError } = await client
-      .from("customers")
-      .select("id, name, phone, created_at")
-      .eq("id", id)
-      .eq("organization_id", organizationId)
-      .single();
+    const customerResult = await query(
+      "SELECT id, created_at FROM customers WHERE id = $1 AND organization_id = $2",
+      [id, organizationId]
+    );
 
-    if (customerError || !customer) {
+    if (customerResult.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: "Customer not found"
       });
     }
 
-    // Get order statistics (using customer_name and customer_phone since customer_id doesn't exist)
-    const { data: orderStats, error: orderError } = await client
-      .from("orders")
-      .select("total_amount, status, created_at")
-      .eq("customer_name", customer.name)
-      .eq("customer_phone", customer.phone)
-      .eq("organization_id", organizationId);
+    // Get order statistics
+    const statsResult = await query(
+      `SELECT 
+        COUNT(*) as total_orders,
+        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_orders,
+        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_orders,
+        SUM(total_amount) as total_spent,
+        MAX(created_at) as last_order_date
+       FROM orders WHERE customer_id = $1`,
+      [id]
+    );
 
-    if (orderError) {
-      console.error("Error fetching order stats:", orderError);
-      return res.status(500).json({
-        success: false,
-        message: "Failed to fetch customer statistics",
-        error: orderError.message,
-      });
-    }
-
-    const stats = {
-      totalOrders: orderStats?.length || 0,
-      totalSpent: orderStats?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0,
-      completedOrders: orderStats?.filter(order => order.status === 'completed').length || 0,
-      pendingOrders: orderStats?.filter(order => order.status === 'pending').length || 0,
-      lastOrderDate: orderStats?.length > 0 ? 
-        orderStats.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0].created_at : null,
-      customerSince: customer.created_at
-    };
+    const stats = statsResult.rows[0];
 
     res.json({
       success: true,
-      data: { stats }
+      data: {
+        stats: {
+          totalOrders: parseInt(stats.total_orders) || 0,
+          completedOrders: parseInt(stats.completed_orders) || 0,
+          pendingOrders: parseInt(stats.pending_orders) || 0,
+          totalSpent: parseFloat(stats.total_spent) || 0,
+          lastOrderDate: stats.last_order_date,
+          customerSince: customerResult.rows[0].created_at
+        }
+      }
     });
   } catch (error) {
-    console.error("Error in getCustomerStats:", error);
+    console.error("Error fetching customer stats:", error);
     res.status(500).json({
       success: false,
-      message: "Internal server error",
-      error: error.message,
+      message: "Failed to fetch customer statistics"
     });
   }
 };
 
-// Get customer medication history
+/**
+ * Get customer medication history
+ */
 const getCustomerMedicationHistory = async (req, res) => {
   try {
     const { id } = req.params;
     const { page = 1, limit = 20 } = req.query;
     const organizationId = req.user.organization_id;
-    const client = req.supabase || supabase;
 
     // Verify customer exists
-    const { data: customer, error: customerError } = await client
-      .from("customers")
-      .select("id, name, phone")
-      .eq("id", id)
-      .eq("organization_id", organizationId)
-      .single();
+    const customerResult = await query(
+      "SELECT id FROM customers WHERE id = $1 AND organization_id = $2",
+      [id, organizationId]
+    );
 
-    if (customerError || !customer) {
+    if (customerResult.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: "Customer not found"
       });
     }
 
+    // Get total count
+    const countResult = await query(
+      `SELECT COUNT(*) as total FROM order_items oi
+       JOIN orders o ON oi.order_id = o.id
+       WHERE o.customer_id = $1 AND o.status != 'cancelled'`,
+      [id]
+    );
+    const totalCount = parseInt(countResult.rows[0].total);
+
+    // Get paginated medication history
     const offset = (page - 1) * limit;
+    const result = await query(
+      `SELECT oi.medicine_id, oi.quantity, oi.unit_price, oi.total_price,
+              m.name as medicine_name, m.generic_name, m.manufacturer,
+              o.created_at, o.status
+       FROM order_items oi
+       JOIN orders o ON oi.order_id = o.id
+       JOIN medicines m ON oi.medicine_id = m.id
+       WHERE o.customer_id = $1 AND o.status != 'cancelled'
+       ORDER BY o.created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [id, limit, offset]
+    );
 
-    // Get medication history from order items (using customer_name and customer_phone since customer_id doesn't exist)
-    const { data: medicationHistory, error } = await client
-      .from("order_items")
-      .select(`
-        medicine_id,
-        quantity,
-        unit_price,
-        total_price,
-        medicines (name, generic_name, manufacturer, strength),
-        orders!inner (customer_name, customer_phone, created_at, status)
-      `)
-      .eq("orders.customer_name", customer.name)
-      .eq("orders.customer_phone", customer.phone)
-      .eq("orders.organization_id", organizationId)
-      .neq("orders.status", "cancelled")
-      .order("orders.created_at", { ascending: false })
-      .range(offset, offset + limit - 1);
-
-    if (error) {
-      console.error("Error fetching medication history:", error);
-      return res.status(500).json({
-        success: false,
-        message: "Failed to fetch medication history",
-        error: error.message,
-      });
-    }
-
-    // Get total count (using customer_name and customer_phone since customer_id doesn't exist)
-    const { count: totalCount } = await client
-      .from("order_items")
-      .select("*, orders!inner (customer_name, customer_phone)", { count: 'exact', head: true })
-      .eq("orders.customer_name", customer.name)
-      .eq("orders.customer_phone", customer.phone)
-      .eq("orders.organization_id", organizationId)
-      .neq("orders.status", "cancelled");
+    const totalPages = Math.ceil(totalCount / limit);
 
     res.json({
       success: true,
       data: {
-        medications: medicationHistory || [],
+        medications: result.rows || [],
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
-          total: totalCount || 0,
-          pages: Math.ceil((totalCount || 0) / limit)
+          total: totalCount,
+          pages: totalPages
         }
       }
     });
   } catch (error) {
-    console.error("Error in getCustomerMedicationHistory:", error);
+    console.error("Error fetching medication history:", error);
     res.status(500).json({
       success: false,
-      message: "Internal server error",
-      error: error.message,
+      message: "Failed to fetch medication history"
     });
   }
 };

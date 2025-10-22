@@ -13,7 +13,8 @@ const SupplierDetailsModal = ({
   const [expandedOrders, setExpandedOrders] = useState(new Set());
 
   // Fetch purchase orders for this supplier
-  const { data: ordersData, isLoading: ordersLoading } = usePurchaseOrdersBySupplier(supplier?.id);
+  const { data: ordersData, isLoading: ordersLoading } =
+    usePurchaseOrdersBySupplier(supplier?.id);
 
   useEffect(() => {
     if (supplier) {
@@ -48,14 +49,15 @@ const SupplierDetailsModal = ({
   };
 
   const formatCurrency = (amount) => {
-    return `Rs. ${(amount || 0).toFixed(2)}`;
+    const numAmount = parseFloat(amount) || 0;
+    return `Rs. ${numAmount.toFixed(2)}`;
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
     });
   };
 
@@ -417,14 +419,14 @@ const SupplierDetailsModal = ({
                   orders.map((order) => {
                     const isExpanded = expandedOrders.has(order.id);
                     const items = order.purchase_order_items || [];
-                    
+
                     return (
                       <div
                         key={order.id}
                         className="border rounded-lg overflow-hidden"
                       >
                         {/* Order Header */}
-                        <div 
+                        <div
                           className="p-4 hover:bg-gray-50 cursor-pointer"
                           onClick={() => toggleOrderExpansion(order.id)}
                         >
@@ -432,11 +434,12 @@ const SupplierDetailsModal = ({
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
                                 <h4 className="font-medium text-gray-900">
-                                  {order.po_number || `Order #${order.id?.slice(-8)}`}
+                                  {order.po_number ||
+                                    `Order #${order.id?.slice(-8)}`}
                                 </h4>
                                 <svg
                                   className={`w-4 h-4 text-gray-500 transition-transform ${
-                                    isExpanded ? 'rotate-180' : ''
+                                    isExpanded ? "rotate-180" : ""
                                   }`}
                                   fill="none"
                                   stroke="currentColor"
@@ -455,7 +458,8 @@ const SupplierDetailsModal = ({
                               </p>
                               {order.expected_delivery_date && (
                                 <p className="text-xs text-gray-500">
-                                  Expected: {formatDate(order.expected_delivery_date)}
+                                  Expected:{" "}
+                                  {formatDate(order.expected_delivery_date)}
                                 </p>
                               )}
                             </div>
@@ -471,7 +475,7 @@ const SupplierDetailsModal = ({
                           </div>
                           <div className="flex justify-between items-center">
                             <span className="text-sm text-gray-600">
-                              {items.length} item{items.length !== 1 ? 's' : ''}
+                              {items.length} item{items.length !== 1 ? "s" : ""}
                             </span>
                             <span className="font-semibold text-gray-900">
                               {formatCurrency(order.total_amount)}
@@ -485,13 +489,19 @@ const SupplierDetailsModal = ({
                             <div className="p-4">
                               {order.notes && (
                                 <div className="mb-4">
-                                  <h5 className="text-sm font-medium text-gray-700 mb-1">Notes:</h5>
-                                  <p className="text-sm text-gray-600">{order.notes}</p>
+                                  <h5 className="text-sm font-medium text-gray-700 mb-1">
+                                    Notes:
+                                  </h5>
+                                  <p className="text-sm text-gray-600">
+                                    {order.notes}
+                                  </p>
                                 </div>
                               )}
-                              
-                              <h5 className="text-sm font-medium text-gray-700 mb-3">Order Items:</h5>
-                              
+
+                              <h5 className="text-sm font-medium text-gray-700 mb-3">
+                                Order Items:
+                              </h5>
+
                               {items.length > 0 ? (
                                 <div className="space-y-2">
                                   {items.map((item, index) => (
@@ -502,7 +512,8 @@ const SupplierDetailsModal = ({
                                       <div className="flex justify-between items-start">
                                         <div className="flex-1">
                                           <h6 className="font-medium text-gray-900">
-                                            {item.medicine?.name || 'Unknown Medicine'}
+                                            {item.medicine?.name ||
+                                              "Unknown Medicine"}
                                           </h6>
                                           {item.medicine?.manufacturer && (
                                             <p className="text-sm text-gray-600">
@@ -511,10 +522,15 @@ const SupplierDetailsModal = ({
                                           )}
                                           <div className="flex items-center gap-4 mt-1 text-sm text-gray-500">
                                             {item.medicine?.category && (
-                                              <span>Category: {item.medicine.category}</span>
+                                              <span>
+                                                Category:{" "}
+                                                {item.medicine.category}
+                                              </span>
                                             )}
                                             {item.medicine?.unit && (
-                                              <span>Unit: {item.medicine.unit}</span>
+                                              <span>
+                                                Unit: {item.medicine.unit}
+                                              </span>
                                             )}
                                           </div>
                                         </div>
@@ -523,12 +539,15 @@ const SupplierDetailsModal = ({
                                             Qty: {item.quantity}
                                           </div>
                                           <div className="text-sm text-gray-600">
-                                            Unit Cost: {formatCurrency(item.unit_cost)}
+                                            Unit Cost:{" "}
+                                            {formatCurrency(item.unit_cost)}
                                           </div>
                                           <div className="font-medium text-gray-900">
-                                            Total: {formatCurrency(item.total_cost)}
+                                            Total:{" "}
+                                            {formatCurrency(item.total_cost)}
                                           </div>
-                                          {item.received_quantity !== undefined && (
+                                          {item.received_quantity !==
+                                            undefined && (
                                             <div className="text-xs text-green-600 mt-1">
                                               Received: {item.received_quantity}
                                             </div>
@@ -539,13 +558,17 @@ const SupplierDetailsModal = ({
                                   ))}
                                 </div>
                               ) : (
-                                <p className="text-sm text-gray-500 italic">No items found</p>
+                                <p className="text-sm text-gray-500 italic">
+                                  No items found
+                                </p>
                               )}
-                              
+
                               {/* Order Summary */}
                               <div className="mt-4 pt-3 border-t border-gray-200">
                                 <div className="flex justify-between items-center">
-                                  <span className="text-sm font-medium text-gray-700">Order Total:</span>
+                                  <span className="text-sm font-medium text-gray-700">
+                                    Order Total:
+                                  </span>
                                   <span className="text-lg font-semibold text-gray-900">
                                     {formatCurrency(order.total_amount)}
                                   </span>
@@ -553,15 +576,20 @@ const SupplierDetailsModal = ({
                                 {order.tax_amount && order.tax_amount > 0 && (
                                   <div className="flex justify-between items-center text-sm text-gray-600">
                                     <span>Tax:</span>
-                                    <span>{formatCurrency(order.tax_amount)}</span>
+                                    <span>
+                                      {formatCurrency(order.tax_amount)}
+                                    </span>
                                   </div>
                                 )}
-                                {order.discount_amount && order.discount_amount > 0 && (
-                                  <div className="flex justify-between items-center text-sm text-gray-600">
-                                    <span>Discount:</span>
-                                    <span>-{formatCurrency(order.discount_amount)}</span>
-                                  </div>
-                                )}
+                                {order.discount_amount &&
+                                  order.discount_amount > 0 && (
+                                    <div className="flex justify-between items-center text-sm text-gray-600">
+                                      <span>Discount:</span>
+                                      <span>
+                                        -{formatCurrency(order.discount_amount)}
+                                      </span>
+                                    </div>
+                                  )}
                               </div>
                             </div>
                           </div>

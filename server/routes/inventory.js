@@ -2,44 +2,57 @@ const express = require("express");
 const router = express.Router();
 const { auth, checkRole } = require("../middleware/auth");
 const {
-  getInventory,
-  getLowStockItems,
-  getExpiringItems,
-  generateAutoPurchaseOrders,
-  getReorderSuggestions,
-  updateInventoryItem,
-  getInventoryStats
-} = require('../controllers/inventoryController');
+  getInventorySummary,
+  getInventoryAdjustments,
+  createInventoryAdjustment,
+  getStockMovements,
+  getExpiryReport,
+  updateReorderLevel,
+} = require("../controllers/inventoryController");
 
 // Protected routes
 router.use(auth);
 
 // GET /api/inventory/stats - Get inventory statistics
-router.get("/stats", checkRole(["admin", "warehouse", "manager"]), async (req, res) => {
-  try {
-    const stats = await getInventoryStats(req.user.organization_id);
-    res.json({ success: true, data: stats });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
+router.get(
+  "/stats",
+  checkRole(["admin", "warehouse", "manager"]),
+  getInventorySummary
+);
 
-// GET /api/inventory/low-stock - Get low stock items
-router.get("/low-stock", checkRole(["admin", "warehouse", "manager"]), getLowStockItems);
+// GET /api/inventory/adjustments - Get inventory adjustments
+router.get(
+  "/adjustments",
+  checkRole(["admin", "warehouse", "manager"]),
+  getInventoryAdjustments
+);
 
-// GET /api/inventory/expiring - Get expiring items
-router.get("/expiring", checkRole(["admin", "warehouse", "manager"]), getExpiringItems);
+// POST /api/inventory/adjustments - Create inventory adjustment
+router.post(
+  "/adjustments",
+  checkRole(["admin", "warehouse", "manager"]),
+  createInventoryAdjustment
+);
 
-// GET /api/inventory/reorder-suggestions - Get reorder suggestions
-router.get("/reorder-suggestions", checkRole(["admin", "warehouse", "manager"]), getReorderSuggestions);
+// GET /api/inventory/stock-movements - Get stock movements
+router.get(
+  "/stock-movements",
+  checkRole(["admin", "warehouse", "manager"]),
+  getStockMovements
+);
 
-// POST /api/inventory/auto-purchase-orders - Generate automatic purchase orders
-router.post("/auto-purchase-orders", checkRole(["admin", "manager"]), generateAutoPurchaseOrders);
+// GET /api/inventory/expiry-report - Get expiry report
+router.get(
+  "/expiry-report",
+  checkRole(["admin", "warehouse", "manager"]),
+  getExpiryReport
+);
 
-// GET /api/inventory - Get all inventory items with filtering
-router.get("/", checkRole(["admin", "warehouse", "manager", "counter"]), getInventory);
-
-// PUT /api/inventory/:id - Update inventory item
-router.put("/:id", checkRole(["admin", "warehouse", "manager"]), updateInventoryItem);
+// PUT /api/inventory/reorder-level - Update reorder level
+router.put(
+  "/reorder-level",
+  checkRole(["admin", "warehouse", "manager"]),
+  updateReorderLevel
+);
 
 module.exports = router;

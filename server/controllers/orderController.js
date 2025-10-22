@@ -1,6 +1,9 @@
-const { supabase } = require("../config/supabase");
+const { query, withTransaction } = require("../config/database");
+const PDFDocument = require("pdfkit");
 
-// Get all orders
+/**
+ * Get all orders with pagination and filters
+ */
 const getAllOrders = async (req, res) => {
   try {
     const {
@@ -13,59 +16,81 @@ const getAllOrders = async (req, res) => {
     } = req.query;
     const organizationId = req.user.organization_id;
 
-    let query = supabase
-      .from("orders")
-      .select(`
-        *,
-        order_items(
-          *,
-          medicines(name)
-        )
-      `)
-      .eq("organization_id", organizationId);
+    // Build WHERE clause with filters
+    let whereConditions = ["o.organization_id = $1"];
+    let params = [organizationId];
+    let paramIndex = 2;
 
-    // Apply status filter
     if (status && status !== "all") {
-      query = query.eq("status", status);
+      whereConditions.push(`o.status = $${paramIndex}`);
+      params.push(status);
+      paramIndex++;
     }
 
-    // Apply date range filter
     if (startDate) {
-      query = query.gte("created_at", startDate);
+      whereConditions.push(`o.created_at >= $${paramIndex}`);
+      params.push(startDate);
+      paramIndex++;
     }
+
     if (endDate) {
-      query = query.lte("created_at", endDate);
+      whereConditions.push(`o.created_at <= $${paramIndex}`);
+      params.push(endDate);
+      paramIndex++;
     }
 
-    // Apply customer name filter
     if (customerName) {
-      query = query.ilike("customer_name", `%${customerName}%`);
+      whereConditions.push(`o.customer_name ILIKE $${paramIndex}`);
+      params.push(`%${customerName}%`);
+      paramIndex++;
     }
 
-    // Apply sorting and pagination
-    query = query.order("created_at", { ascending: false });
+    const whereClause = whereConditions.join(" AND ");
+
+    // Get total count
+    const countResult = await query(
+      `SELECT COUNT(*) as total FROM orders o WHERE ${whereClause}`,
+      params
+    );
+    const totalCount = parseInt(countResult.rows[0].total);
+
+    // Get paginated data
     const offset = (page - 1) * limit;
-    query = query.range(offset, offset + limit - 1);
+    const ordersResult = await query(
+      `SELECT o.*, json_agg(
+        json_build_object(
+          'id', oi.id,
+          'medicine_id', oi.medicine_id,
+          'quantity', oi.quantity,
+          'unit_price', oi.unit_price,
+          'total_price', oi.total_price,
+          'discount', oi.discount,
+          'cost_price', oi.cost_price,
+          'medicine_name', m.name
+        )
+      ) as order_items
+       FROM orders o
+       LEFT JOIN order_items oi ON o.id = oi.order_id
+       LEFT JOIN medicines m ON oi.medicine_id = m.id
+       WHERE ${whereClause}
+       GROUP BY o.id
+       ORDER BY o.created_at DESC
+       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+      [...params, limit, offset]
+    );
 
-    const { data: orders, error, count } = await query;
-
-    if (error) {
-      return res.status(500).json({
-        success: false,
-        message: "Error fetching orders",
-        error: error.message,
-      });
-    }
+    const totalPages = Math.ceil(totalCount / limit);
+    const currentPage = parseInt(page);
 
     res.json({
       success: true,
       data: {
-        orders: orders || [],
+        orders: ordersResult.rows || [],
         pagination: {
-          page: parseInt(page),
+          page: currentPage,
           limit: parseInt(limit),
-          total: count || orders?.length || 0,
-          pages: Math.ceil((count || orders?.length || 0) / limit),
+          total: totalCount,
+          pages: totalPages,
         },
       },
     });
@@ -78,26 +103,36 @@ const getAllOrders = async (req, res) => {
   }
 };
 
-// Get single order
+/**
+ * Get single order with items
+ */
 const getOrder = async (req, res) => {
   try {
     const { id } = req.params;
     const organizationId = req.user.organization_id;
 
-    const { data: order, error } = await supabase
-      .from("orders")
-      .select(`
-        *,
-        order_items(
-          *,
-          medicines(name)
+    const result = await query(
+      `SELECT o.*, json_agg(
+        json_build_object(
+          'id', oi.id,
+          'medicine_id', oi.medicine_id,
+          'quantity', oi.quantity,
+          'unit_price', oi.unit_price,
+          'total_price', oi.total_price,
+          'discount', oi.discount,
+          'cost_price', oi.cost_price,
+          'medicine_name', m.name
         )
-      `)
-      .eq("id", id)
-      .eq("organization_id", organizationId)
-      .single();
+      ) as order_items
+       FROM orders o
+       LEFT JOIN order_items oi ON o.id = oi.order_id
+       LEFT JOIN medicines m ON oi.medicine_id = m.id
+       WHERE o.id = $1 AND o.organization_id = $2
+       GROUP BY o.id`,
+      [id, organizationId]
+    );
 
-    if (error || !order) {
+    if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: "Order not found",
@@ -106,7 +141,7 @@ const getOrder = async (req, res) => {
 
     res.json({
       success: true,
-      data: { order },
+      data: { order: result.rows[0] },
     });
   } catch (error) {
     console.error("Get order error:", error);
@@ -117,7 +152,9 @@ const getOrder = async (req, res) => {
   }
 };
 
-// Create order
+/**
+ * Create order with items and update medicine quantities
+ */
 const createOrder = async (req, res) => {
   try {
     const {
@@ -145,103 +182,98 @@ const createOrder = async (req, res) => {
     // Generate order number
     const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
 
-    // Start a transaction
-    const { data: order, error: orderError } = await supabase
-      .from("orders")
-      .insert({
-        order_number: orderNumber,
-        user_id,
-        customer_name,
-        customer_phone,
-        customer_email,
-        organization_id: organizationId,
-        total_amount: parseFloat(total_amount),
-        tax_amount: parseFloat(tax_amount || 0),
-        tax_percent: parseFloat(tax_percent || 0),
-        subtotal: parseFloat(subtotal),
-        profit: parseFloat(profit || 0),
-        discount: parseFloat(discount || 0),
-        discount_percent: parseFloat(discount_percent || 0),
-        payment_method,
-        payment_status: payment_status || 'pending',
-        status: status || 'pending',
-        completed_at,
-        notes,
-      })
-      .select()
-      .single();
+    // Use transaction for atomicity
+    await withTransaction(async (client) => {
+      // Insert order
+      const orderResult = await client.query(
+        `INSERT INTO orders (
+          order_number, user_id, customer_name, customer_phone, customer_email,
+          organization_id, total_amount, tax_amount, tax_percent, subtotal,
+          profit, discount, discount_percent, payment_method, payment_status,
+          status, completed_at, notes, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW(), NOW())
+        RETURNING *`,
+        [
+          orderNumber,
+          user_id,
+          customer_name,
+          customer_phone,
+          customer_email,
+          organizationId,
+          parseFloat(total_amount) || 0,
+          parseFloat(tax_amount) || 0,
+          parseFloat(tax_percent) || 0,
+          parseFloat(subtotal) || 0,
+          parseFloat(profit) || 0,
+          parseFloat(discount) || 0,
+          parseFloat(discount_percent) || 0,
+          payment_method,
+          payment_status || 'pending',
+          status || 'pending',
+          completed_at || null,
+          notes || null,
+        ]
+      );
 
-    if (orderError) {
-      return res.status(400).json({
-        success: false,
-        message: "Error creating order",
-        error: orderError.message,
-      });
-    }
+      const order = orderResult.rows[0];
 
-    // Create order items
-    if (items && items.length > 0) {
-      const orderItems = items.map((item) => ({
-        order_id: order.id,
-        medicine_id: item.medicine_id,
-        quantity: parseInt(item.quantity),
-        unit_price: parseFloat(item.unit_price),
-        total_price: parseFloat(item.total_price),
-        discount: parseFloat(item.discount || 0),
-        discount_percent: parseFloat(item.discount_percent || 0),
-        cost_price: parseFloat(item.cost_price),
-        profit: parseFloat(item.profit || 0),
-        gst_amount: parseFloat(item.gst_amount || 0),
-      }));
+      // Insert order items and update medicine quantities
+      if (items && items.length > 0) {
+        for (const item of items) {
+          // Insert order item
+          await client.query(
+            `INSERT INTO order_items (
+              order_id, medicine_id, quantity, unit_price, total_price,
+              discount, discount_percent, cost_price, profit, gst_amount,
+              created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())`,
+            [
+              order.id,
+              item.medicine_id,
+              parseInt(item.quantity),
+              parseFloat(item.unit_price),
+              parseFloat(item.total_price),
+              parseFloat(item.discount || 0),
+              parseFloat(item.discount_percent || 0),
+              parseFloat(item.cost_price),
+              parseFloat(item.profit || 0),
+              parseFloat(item.gst_amount || 0),
+            ]
+          );
 
-      const { error: itemsError } = await supabase
-        .from("order_items")
-        .insert(orderItems);
-
-      if (itemsError) {
-        // Rollback order creation if items fail
-        await supabase.from("orders").delete().eq("id", order.id);
-        return res.status(400).json({
-          success: false,
-          message: "Error creating order items",
-          error: itemsError.message,
-        });
-      }
-
-      // Update medicine quantities
-      for (const item of items) {
-        // First get the current quantity
-        const { data: medicine } = await supabase
-          .from("medicines")
-          .select("quantity")
-          .eq("id", item.medicine_id)
-          .eq("organization_id", organizationId)
-          .single();
-
-        if (medicine) {
-          const newQuantity = medicine.quantity - item.quantity;
-          await supabase
-            .from("medicines")
-            .update({
-              quantity: newQuantity,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", item.medicine_id)
-            .eq("organization_id", organizationId);
+          // Update medicine quantity
+          await client.query(
+            `UPDATE medicines 
+             SET quantity = quantity - $1, updated_at = NOW()
+             WHERE id = $2 AND organization_id = $3`,
+            [parseInt(item.quantity), item.medicine_id, organizationId]
+          );
         }
       }
-    }
 
-    // Get the complete order with items
-    const { data: completeOrder } = await supabase
-      .from("orders")
-      .select("*, order_items(*)")
-      .eq("id", order.id)
-      .single();
+      // Return complete order with items
+      const completeOrderResult = await client.query(
+        `SELECT o.*, json_agg(
+          json_build_object(
+            'id', oi.id,
+            'medicine_id', oi.medicine_id,
+            'quantity', oi.quantity,
+            'unit_price', oi.unit_price,
+            'total_price', oi.total_price,
+            'discount', oi.discount
+          )
+        ) as order_items
+         FROM orders o
+         LEFT JOIN order_items oi ON o.id = oi.order_id
+         WHERE o.id = $1
+         GROUP BY o.id`,
+        [order.id]
+      );
 
-    res.status(201).json({
-      success: true,
-      data: { order: completeOrder },
+      res.status(201).json({
+        success: true,
+        data: { order: completeOrderResult.rows[0] },
+      });
     });
   } catch (error) {
     console.error("Create order error:", error);
@@ -252,72 +284,49 @@ const createOrder = async (req, res) => {
   }
 };
 
-// Get dashboard data
+/**
+ * Get dashboard data with sales metrics
+ */
 const getDashboardData = async (req, res) => {
   try {
     const organizationId = req.user.organization_id;
-    const { range = "daily" } = req.query; // Default to 'daily'
+    const { range = "daily" } = req.query;
 
     const now = new Date();
-    let startDate,
-      endDate = now.toISOString();
+    let startDate;
 
     switch (range) {
       case "weekly":
-        startDate = new Date(
-          now.getFullYear(),
-          now.getMonth(),
-          now.getDate() - 7
-        ).toISOString();
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
         break;
       case "monthly":
-        startDate = new Date(
-          now.getFullYear(),
-          now.getMonth() - 1,
-          now.getDate()
-        ).toISOString();
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
         break;
       case "yearly":
-        startDate = new Date(
-          now.getFullYear() - 1,
-          now.getMonth(),
-          now.getDate()
-        ).toISOString();
+        startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString();
         break;
       case "daily":
       default:
-        startDate = new Date(
-          now.getFullYear(),
-          now.getMonth(),
-          now.getDate()
-        ).toISOString();
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
         break;
     }
 
-    // Get orders within the selected range
-    const { data: orders, error: ordersError } = await supabase
-      .from("orders")
-      .select("total_amount, status, created_at")
-      .eq("organization_id", organizationId)
-      .gte("created_at", startDate)
-      .lte("created_at", endDate);
-
-    if (ordersError) {
-      return res.status(500).json({
-        success: false,
-        message: "Error fetching dashboard data",
-        error: ordersError.message,
-      });
-    }
+    const result = await query(
+      `SELECT 
+        COUNT(*) as total_orders,
+        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_orders,
+        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_orders,
+        SUM(total_amount) as total_revenue
+       FROM orders
+       WHERE organization_id = $1 AND created_at >= $2`,
+      [organizationId, startDate]
+    );
 
     const dashboardData = {
-      totalOrders: orders?.length || 0,
-      totalRevenue:
-        orders?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0,
-      completedOrders:
-        orders?.filter((order) => order.status === "completed").length || 0,
-      pendingOrders:
-        orders?.filter((order) => order.status === "pending").length || 0,
+      totalOrders: parseInt(result.rows[0].total_orders) || 0,
+      totalRevenue: parseFloat(result.rows[0].total_revenue) || 0,
+      completedOrders: parseInt(result.rows[0].completed_orders) || 0,
+      pendingOrders: parseInt(result.rows[0].pending_orders) || 0,
     };
 
     res.json({
@@ -333,29 +342,40 @@ const getDashboardData = async (req, res) => {
   }
 };
 
-const PDFDocument = require("pdfkit");
-
-// ... (existing code)
-
+/**
+ * Generate PDF for an order
+ */
 const getOrderPdf = async (req, res) => {
   try {
     const { id } = req.params;
     const organizationId = req.user.organization_id;
 
-    const { data: order, error } = await supabase
-      .from("orders")
-      .select("*, order_items(*)")
-      .eq("id", id)
-      .eq("organization_id", organizationId)
-      .single();
+    const result = await query(
+      `SELECT o.*, json_agg(
+        json_build_object(
+          'id', oi.id,
+          'quantity', oi.quantity,
+          'unit_price', oi.unit_price,
+          'total_price', oi.total_price,
+          'medicine_name', m.name
+        )
+      ) as order_items
+       FROM orders o
+       LEFT JOIN order_items oi ON o.id = oi.order_id
+       LEFT JOIN medicines m ON oi.medicine_id = m.id
+       WHERE o.id = $1 AND o.organization_id = $2
+       GROUP BY o.id`,
+      [id, organizationId]
+    );
 
-    if (error || !order) {
+    if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: "Order not found",
       });
     }
 
+    const order = result.rows[0];
     const doc = new PDFDocument({ size: "A4", margin: 50 });
 
     res.setHeader("Content-Type", "application/pdf");
@@ -387,26 +407,26 @@ const getOrderPdf = async (req, res) => {
 
     // Add table rows
     let y = 220;
-    order.order_items.forEach((item) => {
-      doc.text(item.medicine_id, 50, y);
-      doc.text(item.quantity, 250, y);
-      doc.text(item.unit_price.toFixed(2), 350, y);
-      doc.text(item.total_price.toFixed(2), 450, y);
-      y += 20;
-    });
+    if (order.order_items && Array.isArray(order.order_items)) {
+      order.order_items.forEach((item) => {
+        if (item && item.id) {
+          doc.text(item.medicine_name || "N/A", 50, y);
+          doc.text(item.quantity || 0, 250, y);
+          doc.text((item.unit_price || 0).toFixed(2), 350, y);
+          doc.text((item.total_price || 0).toFixed(2), 450, y);
+          y += 20;
+        }
+      });
+    }
 
     // Add totals
     doc.moveDown();
-    doc.text(`Subtotal: ${order.subtotal.toFixed(2)}`, { align: "right" });
-    doc.text(`Tax: ${order.tax_amount.toFixed(2)}`, { align: "right" });
-    doc.text(`Discount: ${order.discount.toFixed(2)}`, {
-      align: "right",
-    });
+    doc.text(`Subtotal: ${(order.subtotal || 0).toFixed(2)}`, { align: "right" });
+    doc.text(`Tax: ${(order.tax_amount || 0).toFixed(2)}`, { align: "right" });
+    doc.text(`Discount: ${(order.discount || 0).toFixed(2)}`, { align: "right" });
     doc.font("Helvetica-Bold");
-    doc.text(`Total: ${order.total_amount.toFixed(2)}`, { align: "right" });
-    doc.font("Helvetica");
+    doc.text(`Total: ${(order.total_amount || 0).toFixed(2)}`, { align: "right" });
 
-    // Finalize PDF
     doc.end();
   } catch (error) {
     console.error("Get order PDF error:", error);
@@ -417,62 +437,46 @@ const getOrderPdf = async (req, res) => {
   }
 };
 
+/**
+ * Get sales chart data for weekly and monthly trends
+ */
 const getSalesChartData = async (req, res) => {
   try {
     const organizationId = req.user.organization_id;
 
     // Last 7 days
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      return d.toISOString().split("T")[0];
-    }).reverse();
-
-    const { data: weeklyData, error: weeklyError } = await supabase
-      .from("orders")
-      .select("created_at, total_amount")
-      .eq("organization_id", organizationId)
-      .gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
-
-    if (weeklyError) throw weeklyError;
-
-    const weeklySales = last7Days.map((day) => {
-      const total = weeklyData
-        .filter((order) => order.created_at.startsWith(day))
-        .reduce((sum, order) => sum + order.total_amount, 0);
-      return { date: day, sales: total };
-    });
+    const weeklySalesResult = await query(
+      `SELECT 
+        DATE(created_at) as date,
+        SUM(total_amount) as sales
+       FROM orders
+       WHERE organization_id = $1 AND created_at >= NOW() - INTERVAL '7 days'
+       GROUP BY DATE(created_at)
+       ORDER BY DATE(created_at)`,
+      [organizationId]
+    );
 
     // Last 12 months
-    const last12Months = Array.from({ length: 12 }, (_, i) => {
-      const d = new Date();
-      d.setMonth(d.getMonth() - i);
-      return {
-        year: d.getFullYear(),
-        month: d.getMonth() + 1,
-        name: d.toLocaleString("default", { month: "short" }),
-      };
-    }).reverse();
+    const monthlySalesResult = await query(
+      `SELECT 
+        TO_CHAR(created_at, 'Mon') as month,
+        SUM(total_amount) as sales
+       FROM orders
+       WHERE organization_id = $1 AND created_at >= NOW() - INTERVAL '12 months'
+       GROUP BY DATE_TRUNC('month', created_at), TO_CHAR(created_at, 'Mon')
+       ORDER BY DATE_TRUNC('month', created_at)`,
+      [organizationId]
+    );
 
-    const { data: monthlyData, error: monthlyError } = await supabase
-      .from("orders")
-      .select("created_at, total_amount")
-      .eq("organization_id", organizationId)
-      .gte("created_at", new Date(new Date().setFullYear(new Date().getFullYear() - 1)));
+    const weeklySales = weeklySalesResult.rows.map(row => ({
+      date: row.date,
+      sales: parseFloat(row.sales) || 0,
+    }));
 
-    if (monthlyError) throw monthlyError;
-
-    const monthlySales = last12Months.map(({ year, month, name }) => {
-      const total = monthlyData
-        .filter((order) => {
-          const orderDate = new Date(order.created_at);
-          return (
-            orderDate.getFullYear() === year && orderDate.getMonth() + 1 === month
-          );
-        })
-        .reduce((sum, order) => sum + order.total_amount, 0);
-      return { month: name, sales: total };
-    });
+    const monthlySales = monthlySalesResult.rows.map(row => ({
+      month: row.month,
+      sales: parseFloat(row.sales) || 0,
+    }));
 
     res.json({
       success: true,

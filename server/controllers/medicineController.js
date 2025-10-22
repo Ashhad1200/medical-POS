@@ -1,6 +1,10 @@
-const { supabase } = require("../config/supabase");
+const { query, withTransaction } = require("../config/database");
+const xlsx = require("xlsx");
 
-// Get all medicines
+/**
+ * Get all medicines with pagination and filters
+ * Supports search, category, manufacturer, stock filters, and sorting
+ */
 const getAllMedicines = async (req, res) => {
   try {
     const {
@@ -15,125 +19,80 @@ const getAllMedicines = async (req, res) => {
     } = req.query;
     const organizationId = req.user.organization_id;
 
-    let query = supabase
-      .from("medicines")
-      .select("*")
-      .eq("organization_id", organizationId)
-      .eq("is_active", true);
+    // Build WHERE clause with filters
+    let whereConditions = ["organization_id = $1", "is_active = true"];
+    let params = [organizationId];
+    let paramIndex = 2;
 
-    // Apply search filter
     if (search) {
-      query = query.or(
-        `name.ilike.%${search}%,generic_name.ilike.%${search}%,manufacturer.ilike.%${search}%`
+      whereConditions.push(
+        `(name ILIKE $${paramIndex} OR generic_name ILIKE $${paramIndex} OR manufacturer ILIKE $${paramIndex})`
       );
+      params.push(`%${search}%`);
+      paramIndex++;
     }
 
-    // Apply category filter
     if (category) {
-      query = query.eq("category", category);
+      whereConditions.push(`category = $${paramIndex}`);
+      params.push(category);
+      paramIndex++;
     }
 
-    // Apply manufacturer filter
     if (manufacturer) {
-      query = query.eq("manufacturer", manufacturer);
+      whereConditions.push(`manufacturer = $${paramIndex}`);
+      params.push(manufacturer);
+      paramIndex++;
     }
 
-    // Apply stock status filter
     if (stockFilter && stockFilter !== "all") {
-      const currentDate = new Date().toISOString().split('T')[0];
-      const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      
       switch (stockFilter) {
         case "in-stock":
-          query = query.gt("quantity", "low_stock_threshold");
+          whereConditions.push("quantity > low_stock_threshold");
           break;
         case "low-stock":
-          query = query.lte("quantity", "low_stock_threshold").gt("quantity", 0);
+          whereConditions.push(
+            "quantity <= low_stock_threshold AND quantity > 0"
+          );
           break;
         case "out-of-stock":
-          query = query.eq("quantity", 0);
+          whereConditions.push("quantity = 0");
           break;
         case "expired":
-          query = query.lt("expiry_date", currentDate);
+          whereConditions.push(`expiry_date < CURRENT_DATE`);
           break;
         case "expiring-soon":
-          query = query.gte("expiry_date", currentDate).lte("expiry_date", thirtyDaysFromNow);
+          whereConditions.push(
+            `expiry_date >= CURRENT_DATE AND expiry_date <= CURRENT_DATE + INTERVAL '30 days'`
+          );
           break;
       }
     }
 
-    // Apply sorting
-    query = query.order(sortBy, { ascending: sortOrder === "asc" });
+    const whereClause = whereConditions.join(" AND ");
+    const sortColumn = [
+      "name",
+      "manufacturer",
+      "quantity",
+      "selling_price",
+      "expiry_date",
+    ].includes(sortBy)
+      ? sortBy
+      : "name";
+    const sortDirection = sortOrder === "asc" ? "ASC" : "DESC";
 
-    // Build count query with same filters
-    let countQuery = supabase
-      .from("medicines")
-      .select("*", { count: 'exact', head: true })
-      .eq("organization_id", organizationId)
-      .eq("is_active", true);
+    // Get total count
+    const countResult = await query(
+      `SELECT COUNT(*) as total FROM medicines WHERE ${whereClause}`,
+      params
+    );
+    const totalCount = parseInt(countResult.rows[0].total);
 
-    // Apply same filters to count query
-    if (search) {
-      countQuery = countQuery.or(
-        `name.ilike.%${search}%,generic_name.ilike.%${search}%,manufacturer.ilike.%${search}%`
-      );
-    }
-
-    if (category) {
-      countQuery = countQuery.eq("category", category);
-    }
-
-    if (manufacturer) {
-      countQuery = countQuery.eq("manufacturer", manufacturer);
-    }
-
-    // Apply same stock status filter to count query
-    if (stockFilter && stockFilter !== "all") {
-      const currentDate = new Date().toISOString().split('T')[0];
-      const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      
-      switch (stockFilter) {
-        case "in-stock":
-          countQuery = countQuery.gt("quantity", "low_stock_threshold");
-          break;
-        case "low-stock":
-          countQuery = countQuery.lte("quantity", "low_stock_threshold").gt("quantity", 0);
-          break;
-        case "out-of-stock":
-          countQuery = countQuery.eq("quantity", 0);
-          break;
-        case "expired":
-          countQuery = countQuery.lt("expiry_date", currentDate);
-          break;
-        case "expiring-soon":
-          countQuery = countQuery.gte("expiry_date", currentDate).lte("expiry_date", thirtyDaysFromNow);
-          break;
-      }
-    }
-
-    const { count: totalCount, error: countError } = await countQuery;
-
-    if (countError) {
-      return res.status(500).json({
-        success: false,
-        message: "Error counting medicines",
-        error: countError.message,
-      });
-    }
-
-    // Apply pagination
+    // Get paginated data
     const offset = (page - 1) * limit;
-    query = query.range(offset, offset + limit - 1);
-
-    const { data: medicines, error } = await query;
-
-    if (error) {
-      return res.status(500).json({
-        success: false,
-        message: "Error fetching medicines",
-        error: error.message,
-      });
-    }
+    const medicinesResult = await query(
+      `SELECT * FROM medicines WHERE ${whereClause} ORDER BY ${sortColumn} ${sortDirection} LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+      [...params, limit, offset]
+    );
 
     const totalPages = Math.ceil(totalCount / limit);
     const currentPage = parseInt(page);
@@ -141,7 +100,7 @@ const getAllMedicines = async (req, res) => {
     res.json({
       success: true,
       data: {
-        medicines: medicines || [],
+        medicines: medicinesResult.rows || [],
         pagination: {
           currentPage,
           itemsPerPage: parseInt(limit),
@@ -161,21 +120,20 @@ const getAllMedicines = async (req, res) => {
   }
 };
 
-// Get single medicine
+/**
+ * Get a single medicine by ID
+ */
 const getMedicine = async (req, res) => {
   try {
     const { id } = req.params;
     const organizationId = req.user.organization_id;
 
-    const { data: medicine, error } = await supabase
-      .from("medicines")
-      .select("*")
-      .eq("id", id)
-      .eq("organization_id", organizationId)
-      .eq("is_active", true)
-      .single();
+    const result = await query(
+      "SELECT * FROM medicines WHERE id = $1 AND organization_id = $2 AND is_active = true",
+      [id, organizationId]
+    );
 
-    if (error || !medicine) {
+    if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: "Medicine not found",
@@ -184,7 +142,7 @@ const getMedicine = async (req, res) => {
 
     res.json({
       success: true,
-      data: { medicine },
+      data: { medicine: result.rows[0] },
     });
   } catch (error) {
     console.error("Get medicine error:", error);
@@ -195,7 +153,9 @@ const getMedicine = async (req, res) => {
   }
 };
 
-// Create medicine
+/**
+ * Create a new medicine
+ */
 const createMedicine = async (req, res) => {
   try {
     const {
@@ -217,83 +177,70 @@ const createMedicine = async (req, res) => {
     } = req.body;
 
     const organizationId = req.user.organization_id;
-    const userSupabase = req.supabase || supabase;
-    
-    console.log('Creating medicine with user:', req.user.id, 'org:', organizationId);
-    console.log('Using bypass function');
-    console.log('Medicine data:', { name, generic_name, manufacturer });
+    const userId = req.user.id;
 
-    const medicineData = {
-      name,
-      generic_name,
-      manufacturer,
-      batch_number,
-      selling_price: parseFloat(selling_price),
-      cost_price: parseFloat(cost_price),
-      gst_per_unit: parseFloat(gst_per_unit),
-      gst_rate: parseFloat(gst_rate),
-      quantity: parseInt(quantity),
-      low_stock_threshold: parseInt(low_stock_threshold),
-      expiry_date,
-      category,
-      description,
-      is_active,
-      organization_id: organizationId,
-      supplier_id,
-      created_by: req.user.id,
-    };
+    console.log("Creating medicine with user:", userId, "org:", organizationId);
 
-    // Create a fresh service role client to bypass RLS
-    const { createClient } = require('@supabase/supabase-js');
-    const serviceSupabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
-     
-     const { data: medicine, error } = await serviceSupabase
-       .from('medicines')
-       .insert({
-         name: medicineData.name,
-         generic_name: medicineData.generic_name || null,
-         manufacturer: medicineData.manufacturer || 'Unknown',
-         batch_number: medicineData.batch_number || null,
-         selling_price: medicineData.selling_price || 0,
-         cost_price: medicineData.cost_price || 0,
-         gst_per_unit: medicineData.gst_per_unit || 0,
-         gst_rate: medicineData.gst_rate || 0,
-         quantity: medicineData.quantity || 0,
-         low_stock_threshold: medicineData.low_stock_threshold || 10,
-         expiry_date: medicineData.expiry_date || '2025-12-31',
-         category: medicineData.category || null,
-         subcategory: medicineData.subcategory || null,
-         description: medicineData.description || null,
-         dosage_form: medicineData.dosage_form || null,
-         strength: medicineData.strength || null,
-         pack_size: medicineData.pack_size || null,
-         storage_conditions: medicineData.storage_conditions || null,
-         prescription_required: medicineData.prescription_required || false,
-         is_active: medicineData.is_active !== undefined ? medicineData.is_active : true,
-         supplier_id: medicineData.supplier_id || null,
-         organization_id: req.user.organization_id,
-         created_by: req.user.id
-       })
-       .select()
-       .single();
-
-    if (error) {
-      console.error('Medicine creation error details:', error);
+    // Validate required fields
+    if (!name || !manufacturer) {
       return res.status(400).json({
         success: false,
-        message: "Error creating medicine",
-        error: error.message,
+        message: "Name and manufacturer are required fields",
       });
     }
+
+    // Prepare medicine data
+    const medicineData = {
+      name,
+      generic_name: generic_name || null,
+      manufacturer: manufacturer || "Unknown",
+      batch_number: batch_number || null,
+      selling_price: selling_price ? parseFloat(selling_price) : 0,
+      cost_price: cost_price ? parseFloat(cost_price) : 0,
+      gst_per_unit: gst_per_unit ? parseFloat(gst_per_unit) : 0,
+      gst_rate: gst_rate ? parseFloat(gst_rate) : 0,
+      quantity: quantity ? parseInt(quantity) : 0,
+      low_stock_threshold: low_stock_threshold ? parseInt(low_stock_threshold) : 10,
+      expiry_date: expiry_date || "2025-12-31",
+      category: category || null,
+      description: description || null,
+      is_active: is_active !== undefined ? is_active : true,
+      supplier_id: supplier_id || null,
+      organization_id: organizationId,
+      created_by: userId,
+    };
+
+    // Insert medicine into PostgreSQL
+    const result = await query(
+      `INSERT INTO medicines (
+        name, generic_name, manufacturer, batch_number, selling_price, cost_price,
+        gst_per_unit, gst_rate, quantity, low_stock_threshold, expiry_date, category,
+        description, is_active, supplier_id, organization_id, created_by, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), NOW())
+      RETURNING *`,
+      [
+        medicineData.name,
+        medicineData.generic_name,
+        medicineData.manufacturer,
+        medicineData.batch_number,
+        medicineData.selling_price,
+        medicineData.cost_price,
+        medicineData.gst_per_unit,
+        medicineData.gst_rate,
+        medicineData.quantity,
+        medicineData.low_stock_threshold,
+        medicineData.expiry_date,
+        medicineData.category,
+        medicineData.description,
+        medicineData.is_active,
+        medicineData.supplier_id,
+        medicineData.organization_id,
+        medicineData.created_by,
+      ]
+    );
+
+    const medicine = result.rows[0];
+    console.log("Medicine created successfully:", medicine.id);
 
     res.status(201).json({
       success: true,
@@ -301,84 +248,123 @@ const createMedicine = async (req, res) => {
     });
   } catch (error) {
     console.error("Create medicine error:", error);
-    res.status(500).json({
+
+    // Check for duplicate key error
+    if (error.code === "23505") {
+      return res.status(409).json({
+        success: false,
+        message: "A medicine with this name already exists in your organization",
+        code: "DUPLICATE_MEDICINE",
+      });
+    }
+
+    res.status(400).json({
       success: false,
-      message: "Error creating medicine",
+      message: "Error creating medicine: " + error.message,
+      error: error.message,
     });
   }
 };
 
-// Update medicine
+/**
+ * Update a medicine
+ */
 const updateMedicine = async (req, res) => {
   try {
     const { id } = req.params;
     const organizationId = req.user.organization_id;
     const updateData = req.body;
-    
-    console.log('Updating medicine:', id, 'for org:', organizationId);
-    console.log('Update data:', updateData);
 
-    // Map field names from frontend to database schema
-    const mappedData = {};
-    
-    // Direct mappings
-    if (updateData.name) mappedData.name = updateData.name;
-    if (updateData.generic_name) mappedData.generic_name = updateData.generic_name;
-    if (updateData.manufacturer) mappedData.manufacturer = updateData.manufacturer;
-    if (updateData.category) mappedData.category = updateData.category;
-    if (updateData.subcategory) mappedData.subcategory = updateData.subcategory;
-    if (updateData.description) mappedData.description = updateData.description;
-    if (updateData.dosage_form) mappedData.dosage_form = updateData.dosage_form;
-    if (updateData.strength) mappedData.strength = updateData.strength;
-    if (updateData.pack_size) mappedData.pack_size = updateData.pack_size;
-    if (updateData.storage_conditions) mappedData.storage_conditions = updateData.storage_conditions;
-    if (updateData.quantity !== undefined) mappedData.quantity = parseInt(updateData.quantity);
-    if (updateData.is_active !== undefined) mappedData.is_active = updateData.is_active;
-    if (updateData.prescription_required !== undefined) mappedData.prescription_required = updateData.prescription_required;
-    if (updateData.supplier_id) mappedData.supplier_id = updateData.supplier_id;
-    
-    // Field name mappings (frontend -> database)
-    if (updateData.batchNumber) mappedData.batch_number = updateData.batchNumber;
-    if (updateData.batch_number) mappedData.batch_number = updateData.batch_number;
-    if (updateData.retailPrice !== undefined) mappedData.selling_price = parseFloat(updateData.retailPrice);
-    if (updateData.selling_price !== undefined) mappedData.selling_price = parseFloat(updateData.selling_price);
-    if (updateData.tradePrice !== undefined) mappedData.cost_price = parseFloat(updateData.tradePrice);
-    if (updateData.cost_price !== undefined) mappedData.cost_price = parseFloat(updateData.cost_price);
-    if (updateData.gstPerUnit !== undefined) mappedData.gst_per_unit = parseFloat(updateData.gstPerUnit);
-    if (updateData.gst_per_unit !== undefined) mappedData.gst_per_unit = parseFloat(updateData.gst_per_unit);
-    if (updateData.gst_rate !== undefined) mappedData.gst_rate = parseFloat(updateData.gst_rate);
-    if (updateData.expiryDate) mappedData.expiry_date = updateData.expiryDate;
-    if (updateData.expiry_date) mappedData.expiry_date = updateData.expiry_date;
-    if (updateData.reorderThreshold !== undefined) mappedData.low_stock_threshold = parseInt(updateData.reorderThreshold);
-    if (updateData.low_stock_threshold !== undefined) mappedData.low_stock_threshold = parseInt(updateData.low_stock_threshold);
-    
-    console.log('Mapped update data:', mappedData);
+    console.log("Updating medicine:", id, "for org:", organizationId);
 
-    // Create a fresh service role client to bypass RLS
-    const { createClient } = require('@supabase/supabase-js');
-    const serviceSupabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
+    // Define allowed fields for update
+    const allowedFields = [
+      "name",
+      "generic_name",
+      "manufacturer",
+      "category",
+      "subcategory",
+      "description",
+      "dosage_form",
+      "strength",
+      "pack_size",
+      "storage_conditions",
+      "quantity",
+      "is_active",
+      "prescription_required",
+      "supplier_id",
+      "batch_number",
+      "selling_price",
+      "cost_price",
+      "gst_per_unit",
+      "gst_rate",
+      "expiry_date",
+    ];
+
+    const fieldMappings = {
+      batchNumber: "batch_number",
+      retailPrice: "selling_price",
+      tradePrice: "cost_price",
+      gstPerUnit: "gst_per_unit",
+      expiryDate: "expiry_date",
+      reorderThreshold: "low_stock_threshold",
+    };
+
+    // Build SET clause
+    const setFields = [];
+    const params = [];
+    let paramIndex = 1;
+
+    for (const [key, value] of Object.entries(updateData)) {
+      let dbField = fieldMappings[key] || key;
+
+      if (allowedFields.includes(dbField)) {
+        let setValue = value;
+
+        // Type conversions
+        if (
+          ["quantity", "low_stock_threshold"].includes(dbField) &&
+          value !== undefined
+        ) {
+          setValue = parseInt(value);
+        } else if (
+          ["selling_price", "cost_price", "gst_per_unit", "gst_rate"].includes(
+            dbField
+          ) &&
+          value !== undefined
+        ) {
+          setValue = parseFloat(value);
         }
-      }
-    );
-    
-    const { data: medicine, error } = await serviceSupabase
-      .from("medicines")
-      .update({
-        ...mappedData,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id)
-      .eq("organization_id", organizationId)
-      .select()
-      .single();
 
-    if (error || !medicine) {
+        setFields.push(`${dbField} = $${paramIndex}`);
+        params.push(setValue);
+        paramIndex++;
+      }
+    }
+
+    if (setFields.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No valid fields to update",
+      });
+    }
+
+    // Add updated_at
+    setFields.push(`updated_at = NOW()`);
+
+    // Add where conditions
+    params.push(id, organizationId);
+    const whereIndex1 = paramIndex;
+    const whereIndex2 = paramIndex + 1;
+
+    const result = await query(
+      `UPDATE medicines SET ${setFields.join(", ")} 
+       WHERE id = $${whereIndex1} AND organization_id = $${whereIndex2}
+       RETURNING *`,
+      params
+    );
+
+    if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: "Medicine not found",
@@ -387,7 +373,7 @@ const updateMedicine = async (req, res) => {
 
     res.json({
       success: true,
-      data: { medicine },
+      data: { medicine: result.rows[0] },
     });
   } catch (error) {
     console.error("Update medicine error:", error);
@@ -398,7 +384,9 @@ const updateMedicine = async (req, res) => {
   }
 };
 
-// Update stock
+/**
+ * Update medicine stock quantity
+ */
 const updateStock = async (req, res) => {
   try {
     const { id } = req.params;
@@ -406,22 +394,22 @@ const updateStock = async (req, res) => {
     const organizationId = req.user.organization_id;
 
     // Get current medicine
-    const { data: medicine, error: fetchError } = await supabase
-      .from("medicines")
-      .select("quantity")
-      .eq("id", id)
-      .eq("organization_id", organizationId)
-      .single();
+    const result = await query(
+      "SELECT quantity FROM medicines WHERE id = $1 AND organization_id = $2",
+      [id, organizationId]
+    );
 
-    if (fetchError || !medicine) {
+    if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: "Medicine not found",
       });
     }
 
+    const currentQuantity = result.rows[0].quantity;
+
     // Calculate new quantity
-    let newQuantity = medicine.quantity;
+    let newQuantity = currentQuantity;
     if (operation === "add") {
       newQuantity += parseInt(quantity);
     } else if (operation === "subtract") {
@@ -438,28 +426,14 @@ const updateStock = async (req, res) => {
     }
 
     // Update quantity
-    const { data: updatedMedicine, error } = await supabase
-      .from("medicines")
-      .update({
-        quantity: newQuantity,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id)
-      .eq("organization_id", organizationId)
-      .select()
-      .single();
-
-    if (error) {
-      return res.status(500).json({
-        success: false,
-        message: "Error updating stock",
-        error: error.message,
-      });
-    }
+    const updateResult = await query(
+      `UPDATE medicines SET quantity = $1, updated_at = NOW() WHERE id = $2 AND organization_id = $3 RETURNING *`,
+      [newQuantity, id, organizationId]
+    );
 
     res.json({
       success: true,
-      data: { medicine: updatedMedicine },
+      data: { medicine: updateResult.rows[0] },
     });
   } catch (error) {
     console.error("Update stock error:", error);
@@ -470,82 +444,55 @@ const updateStock = async (req, res) => {
   }
 };
 
-// Delete medicine
+/**
+ * Delete a medicine (soft delete or archive if has related records)
+ */
 const deleteMedicine = async (req, res) => {
   try {
     const { id } = req.params;
     const organizationId = req.user.organization_id;
 
-    // Create a fresh service role client to bypass RLS
-    const { createClient } = require('@supabase/supabase-js');
-    const serviceSupabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
+    // Check if medicine has any related records
+    const orderItemsResult = await query(
+      "SELECT id FROM order_items WHERE medicine_id = $1 LIMIT 1",
+      [id]
     );
 
-    // Check if medicine has any related records
-    const { data: orderItems } = await serviceSupabase
-      .from("order_items")
-      .select("id")
-      .eq("medicine_id", id)
-      .limit(1);
+    const purchaseOrderItemsResult = await query(
+      "SELECT id FROM purchase_order_items WHERE medicine_id = $1 LIMIT 1",
+      [id]
+    );
 
-    const { data: purchaseOrderItems } = await serviceSupabase
-      .from("purchase_order_items")
-      .select("id")
-      .eq("medicine_id", id)
-      .limit(1);
-
-    const { data: inventoryTransactions } = await serviceSupabase
-      .from("inventory_transactions")
-      .select("id")
-      .eq("medicine_id", id)
-      .limit(1);
+    const inventoryTransactionsResult = await query(
+      "SELECT id FROM inventory_transactions WHERE medicine_id = $1 LIMIT 1",
+      [id]
+    );
 
     // If medicine has related records, archive instead of delete
-    if (orderItems?.length > 0 || purchaseOrderItems?.length > 0 || inventoryTransactions?.length > 0) {
+    if (
+      orderItemsResult.rows.length > 0 ||
+      purchaseOrderItemsResult.rows.length > 0 ||
+      inventoryTransactionsResult.rows.length > 0
+    ) {
       // Archive the medicine by setting is_active to false
-      const { error: archiveError } = await serviceSupabase
-        .from("medicines")
-        .update({ is_active: false })
-        .eq("id", id)
-        .eq("organization_id", organizationId);
-
-      if (archiveError) {
-        return res.status(500).json({
-          success: false,
-          message: "Error archiving medicine",
-          error: archiveError.message,
-        });
-      }
+      await query(
+        "UPDATE medicines SET is_active = false, updated_at = NOW() WHERE id = $1 AND organization_id = $2",
+        [id, organizationId]
+      );
 
       return res.json({
         success: true,
-        message: "Medicine archived successfully (cannot be deleted due to existing transactions)",
+        message:
+          "Medicine archived successfully (cannot be deleted due to existing transactions)",
         archived: true,
       });
     }
 
     // If no related records, proceed with deletion
-    const { error } = await serviceSupabase
-      .from("medicines")
-      .delete()
-      .eq("id", id)
-      .eq("organization_id", organizationId);
-
-    if (error) {
-      return res.status(500).json({
-        success: false,
-        message: "Error deleting medicine",
-        error: error.message,
-      });
-    }
+    await query(
+      "DELETE FROM medicines WHERE id = $1 AND organization_id = $2",
+      [id, organizationId]
+    );
 
     res.json({
       success: true,
@@ -560,7 +507,9 @@ const deleteMedicine = async (req, res) => {
   }
 };
 
-// Search medicines
+/**
+ * Search medicines by name, generic name, manufacturer, or batch number
+ */
 const searchMedicines = async (req, res) => {
   try {
     const { q, limit = 10 } = req.query;
@@ -573,30 +522,18 @@ const searchMedicines = async (req, res) => {
       });
     }
 
-    const { data: medicines, error } = await supabase
-      .from("medicines")
-      .select(
-        "id, name, generic_name, manufacturer, batch_number, selling_price, cost_price, gst_per_unit, quantity, low_stock_threshold, expiry_date"
-      )
-      .eq("organization_id", organizationId)
-      .eq("is_active", true)
-      .or(
-        `name.ilike.%${q}%,generic_name.ilike.%${q}%,manufacturer.ilike.%${q}%,batch_number.ilike.%${q}%`
-      )
-      .order("name")
-      .limit(parseInt(limit));
-
-    if (error) {
-      return res.status(500).json({
-        success: false,
-        message: "Error searching medicines",
-        error: error.message,
-      });
-    }
+    const result = await query(
+      `SELECT id, name, generic_name, manufacturer, batch_number, selling_price, cost_price,
+              gst_per_unit, quantity, low_stock_threshold, expiry_date
+       FROM medicines WHERE organization_id = $1 AND is_active = true
+       AND (name ILIKE $2 OR generic_name ILIKE $2 OR manufacturer ILIKE $2 OR batch_number ILIKE $2)
+       ORDER BY name LIMIT $3`,
+      [organizationId, `%${q}%`, limit]
+    );
 
     res.json({
       success: true,
-      data: { medicines: medicines || [] },
+      data: { medicines: result.rows || [] },
     });
   } catch (error) {
     console.error("Search medicines error:", error);
@@ -607,25 +544,20 @@ const searchMedicines = async (req, res) => {
   }
 };
 
-// Get inventory stats
+/**
+ * Get inventory statistics
+ */
 const getInventoryStats = async (req, res) => {
   try {
     const organizationId = req.user.organization_id;
 
-    const { data: medicines, error } = await supabase
-      .from("medicines")
-      .select("quantity, low_stock_threshold, selling_price, expiry_date")
-      .eq("organization_id", organizationId)
-      .eq("is_active", true);
+    const result = await query(
+      `SELECT quantity, low_stock_threshold, selling_price, expiry_date
+       FROM medicines WHERE organization_id = $1 AND is_active = true`,
+      [organizationId]
+    );
 
-    if (error) {
-      return res.status(500).json({
-        success: false,
-        message: "Error fetching inventory stats",
-        error: error.message,
-      });
-    }
-
+    const medicines = result.rows;
     const now = new Date();
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
@@ -633,18 +565,15 @@ const getInventoryStats = async (req, res) => {
     const stats = {
       total: medicines?.length || 0,
       totalValue:
-        medicines?.reduce(
-          (sum, med) => sum + med.quantity * med.selling_price,
-          0
-        ) || 0,
+        medicines?.reduce((sum, med) => sum + med.quantity * med.selling_price, 0) ||
+        0,
       lowStock:
         medicines?.filter((med) => med.quantity <= med.low_stock_threshold)
           .length || 0,
       inStock:
         medicines?.filter((med) => med.quantity > med.low_stock_threshold)
           .length || 0,
-      outOfStock:
-        medicines?.filter((med) => med.quantity === 0).length || 0,
+      outOfStock: medicines?.filter((med) => med.quantity === 0).length || 0,
       expired:
         medicines?.filter((med) => {
           const expiryDate = new Date(med.expiry_date);
@@ -670,35 +599,22 @@ const getInventoryStats = async (req, res) => {
   }
 };
 
-// Get low stock medicines
+/**
+ * Get low stock medicines
+ */
 const getLowStockMedicines = async (req, res) => {
   try {
     const organizationId = req.user.organization_id;
 
-    // Use a raw SQL query to compare quantity with low_stock_threshold
-    const { data: medicines, error } = await supabase
-      .from("medicines")
-      .select("*")
-      .eq("organization_id", organizationId)
-      .eq("is_active", true)
-      .order("quantity");
-
-    // Filter in JavaScript since Supabase doesn't support column-to-column comparison directly
-    const lowStockMedicines = medicines ? medicines.filter(medicine => 
-      medicine.quantity <= medicine.low_stock_threshold
-    ) : [];
-
-    if (error) {
-      return res.status(500).json({
-        success: false,
-        message: "Error fetching low stock medicines",
-        error: error.message,
-      });
-    }
+    const result = await query(
+      `SELECT * FROM medicines WHERE organization_id = $1 AND is_active = true
+       AND quantity <= low_stock_threshold ORDER BY quantity`,
+      [organizationId]
+    );
 
     res.json({
       success: true,
-      data: { medicines: medicines || [] },
+      data: { medicines: result.rows || [] },
     });
   } catch (error) {
     console.error("Get low stock medicines error:", error);
@@ -709,31 +625,22 @@ const getLowStockMedicines = async (req, res) => {
   }
 };
 
-// Get expired medicines
+/**
+ * Get expired medicines
+ */
 const getExpiredMedicines = async (req, res) => {
   try {
     const organizationId = req.user.organization_id;
-    const today = new Date().toISOString().split("T")[0];
 
-    const { data: medicines, error } = await supabase
-      .from("medicines")
-      .select("*")
-      .eq("organization_id", organizationId)
-      .eq("is_active", true)
-      .lt("expiry_date", today)
-      .order("expiry_date");
-
-    if (error) {
-      return res.status(500).json({
-        success: false,
-        message: "Error fetching expired medicines",
-        error: error.message,
-      });
-    }
+    const result = await query(
+      `SELECT * FROM medicines WHERE organization_id = $1 AND is_active = true
+       AND expiry_date < CURRENT_DATE ORDER BY expiry_date`,
+      [organizationId]
+    );
 
     res.json({
       success: true,
-      data: { medicines: medicines || [] },
+      data: { medicines: result.rows || [] },
     });
   } catch (error) {
     console.error("Get expired medicines error:", error);
@@ -744,35 +651,23 @@ const getExpiredMedicines = async (req, res) => {
   }
 };
 
-// Get expiring soon medicines
+/**
+ * Get medicines expiring in the next 30 days
+ */
 const getExpiringSoonMedicines = async (req, res) => {
   try {
     const organizationId = req.user.organization_id;
-    const today = new Date().toISOString().split("T")[0];
-    const thirtyDaysFromNow = new Date();
-    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-    const futureDate = thirtyDaysFromNow.toISOString().split("T")[0];
 
-    const { data: medicines, error } = await supabase
-      .from("medicines")
-      .select("*")
-      .eq("organization_id", organizationId)
-      .eq("is_active", true)
-      .gte("expiry_date", today)
-      .lte("expiry_date", futureDate)
-      .order("expiry_date");
-
-    if (error) {
-      return res.status(500).json({
-        success: false,
-        message: "Error fetching expiring soon medicines",
-        error: error.message,
-      });
-    }
+    const result = await query(
+      `SELECT * FROM medicines WHERE organization_id = $1 AND is_active = true
+       AND expiry_date >= CURRENT_DATE AND expiry_date <= CURRENT_DATE + INTERVAL '30 days'
+       ORDER BY expiry_date`,
+      [organizationId]
+    );
 
     res.json({
       success: true,
-      data: { medicines: medicines || [] },
+      data: { medicines: result.rows || [] },
     });
   } catch (error) {
     console.error("Get expiring soon medicines error:", error);
@@ -783,10 +678,9 @@ const getExpiringSoonMedicines = async (req, res) => {
   }
 };
 
-const xlsx = require("xlsx");
-
-// ... (existing code)
-
+/**
+ * Bulk import medicines from Excel file
+ */
 const bulkImport = async (req, res) => {
   try {
     if (!req.file) {
@@ -797,46 +691,52 @@ const bulkImport = async (req, res) => {
     }
 
     const organizationId = req.user.organization_id;
+    const userId = req.user.id;
+
     const workbook = xlsx.read(req.file.buffer, { type: "buffer" });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
     const data = xlsx.utils.sheet_to_json(worksheet);
 
-    const medicinesToInsert = data.map((row) => ({
-      name: row.name,
-      generic_name: row.genericName,
-      manufacturer: row.manufacturer,
-      batch_number: row.batchNumber,
-      selling_price: parseFloat(row.sellingPrice),
-      cost_price: parseFloat(row.costPrice),
-      gst_per_unit: parseFloat(row.gstPerUnit),
-      gst_rate: parseFloat(row.gstRate),
-      quantity: parseInt(row.quantity),
-      low_stock_threshold: parseInt(row.lowStockThreshold),
-      expiry_date: row.expiryDate,
-      category: row.category,
-      description: row.description,
-      is_active: row.isActive,
-       organization_id: organizationId,
-       supplier_id: row.supplierId,
-     }));
+    let insertedCount = 0;
 
-    const { data: insertedMedicines, error } = await supabase
-      .from("medicines")
-      .insert(medicinesToInsert)
-      .select();
-
-    if (error) {
-      return res.status(500).json({
-        success: false,
-        message: "Error importing medicines",
-        error: error.message,
-      });
+    for (const row of data) {
+      try {
+        await query(
+          `INSERT INTO medicines (
+            name, generic_name, manufacturer, batch_number, selling_price, cost_price,
+            gst_per_unit, gst_rate, quantity, low_stock_threshold, expiry_date, category,
+            description, is_active, organization_id, supplier_id, created_by, created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), NOW())`,
+          [
+            row.name,
+            row.genericName || null,
+            row.manufacturer,
+            row.batchNumber || null,
+            parseFloat(row.sellingPrice) || 0,
+            parseFloat(row.costPrice) || 0,
+            parseFloat(row.gstPerUnit) || 0,
+            parseFloat(row.gstRate) || 0,
+            parseInt(row.quantity) || 0,
+            parseInt(row.lowStockThreshold) || 10,
+            row.expiryDate || "2025-12-31",
+            row.category || null,
+            row.description || null,
+            row.isActive !== false,
+            organizationId,
+            row.supplierId || null,
+            userId,
+          ]
+        );
+        insertedCount++;
+      } catch (error) {
+        console.error("Error inserting medicine from bulk import:", error.message);
+      }
     }
 
     res.json({
       success: true,
-      message: `${insertedMedicines.length} medicines imported successfully`,
+      message: `${insertedCount} medicines imported successfully`,
     });
   } catch (error) {
     console.error("Bulk import error:", error);
@@ -847,23 +747,19 @@ const bulkImport = async (req, res) => {
   }
 };
 
+/**
+ * Export medicines to Excel file
+ */
 const exportInventory = async (req, res) => {
   try {
     const organizationId = req.user.organization_id;
 
-    const { data: medicines, error } = await supabase
-      .from("medicines")
-      .select("*")
-      .eq("organization_id", organizationId)
-      .eq("is_active", true);
+    const result = await query(
+      "SELECT * FROM medicines WHERE organization_id = $1 AND is_active = true",
+      [organizationId]
+    );
 
-    if (error) {
-      return res.status(500).json({
-        success: false,
-        message: "Error fetching medicines for export",
-        error: error.message,
-      });
-    }
+    const medicines = result.rows;
 
     const worksheet = xlsx.utils.json_to_sheet(medicines);
     const workbook = xlsx.utils.book_new();
@@ -871,10 +767,7 @@ const exportInventory = async (req, res) => {
 
     const buffer = xlsx.write(workbook, { bookType: "xlsx", type: "buffer" });
 
-    res.setHeader(
-      "Content-Disposition",
-      "attachment; filename=inventory.xlsx"
-    );
+    res.setHeader("Content-Disposition", "attachment; filename=inventory.xlsx");
     res.setHeader(
       "Content-Type",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
