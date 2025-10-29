@@ -47,7 +47,11 @@ export const PAGINATION_CONFIG = {
 export const UPLOAD_CONFIG = {
   MAX_FILE_SIZE: 5 * 1024 * 1024, // 5MB
   ALLOWED_IMAGE_TYPES: ["image/jpeg", "image/png", "image/webp"],
-  ALLOWED_DOCUMENT_TYPES: ["application/pdf", "text/csv", "application/vnd.ms-excel"],
+  ALLOWED_DOCUMENT_TYPES: [
+    "application/pdf",
+    "text/csv",
+    "application/vnd.ms-excel",
+  ],
 };
 
 // Role Hierarchy
