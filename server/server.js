@@ -23,6 +23,8 @@ const supplierRoutes = require("./routes/refactoredSuppliers");
 const purchaseOrderRoutes = require("./routes/refactoredPurchaseOrders");
 const inventoryRoutes = require("./routes/inventory");
 const userRoutes = require("./routes/users");
+const organizationRoutes = require("./routes/organizations");
+const adminRoutes = require("./routes/admin");
 const reportRoutes = require("./routes/reports");
 const customerRoutes = require("./routes/customers");
 const securityTestRoutes = require("./routes/security-test");
@@ -40,7 +42,7 @@ app.use(
   helmet({
     // Hide X-Powered-By header
     hidePoweredBy: true,
-    
+
     // Set Content-Security-Policy
     contentSecurityPolicy: {
       directives: {
@@ -50,32 +52,32 @@ app.use(
         imgSrc: ["'self'", "data:", "https:"],
       },
     },
-    
+
     // Set X-Content-Type-Options to prevent MIME sniffing
     noSniff: true,
-    
+
     // Set X-Frame-Options to prevent clickjacking
     frameguard: { action: "deny" },
-    
+
     // Set Strict-Transport-Security for HTTPS
     hsts: {
       maxAge: 31536000,
       includeSubDomains: true,
       preload: true,
     },
-    
+
     // Allow cross-origin resource sharing
     crossOriginResourcePolicy: { policy: "cross-origin" },
-    
+
     // Set X-DNS-Prefetch-Control
     dnsPrefetchControl: { allow: false },
-    
+
     // Set X-Download-Options for IE8+
     ieNoOpen: true,
-    
+
     // Set Referrer-Policy
     referrerPolicy: { policy: "no-referrer" },
-    
+
     // Set X-XSS-Protection for older browsers
     xssFilter: true,
   })
@@ -150,6 +152,10 @@ const corsOptions = {
   allowedHeaders: [
     "Content-Type",
     "Authorization",
+    "Cache-Control",
+    "X-Requested-With",
+    "Accept",
+    "Accept-Language",
   ],
   // Only expose essential headers, hide everything else
   exposedHeaders: ["X-Total-Count"],
@@ -188,12 +194,14 @@ if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 } else {
   // In production, use combined format but don't log sensitive data
-  app.use(morgan("combined", {
-    skip: (req, res) => {
-      // Skip logging for health checks
-      return req.url === "/health";
-    }
-  }));
+  app.use(
+    morgan("combined", {
+      skip: (req, res) => {
+        // Skip logging for health checks
+        return req.url === "/health";
+      },
+    })
+  );
 }
 
 // Health check endpoint (minimal information for security)
@@ -214,11 +222,13 @@ app.use("/api/suppliers", supplierRoutes);
 app.use("/api/purchase-orders", purchaseOrderRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/admin/organizations", organizationRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/customers", customerRoutes);
 
 // Security test routes (for development/testing only)
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== "production") {
   app.use("/api/security-test", securityTestRoutes);
 }
 
@@ -266,9 +276,10 @@ app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
   const response = {
     success: false,
-    message: statusCode === 500 && process.env.NODE_ENV === "production" 
-      ? "An error occurred. Please try again later." 
-      : (err.message || "Internal Server Error"),
+    message:
+      statusCode === 500 && process.env.NODE_ENV === "production"
+        ? "An error occurred. Please try again later."
+        : err.message || "Internal Server Error",
   };
 
   // Only include stack trace in development
