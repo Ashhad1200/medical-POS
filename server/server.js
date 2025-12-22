@@ -28,6 +28,7 @@ const adminRoutes = require("./routes/admin");
 const reportRoutes = require("./routes/reports");
 const customerRoutes = require("./routes/customers");
 const securityTestRoutes = require("./routes/security-test");
+const aiAnalyticsRoutes = require("./routes/aiAnalytics");
 
 const app = express();
 
@@ -120,6 +121,11 @@ const corsOptions = {
       /^https:\/\/.*\.vercel\.app$/.test(origin) &&
       origin.includes("medical")
     ) {
+      return callback(null, true);
+    }
+
+    // Allow Render domains
+    if (/^https:\/\/.*\.onrender\.com$/.test(origin)) {
       return callback(null, true);
     }
 
@@ -226,6 +232,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/admin/organizations", organizationRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/customers", customerRoutes);
+app.use("/api/ai-analytics", aiAnalyticsRoutes);
 
 // Security test routes (for development/testing only)
 if (process.env.NODE_ENV !== "production") {

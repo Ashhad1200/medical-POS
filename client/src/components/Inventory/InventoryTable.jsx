@@ -164,10 +164,12 @@ const TableRow = ({
   index = 0,
 }) => {
   const stockStatus = getStockStatus(medicine);
-  const isExpired = medicine.expiry_date ? new Date(medicine.expiry_date) <= new Date() : false;
-  const daysUntilExpiry = medicine.expiry_date ? Math.ceil(
+  // Safe handling for Product aggregates (expiry_date is now on batches, not products)
+  const hasExpiry = medicine.expiry_date && medicine.expiry_date !== null;
+  const isExpired = hasExpiry ? new Date(medicine.expiry_date) <= new Date() : false;
+  const daysUntilExpiry = hasExpiry ? Math.ceil(
     (new Date(medicine.expiry_date) - new Date()) / (1000 * 60 * 60 * 24)
-  ) : 0;
+  ) : null;
 
   const handleQuantitySubmit = (e) => {
     e.preventDefault();
@@ -185,28 +187,27 @@ const TableRow = ({
   const profitMargin =
     medicine.selling_price > 0 && medicine.cost_price > 0
       ? (
-          ((medicine.selling_price - medicine.cost_price) / medicine.cost_price) *
-          100
-        ).toFixed(1)
+        ((medicine.selling_price - medicine.cost_price) / medicine.cost_price) *
+        100
+      ).toFixed(1)
       : 0;
 
   return (
-    <tr 
-      className="table-row-hover animate-fadeIn" 
-      style={{animationDelay: `${index * 50}ms`}}
+    <tr
+      className="table-row-hover animate-fadeIn"
+      style={{ animationDelay: `${index * 50}ms` }}
     >
       {/* Medicine Details */}
       <td className="px-6 py-4">
         <div className="flex items-start space-x-3">
           <div className="flex-shrink-0">
             <div
-              className={`w-10 h-10 rounded-lg flex items-center justify-center text-white text-sm font-bold ${
-                isExpired
+              className={`w-10 h-10 rounded-lg flex items-center justify-center text-white text-sm font-bold ${isExpired
                   ? "bg-red-500"
                   : stockStatus.status === "low-stock"
-                  ? "bg-yellow-500"
-                  : "bg-blue-500"
-              }`}
+                    ? "bg-yellow-500"
+                    : "bg-blue-500"
+                }`}
             >
               {medicine.name.charAt(0).toUpperCase()}
             </div>
@@ -226,7 +227,7 @@ const TableRow = ({
             </p>
             <div className="flex items-center space-x-2 mt-1">
               <span className="text-xs text-gray-500">
-                Batch: {medicine.batch_number || 'N/A'}
+                {medicine.batch_number ? `Batch: ${medicine.batch_number}` : 'Multi-Batch / Master'}
               </span>
             </div>
           </div>
@@ -239,11 +240,13 @@ const TableRow = ({
           <div className="text-base font-semibold text-gray-900">
             {formatCurrency(medicine.selling_price)}
           </div>
-          <div className="text-sm text-gray-500">
-            Cost: {formatCurrency(medicine.cost_price)}
-          </div>
+          {medicine.cost_price > 0 && (
+            <div className="text-sm text-gray-500">
+              Cost: {formatCurrency(medicine.cost_price)}
+            </div>
+          )}
           <div className="text-xs text-green-600 font-medium">
-            +{profitMargin}% margin
+            {profitMargin > 0 ? `+${profitMargin}% margin` : ''}
           </div>
         </div>
       </td>
@@ -290,23 +293,25 @@ const TableRow = ({
       <td className="px-6 py-4">
         <div className="space-y-1">
           <div className="text-sm text-gray-900">
-            {medicine.expiry_date ? new Date(medicine.expiry_date).toLocaleDateString() : 'N/A'}
+            {/* If no specific expiry (Product Master), show generic text or range if we had it */}
+            {medicine.expiry_date ? new Date(medicine.expiry_date).toLocaleDateString() : 'See Batches'}
           </div>
-          <div
-            className={`text-xs ${
-              isExpired
-                ? "text-red-600"
+          {daysUntilExpiry !== null && (
+            <div
+              className={`text-xs ${isExpired
+                  ? "text-red-600"
+                  : daysUntilExpiry <= 30
+                    ? "text-yellow-600"
+                    : "text-gray-500"
+                }`}
+            >
+              {isExpired
+                ? "Expired"
                 : daysUntilExpiry <= 30
-                ? "text-yellow-600"
-                : "text-gray-500"
-            }`}
-          >
-            {isExpired
-              ? "Expired"
-              : daysUntilExpiry <= 30
-              ? `${daysUntilExpiry} days left`
-              : "Valid"}
-          </div>
+                  ? `${daysUntilExpiry} days left`
+                  : "Valid"}
+            </div>
+          )}
         </div>
       </td>
 
@@ -314,9 +319,9 @@ const TableRow = ({
       <td className="px-6 py-4">
         <div className="text-right">
           <div className="text-sm font-medium text-gray-900">
-            {formatCurrency(safeMultiply(medicine.quantity, medicine.cost_price))}
+            {formatCurrency(safeMultiply(medicine.quantity, medicine.selling_price))}
           </div>
-          <div className="text-xs text-gray-500">Cost value</div>
+          <div className="text-xs text-gray-500">Retail value</div>
         </div>
       </td>
 
@@ -502,11 +507,10 @@ const InventoryTable = ({
                         <button
                           key={i}
                           onClick={() => onPageChange(i)}
-                          className={`pagination-button px-4 py-2 text-sm rounded-lg ${
-                            i === currentPage
+                          className={`pagination-button px-4 py-2 text-sm rounded-lg ${i === currentPage
                               ? "bg-blue-600 text-white border border-blue-600 shadow-lg"
                               : "border border-gray-300 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300"
-                          }`}
+                            }`}
                         >
                           {i}
                         </button>
@@ -518,18 +522,17 @@ const InventoryTable = ({
                       <button
                         key={1}
                         onClick={() => onPageChange(1)}
-                        className={`pagination-button px-4 py-2 text-sm rounded-lg ${
-                          1 === currentPage
+                        className={`pagination-button px-4 py-2 text-sm rounded-lg ${1 === currentPage
                             ? "bg-blue-600 text-white border border-blue-600 shadow-lg"
                             : "border border-gray-300 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300"
-                        }`}
+                          }`}
                       >
                         1
                       </button>
                     );
 
                     let startPage, endPage;
-                    
+
                     if (currentPage <= 3) {
                       // Near the beginning
                       startPage = 2;
@@ -543,7 +546,7 @@ const InventoryTable = ({
                       startPage = currentPage - 1;
                       endPage = currentPage + 1;
                     }
-                    
+
                     // Add ellipsis after first page if needed
                     if (startPage > 2) {
                       pages.push(
@@ -552,24 +555,23 @@ const InventoryTable = ({
                         </span>
                       );
                     }
-                    
+
                     // Add middle pages
                     for (let i = startPage; i <= endPage; i++) {
                       pages.push(
                         <button
                           key={i}
                           onClick={() => onPageChange(i)}
-                          className={`pagination-button px-4 py-2 text-sm rounded-lg ${
-                            i === currentPage
+                          className={`pagination-button px-4 py-2 text-sm rounded-lg ${i === currentPage
                               ? "bg-blue-600 text-white border border-blue-600 shadow-lg"
                               : "border border-gray-300 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300"
-                          }`}
+                            }`}
                         >
                           {i}
                         </button>
                       );
                     }
-                    
+
                     // Add ellipsis before last page if needed
                     if (endPage < totalPages - 1) {
                       pages.push(
@@ -578,18 +580,17 @@ const InventoryTable = ({
                         </span>
                       );
                     }
-                    
+
                     // Always show last page
                     if (totalPages > 1) {
                       pages.push(
                         <button
                           key={totalPages}
                           onClick={() => onPageChange(totalPages)}
-                          className={`pagination-button px-4 py-2 text-sm rounded-lg ${
-                            totalPages === currentPage
+                          className={`pagination-button px-4 py-2 text-sm rounded-lg ${totalPages === currentPage
                               ? "bg-blue-600 text-white border border-blue-600 shadow-lg"
                               : "border border-gray-300 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300"
-                          }`}
+                            }`}
                         >
                           {totalPages}
                         </button>

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect, useMemo } from "react";
 
 const PaymentPanel = ({
   totals,
@@ -7,7 +7,43 @@ const PaymentPanel = ({
   onCompleteOrder,
   onSaveOrder,
   isProcessing,
+  amountReceived,
+  onAmountReceivedChange,
 }) => {
+  // Local state for input (allows typing before parent sync)
+  const [localAmount, setLocalAmount] = useState("");
+
+  // Initialize local amount when totals change
+  useEffect(() => {
+    if (amountReceived !== undefined && amountReceived !== null) {
+      setLocalAmount(String(amountReceived));
+    } else if (totals.grandTotal > 0) {
+      setLocalAmount(String(totals.grandTotal.toFixed(2)));
+    }
+  }, [totals.grandTotal]);
+
+  // Sync with parent when local amount changes
+  useEffect(() => {
+    const parsed = parseFloat(localAmount);
+    if (!isNaN(parsed) && onAmountReceivedChange) {
+      onAmountReceivedChange(parsed);
+    }
+  }, [localAmount]);
+
+  // Calculate change or due
+  const paymentCalc = useMemo(() => {
+    const received = parseFloat(localAmount) || 0;
+    const total = totals.grandTotal || 0;
+
+    if (received >= total) {
+      return { type: 'change', amount: received - total };
+    } else if (received > 0) {
+      return { type: 'due', amount: total - received };
+    } else {
+      return { type: 'due', amount: total };
+    }
+  }, [localAmount, totals.grandTotal]);
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("en-PK", {
       style: "currency",
@@ -16,6 +52,14 @@ const PaymentPanel = ({
     })
       .format(amount)
       .replace("PKR", "Rs.");
+  };
+
+  const handleAmountFocus = (e) => {
+    e.target.select();
+  };
+
+  const handleQuickAmount = (amount) => {
+    setLocalAmount(String(amount));
   };
 
   const paymentMethods = [
@@ -82,12 +126,12 @@ const PaymentPanel = ({
         </h2>
       </div>
 
-      <div className="p-4 space-y-6">
+      <div className="p-4 space-y-4">
         {/* Order Total Display */}
-        <div className="bg-green-50 rounded-lg p-4">
+        <div className="bg-green-50 rounded-lg p-3">
           <div className="text-center">
             <p className="text-sm text-gray-600">Total Amount</p>
-            <p className="text-3xl font-bold text-green-600">
+            <p className="text-2xl font-bold text-green-600">
               {formatCurrency(totals.grandTotal)}
             </p>
             <p className="text-xs text-gray-500 mt-1">
@@ -96,28 +140,90 @@ const PaymentPanel = ({
           </div>
         </div>
 
+        {/* Amount Received Input */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Amount Received
+          </label>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">Rs.</span>
+            <input
+              type="number"
+              value={localAmount}
+              onChange={(e) => setLocalAmount(e.target.value)}
+              onFocus={handleAmountFocus}
+              className="w-full pl-10 pr-4 py-3 text-xl font-bold border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors text-right"
+              placeholder="0.00"
+              min="0"
+              step="0.01"
+            />
+          </div>
+          {/* Quick Amount Buttons */}
+          <div className="flex gap-2 mt-2">
+            <button
+              type="button"
+              onClick={() => handleQuickAmount(totals.grandTotal)}
+              className="flex-1 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+            >
+              Exact
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickAmount(Math.ceil(totals.grandTotal / 100) * 100)}
+              className="flex-1 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+            >
+              Round ↑
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickAmount(0)}
+              className="flex-1 py-1 text-xs bg-orange-100 hover:bg-orange-200 text-orange-700 rounded transition-colors"
+            >
+              Credit
+            </button>
+          </div>
+        </div>
+
+        {/* Change / Due Display */}
+        <div className={`rounded-lg p-3 text-center ${paymentCalc.type === 'change'
+            ? 'bg-blue-50 border border-blue-200'
+            : 'bg-orange-50 border border-orange-200'
+          }`}>
+          <p className={`text-sm font-medium ${paymentCalc.type === 'change' ? 'text-blue-600' : 'text-orange-600'
+            }`}>
+            {paymentCalc.type === 'change' ? '💵 Change to Return' : '⚠️ Amount Due'}
+          </p>
+          <p className={`text-2xl font-bold ${paymentCalc.type === 'change' ? 'text-blue-700' : 'text-orange-700'
+            }`}>
+            {formatCurrency(paymentCalc.amount)}
+          </p>
+          {paymentCalc.type === 'due' && paymentCalc.amount > 0 && (
+            <p className="text-xs text-orange-600 mt-1">
+              Order will be saved as credit/partial payment
+            </p>
+          )}
+        </div>
+
         {/* Payment Method Selection */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
             Payment Method
           </label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2">
             {paymentMethods.map((method) => (
               <button
                 key={method.id}
                 onClick={() => onPaymentMethodChange(method.id)}
-                className={`relative flex flex-col items-center p-3 rounded-lg border-2 transition-colors ${
-                  paymentMethod === method.id
-                    ? "border-blue-500 bg-blue-50 text-blue-700"
-                    : "border-gray-200 hover:border-gray-300 text-gray-700"
-                }`}
+                className={`relative flex flex-col items-center p-2 rounded-lg border-2 transition-colors ${paymentMethod === method.id
+                  ? "border-blue-500 bg-blue-50 text-blue-700"
+                  : "border-gray-200 hover:border-gray-300 text-gray-700"
+                  }`}
               >
                 <div
-                  className={`mb-2 ${
-                    paymentMethod === method.id
-                      ? "text-blue-600"
-                      : "text-gray-400"
-                  }`}
+                  className={`mb-1 ${paymentMethod === method.id
+                    ? "text-blue-600"
+                    : "text-gray-400"
+                    }`}
                 >
                   {method.icon}
                 </div>
@@ -125,7 +231,7 @@ const PaymentPanel = ({
                 {paymentMethod === method.id && (
                   <div className="absolute top-1 right-1">
                     <svg
-                      className="w-4 h-4 text-blue-600"
+                      className="w-3 h-3 text-blue-600"
                       fill="currentColor"
                       viewBox="0 0 20 20"
                     >
@@ -143,12 +249,16 @@ const PaymentPanel = ({
         </div>
 
         {/* Payment Actions */}
-        <div className="space-y-3">
+        <div className="space-y-2">
           {/* Complete Order Button */}
           <button
+            id="complete-order-btn"
             onClick={onCompleteOrder}
             disabled={isProcessing || !paymentMethod || totals.grandTotal <= 0}
-            className="w-full flex items-center justify-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className={`w-full flex items-center justify-center px-6 py-3 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${paymentCalc.type === 'due' && paymentCalc.amount > 0
+                ? 'bg-orange-600 hover:bg-orange-700 focus:ring-orange-500'
+                : 'bg-green-600 hover:bg-green-700 focus:ring-green-500'
+              }`}
           >
             {isProcessing ? (
               <>
@@ -188,7 +298,9 @@ const PaymentPanel = ({
                     d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                   />
                 </svg>
-                Complete Order
+                {paymentCalc.type === 'due' && paymentCalc.amount > 0
+                  ? `Complete (Due: ${formatCurrency(paymentCalc.amount)})`
+                  : 'Complete Order'}
               </>
             )}
           </button>
@@ -218,30 +330,13 @@ const PaymentPanel = ({
           )}
         </div>
 
-        {/* Payment Notes */}
-        <div className="p-3 bg-gray-50 rounded-lg">
-          <div className="flex items-start space-x-2">
-            <svg
-              className="w-4 h-4 text-blue-600 mt-0.5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <div className="text-xs text-gray-600">
-              <p className="font-medium mb-1">Payment Information:</p>
-              <ul className="space-y-1">
-                <li>• Receipt will be generated automatically</li>
-                <li>• Order can be saved as pending for later</li>
-                <li>• All payments are recorded in daily sales</li>
-              </ul>
-            </div>
+        {/* Keyboard Shortcuts Hint */}
+        <div className="p-2 bg-gray-50 rounded-lg">
+          <div className="text-xs text-gray-500 text-center">
+            <span className="font-medium">Shortcuts:</span>{" "}
+            <span className="bg-gray-200 px-1 rounded">F1</span> Cash •{" "}
+            <span className="bg-gray-200 px-1 rounded">F3</span> UPI •{" "}
+            <span className="bg-gray-200 px-1 rounded">F12</span> Complete
           </div>
         </div>
       </div>
@@ -250,3 +345,4 @@ const PaymentPanel = ({
 };
 
 export default PaymentPanel;
+

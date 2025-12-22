@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
+import { useQuery } from "@tanstack/react-query";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import SalesChart from "../components/Admin/SalesChart";
 import { useDashboard } from "../hooks/useDashboard";
 import { useOrderDashboard } from "../hooks/useOrders";
 import { useMedicines } from "../hooks/useMedicines";
 import { formatCurrency, formatPercentage } from "../utils/currency";
+import { ExpiryAlertsWidget } from "../components/Dashboard/AdvancedWidgets";
+import api from "../services/api";
 
 // Modern Enhanced StatCard Component
 const StatCard = ({
@@ -26,21 +29,20 @@ const StatCard = ({
     trend === "up"
       ? "text-emerald-600"
       : trend === "down"
-      ? "text-red-500"
-      : "text-gray-500";
+        ? "text-red-500"
+        : "text-gray-500";
   const trendIcon = trend === "up" ? "📈" : trend === "down" ? "📉" : "📊";
   const trendBg = trend === "up" ? "bg-emerald-50" : trend === "down" ? "bg-red-50" : "bg-gray-50";
 
   return (
     <div
-      className={`group relative bg-white overflow-hidden shadow-sm rounded-2xl border border-gray-100 hover:shadow-xl hover:border-gray-200 transition-all duration-500 transform ${
-        onClick ? "cursor-pointer hover:scale-[1.02] hover:-translate-y-1" : ""
-      }`}
+      className={`group relative bg-white overflow-hidden shadow-sm rounded-2xl border border-gray-100 hover:shadow-xl hover:border-gray-200 transition-all duration-500 transform ${onClick ? "cursor-pointer hover:scale-[1.02] hover:-translate-y-1" : ""
+        }`}
       onClick={onClick}
     >
       {/* Gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-white via-white to-gray-50 opacity-60"></div>
-      
+
       {/* Content */}
       <div className="relative p-6">
         <div className="flex items-start justify-between">
@@ -75,11 +77,11 @@ const StatCard = ({
                 </div>
               </div>
             </div>
-            
+
             {subtitle && (
               <p className="text-sm text-gray-500 mb-3">{subtitle}</p>
             )}
-            
+
             {trend && (
               <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full ${trendBg}`}>
                 <span className="text-lg">{trendIcon}</span>
@@ -90,7 +92,7 @@ const StatCard = ({
               </div>
             )}
           </div>
-          
+
           {/* Mini sparkline */}
           {sparklineData.length > 0 && (
             <div className="w-20 h-12 opacity-30 group-hover:opacity-60 transition-opacity">
@@ -99,7 +101,7 @@ const StatCard = ({
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
-                  points={sparklineData.map((point, index) => 
+                  points={sparklineData.map((point, index) =>
                     `${(index / (sparklineData.length - 1)) * 80},${48 - (point / Math.max(...sparklineData)) * 48}`
                   ).join(' ')}
                   className={trend === 'up' ? 'text-emerald-500' : trend === 'down' ? 'text-red-500' : 'text-gray-400'}
@@ -109,7 +111,7 @@ const StatCard = ({
           )}
         </div>
       </div>
-      
+
       {/* Hover effect border */}
       <div className="absolute inset-0 rounded-2xl border-2 border-transparent group-hover:border-blue-100 transition-colors duration-300"></div>
     </div>
@@ -168,6 +170,16 @@ const AdminDashboard = () => {
     refetch,
   } = useOrderDashboard(range);
 
+  // Fetch Expiry Alerts for dashboard widget
+  const { data: expiryData, isLoading: expiryLoading } = useQuery({
+    queryKey: ['expiry-alerts'],
+    queryFn: async () => {
+      const response = await api.get('/inventory/expiry-report');
+      return response.data.data;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
   // Generate sample sparkline data for demo
   const generateSparklineData = (baseValue, trend) => {
     const data = [];
@@ -221,9 +233,8 @@ const AdminDashboard = () => {
       icon: "💰",
       link: "/orders",
       color: "bg-gradient-to-r from-green-500 to-green-600",
-      stats: `${
-        dashboardOrderData?.data.totalOrders
-      } Orders Today | ${formatCurrency(dashboardOrderData?.data.totalRevenue)} Revenue`,
+      stats: `${dashboardOrderData?.data.totalOrders
+        } Orders Today | ${formatCurrency(dashboardOrderData?.data.totalRevenue)} Revenue`,
     },
 
     {
@@ -278,9 +289,8 @@ const AdminDashboard = () => {
                 </h1>
                 <div className="flex items-center space-x-3 text-sm text-gray-500 mt-1">
                   <div className="flex items-center space-x-1">
-                    <div className={`w-2 h-2 rounded-full ${
-                      refreshing ? 'bg-yellow-400 animate-pulse' : 'bg-green-400'
-                    }`}></div>
+                    <div className={`w-2 h-2 rounded-full ${refreshing ? 'bg-yellow-400 animate-pulse' : 'bg-green-400'
+                      }`}></div>
                     <span>{refreshing ? "Syncing..." : "Live"}</span>
                   </div>
                   <span>•</span>
@@ -298,11 +308,10 @@ const AdminDashboard = () => {
                   <button
                     key={timeframe}
                     onClick={() => setSelectedTimeframe(timeframe)}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-                      selectedTimeframe === timeframe
-                        ? 'bg-white text-blue-600 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
+                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${selectedTimeframe === timeframe
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                      }`}
                   >
                     {timeframe === 'today' ? 'Today' : timeframe === '7days' ? '7 Days' : '30 Days'}
                   </button>
@@ -312,15 +321,13 @@ const AdminDashboard = () => {
               {/* Auto-refresh Toggle */}
               <button
                 onClick={() => setAutoRefresh(!autoRefresh)}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
-                  autoRefresh
-                    ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${autoRefresh
+                  ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
               >
-                <div className={`w-2 h-2 rounded-full ${
-                  autoRefresh ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'
-                }`}></div>
+                <div className={`w-2 h-2 rounded-full ${autoRefresh ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'
+                  }`}></div>
                 <span>Auto-sync</span>
               </button>
 
@@ -331,9 +338,8 @@ const AdminDashboard = () => {
                 className="group p-3 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 disabled:opacity-50"
               >
                 <svg
-                  className={`w-5 h-5 group-hover:scale-110 transition-transform ${
-                    refreshing ? "animate-spin" : ""
-                  }`}
+                  className={`w-5 h-5 group-hover:scale-110 transition-transform ${refreshing ? "animate-spin" : ""
+                    }`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -358,10 +364,10 @@ const AdminDashboard = () => {
           <div className="absolute inset-0 opacity-10">
             <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent"></div>
             <svg className="absolute right-0 top-0 h-full w-1/3" viewBox="0 0 100 100" preserveAspectRatio="none">
-              <polygon fill="white" fillOpacity="0.1" points="50,0 100,0 100,100"/>
+              <polygon fill="white" fillOpacity="0.1" points="50,0 100,0 100,100" />
             </svg>
           </div>
-          
+
           <div className="relative flex items-center justify-between">
             <div className="flex-1">
               <div className="flex items-center space-x-3 mb-4">
@@ -377,7 +383,7 @@ const AdminDashboard = () => {
                   </p>
                 </div>
               </div>
-              
+
               {/* Quick Stats Row */}
               <div className="flex items-center space-x-8 mt-6">
                 <div className="flex items-center space-x-2">
@@ -390,7 +396,7 @@ const AdminDashboard = () => {
                 </div>
               </div>
             </div>
-            
+
             {/* Revenue Display */}
             <div className="text-right">
               <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
@@ -438,7 +444,7 @@ const AdminDashboard = () => {
           />
           <StatCard
             title="Completion Rate"
-            value={`${dashboardOrderData?.data.totalOrders > 0 ? 
+            value={`${dashboardOrderData?.data.totalOrders > 0 ?
               ((dashboardOrderData?.data.completedOrders / dashboardOrderData?.data.totalOrders) * 100).toFixed(1) : 0}%`}
             subtitle={`${dashboardOrderData?.data.completedOrders || 0} of ${dashboardOrderData?.data.totalOrders || 0} completed`}
             icon="✅"
@@ -522,11 +528,10 @@ const AdminDashboard = () => {
                   <button
                     key={period}
                     onClick={() => setSelectedTimeframe(period)}
-                    className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
-                      selectedTimeframe === period
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
-                    }`}
+                    className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${selectedTimeframe === period
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+                      }`}
                   >
                     {period}
                   </button>
@@ -540,7 +545,7 @@ const AdminDashboard = () => {
               </button>
             </div>
           </div>
-          
+
           {/* Chart Container with Enhanced Styling */}
           <div className="relative">
             <div className="absolute top-4 right-4 z-10">
@@ -557,7 +562,7 @@ const AdminDashboard = () => {
             </div>
             <SalesChart data={dashboardOrderData?.data} timeframe={selectedTimeframe} />
           </div>
-          
+
           {/* Quick Stats Below Chart */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6 pt-6 border-t border-gray-100">
             <div className="text-center">
@@ -599,8 +604,8 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        {/* Recent Activities & System Alerts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Recent Activities & System Alerts & Expiry Alerts */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           {/* Enhanced Recent Orders */}
           <div className="bg-white shadow-lg rounded-xl border border-gray-100">
             <div className="px-6 py-4 border-b border-gray-200">
@@ -623,50 +628,48 @@ const AdminDashboard = () => {
               {recentOrders?.length > 0 ? (
                 <div className="space-y-4">
                   {recentOrders.map((activity, index) => (
-                      <div
-                        key={activity.id || index}
-                        className="group flex items-center justify-between p-4 bg-gray-50 hover:bg-blue-50 rounded-xl border border-gray-100 hover:border-blue-200 transition-all duration-200 cursor-pointer"
-                        onClick={() => navigate(`/orders/${activity.id}`)}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-blue-100 group-hover:bg-blue-200 rounded-lg flex items-center justify-center transition-colors">
-                            <span className="text-blue-600 font-semibold text-sm">#{index + 1}</span>
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold text-gray-900 group-hover:text-blue-900">
-                              {activity.description.split(' - ')[0]}
-                            </p>
-                            <div className="flex items-center gap-2 text-xs text-gray-500">
-                              <span>{activity.details?.customer || 'Walk-in Customer'}</span>
-                              <span>•</span>
-                              <span>{format(
-                                new Date(activity.timestamp),
-                                "MMM dd, hh:mm a"
-                              )}</span>
-                            </div>
-                          </div>
+                    <div
+                      key={activity.id || index}
+                      className="group flex items-center justify-between p-4 bg-gray-50 hover:bg-blue-50 rounded-xl border border-gray-100 hover:border-blue-200 transition-all duration-200 cursor-pointer"
+                      onClick={() => navigate(`/orders/${activity.id}`)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-blue-100 group-hover:bg-blue-200 rounded-lg flex items-center justify-center transition-colors">
+                          <span className="text-blue-600 font-semibold text-sm">#{index + 1}</span>
                         </div>
-                        <div className="text-right">
-                          <p className="text-sm font-bold text-green-600 mb-1">
-                            {formatCurrency(activity.details?.amount)}
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900 group-hover:text-blue-900">
+                            {activity.description.split(' - ')[0]}
                           </p>
-                          <span
-                            className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${
-                              activity.details?.status === "completed"
-                                ? "bg-green-100 text-green-800"
-                                : "bg-yellow-100 text-yellow-800"
-                            }`}
-                          >
-                            <div className={`w-1.5 h-1.5 rounded-full ${
-                              activity.details?.status === "completed"
-                                ? "bg-green-500"
-                                : "bg-yellow-500"
-                            }`}></div>
-                            {activity.details?.status || 'pending'}
-                          </span>
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <span>{activity.details?.customer || 'Walk-in Customer'}</span>
+                            <span>•</span>
+                            <span>{format(
+                              new Date(activity.timestamp),
+                              "MMM dd, hh:mm a"
+                            )}</span>
+                          </div>
                         </div>
                       </div>
-                    ))}
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-green-600 mb-1">
+                          {formatCurrency(activity.details?.amount)}
+                        </p>
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${activity.details?.status === "completed"
+                            ? "bg-green-100 text-green-800"
+                            : "bg-yellow-100 text-yellow-800"
+                            }`}
+                        >
+                          <div className={`w-1.5 h-1.5 rounded-full ${activity.details?.status === "completed"
+                            ? "bg-green-500"
+                            : "bg-yellow-500"
+                            }`}></div>
+                          {activity.details?.status || 'pending'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="text-center py-8">
@@ -719,7 +722,7 @@ const AdminDashboard = () => {
                       <p className="text-sm text-red-700 mt-1">
                         {lowStockCount} medicines are running critically low. Immediate restocking required.
                       </p>
-                      <button 
+                      <button
                         onClick={() => navigate("/inventory?filter=low-stock")}
                         className="text-xs text-red-600 hover:text-red-800 font-medium mt-2 flex items-center gap-1"
                       >
@@ -802,7 +805,7 @@ const AdminDashboard = () => {
                 <div className="pt-4 border-t border-gray-100">
                   <h5 className="text-sm font-semibold text-gray-700 mb-3">Quick Actions</h5>
                   <div className="grid grid-cols-2 gap-3">
-                    <button 
+                    <button
                       onClick={() => navigate("/inventory")}
                       className="flex items-center gap-2 p-3 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded-lg transition-all duration-200 text-sm"
                     >
@@ -811,7 +814,7 @@ const AdminDashboard = () => {
                       </svg>
                       <span className="text-gray-700">Check Inventory</span>
                     </button>
-                    <button 
+                    <button
                       onClick={() => window.location.reload()}
                       className="flex items-center gap-2 p-3 bg-gray-50 hover:bg-green-50 border border-gray-200 hover:border-green-200 rounded-lg transition-all duration-200 text-sm"
                     >
@@ -825,6 +828,13 @@ const AdminDashboard = () => {
               </div>
             </div>
           </div>
+
+          {/* Expiry Alerts Widget - Phase 4 */}
+          <ExpiryAlertsWidget
+            data={expiryData}
+            isLoading={expiryLoading}
+            onViewAll={() => navigate('/inventory?filter=expiring')}
+          />
         </div>
 
         {/* Enhanced Performance Analytics & Quick Access */}
@@ -843,7 +853,7 @@ const AdminDashboard = () => {
                 Live Data
               </div>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Revenue Metrics */}
               <div className="space-y-4">
@@ -865,7 +875,7 @@ const AdminDashboard = () => {
                     vs Rs.{((dashboardStats?.monthlyStats?.totalRevenue || 0) * 0.82).toFixed(0)} last month
                   </div>
                 </div>
-                
+
                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-gray-600 text-sm">Avg Order Value</span>
@@ -884,7 +894,7 @@ const AdminDashboard = () => {
                   </div>
                 </div>
               </div>
-              
+
               {/* Order Metrics */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-gray-700 mb-4">Order Metrics</h3>
@@ -905,7 +915,7 @@ const AdminDashboard = () => {
                     {Math.round((dashboardStats?.monthlyStats?.totalOrders || 0) / 30)} orders/day avg
                   </div>
                 </div>
-                
+
                 <div className="bg-gradient-to-r from-orange-50 to-red-50 border border-orange-200 rounded-xl p-4">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-gray-600 text-sm">Growth Rate</span>
@@ -935,7 +945,7 @@ const AdminDashboard = () => {
               </h2>
               <p className="text-gray-600 text-sm">Navigate to key sections</p>
             </div>
-            
+
             <div className="space-y-3">
               <button
                 onClick={() => navigate("/inventory")}
@@ -954,7 +964,7 @@ const AdminDashboard = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </button>
-              
+
               <button
                 onClick={() => navigate("/orders")}
                 className="w-full flex items-center gap-4 p-4 bg-gradient-to-r from-green-50 to-green-100 hover:from-green-100 hover:to-green-200 border border-green-200 rounded-xl transition-all duration-200 group"
@@ -972,7 +982,7 @@ const AdminDashboard = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </button>
-              
+
               <button
                 onClick={() => navigate("/users")}
                 className="w-full flex items-center gap-4 p-4 bg-gradient-to-r from-purple-50 to-purple-100 hover:from-purple-100 hover:to-purple-200 border border-purple-200 rounded-xl transition-all duration-200 group"
@@ -990,7 +1000,7 @@ const AdminDashboard = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </button>
-              
+
               <button
                 onClick={() => navigate("/suppliers")}
                 className="w-full flex items-center gap-4 p-4 bg-gradient-to-r from-orange-50 to-orange-100 hover:from-orange-100 hover:to-orange-200 border border-orange-200 rounded-xl transition-all duration-200 group"
@@ -1009,7 +1019,7 @@ const AdminDashboard = () => {
                 </svg>
               </button>
             </div>
-            
+
             {/* Quick Stats */}
             <div className="mt-6 pt-6 border-t border-gray-100">
               <h4 className="text-sm font-semibold text-gray-700 mb-3">System Health</h4>

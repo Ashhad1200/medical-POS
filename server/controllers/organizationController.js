@@ -1,4 +1,5 @@
 const { query, withTransaction } = require("../config/database");
+const bcrypt = require("bcryptjs");
 
 /**
  * Get all organizations (admin only)
@@ -104,6 +105,7 @@ const getOrganization = async (req, res) => {
 
 /**
  * Create new organization (admin only)
+ * Supports optional auto-generation of users with roles
  */
 const createOrganization = async (req, res) => {
   try {
@@ -130,6 +132,9 @@ const createOrganization = async (req, res) => {
       tax_id,
       currency = "USD",
       timezone = "UTC",
+      access_valid_till,
+      // NEW: User generation config
+      users, // Array: [{ role: "admin", count: 1 }, { role: "counter", count: 4 }]
     } = req.body;
 
     if (!name || !code) {
@@ -138,6 +143,9 @@ const createOrganization = async (req, res) => {
         message: "Name and code are required",
       });
     }
+
+    // Sanitize code for email generation (lowercase, alphanumeric only)
+    const sanitizedCode = code.toLowerCase().replace(/[^a-z0-9]/g, '');
 
     // Check if code already exists
     const existingOrg = await query(
@@ -152,43 +160,122 @@ const createOrganization = async (req, res) => {
       });
     }
 
-    const result = await query(
-      `INSERT INTO organizations 
-       (name, code, description, address, phone, email, website, logo_url,
-        subscription_tier, max_users, billing_email, tax_id, currency, timezone, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, true)
-       RETURNING *`,
-      [
-        name,
-        code,
-        description,
-        address,
-        phone,
-        email,
-        website,
-        logo_url,
-        subscription_tier,
-        max_users,
-        billing_email,
-        tax_id,
-        currency,
-        timezone,
-      ]
-    );
+    // Validate user allocation if provided
+    let totalUsersToCreate = 0;
+    if (users && Array.isArray(users)) {
+      totalUsersToCreate = users.reduce((sum, u) => sum + (u.count || 0), 0);
+
+      if (totalUsersToCreate > max_users) {
+        return res.status(400).json({
+          success: false,
+          message: `Total users (${totalUsersToCreate}) exceeds max_users limit (${max_users})`,
+        });
+      }
+
+      // Check at least one admin
+      const adminCount = users.find(u => u.role === 'admin')?.count || 0;
+      if (adminCount < 1) {
+        return res.status(400).json({
+          success: false,
+          message: "At least one admin user is required",
+        });
+      }
+    }
+
+    // Use transaction for atomicity
+    let organization = null;
+    const createdUsers = []; // Will hold plaintext credentials for download
+
+    await withTransaction(async (client) => {
+      // 1. Create organization
+      const orgResult = await client.query(
+        `INSERT INTO organizations 
+         (name, code, description, address, phone, email, website, logo_url,
+          subscription_tier, max_users, billing_email, tax_id, currency, timezone, 
+          is_active, access_valid_till, current_users)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, true, $15, $16)
+         RETURNING *`,
+        [
+          name,
+          code,
+          description,
+          address,
+          phone,
+          email,
+          website,
+          logo_url,
+          subscription_tier,
+          max_users,
+          billing_email,
+          tax_id,
+          currency,
+          timezone,
+          access_valid_till || null,
+          totalUsersToCreate,
+        ]
+      );
+
+      organization = orgResult.rows[0];
+
+      // 2. Auto-generate users if specified
+      if (users && Array.isArray(users) && users.length > 0) {
+        for (const userConfig of users) {
+          const { role, count } = userConfig;
+          if (!role || !count || count <= 0) continue;
+
+          for (let i = 1; i <= count; i++) {
+            // Generate credentials
+            const username = `${role}${i}_${sanitizedCode}`;
+            const userEmail = `${role}${i}@${sanitizedCode}.local`;
+            const plainPassword = `${role.charAt(0).toUpperCase() + role.slice(1)}@123`;
+            const hashedPassword = await bcrypt.hash(plainPassword, 10);
+
+            // Insert user
+            const userResult = await client.query(
+              `INSERT INTO users 
+               (username, email, password_hash, role_in_pos, organization_id, is_active, access_valid_till)
+               VALUES ($1, $2, $3, $4, $5, true, $6)
+               RETURNING id, username, email, role_in_pos`,
+              [
+                username,
+                userEmail,
+                hashedPassword,
+                role,
+                organization.id,
+                access_valid_till || null,
+              ]
+            );
+
+            // Store plaintext credentials for response (NOT stored in DB)
+            createdUsers.push({
+              id: userResult.rows[0].id,
+              username,
+              email: userEmail,
+              role,
+              password: plainPassword, // Plaintext for download only
+            });
+          }
+        }
+      }
+    });
 
     res.status(201).json({
       success: true,
-      data: result.rows[0],
-      message: "Organization created successfully",
+      data: {
+        organization,
+        createdUsers, // Includes plaintext passwords for credentials download
+      },
+      message: `Organization created successfully with ${createdUsers.length} users`,
     });
   } catch (error) {
     console.error("Error creating organization:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to create organization",
+      message: "Failed to create organization: " + error.message,
     });
   }
 };
+
 
 /**
  * Update organization (admin only)

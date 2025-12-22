@@ -12,6 +12,9 @@ const {
   getDashboardData,
   getOrderPdf,
   getSalesChartData,
+  getDuedOrders,
+  getCustomersWithDues,
+  payDue,
 } = require("../controllers/orderController");
 
 // Middleware to validate order ID (UUID format for Supabase)
@@ -40,6 +43,13 @@ router.get("/dashboard", adminOnly, getDashboardData);
 // Get sales chart data (admin only)
 router.get("/sales-chart", adminOnly, getSalesChartData);
 
+// === NEW: Due Orders Management ===
+// Get all orders with outstanding dues (admin/counter)
+router.get("/dued", adminOrCounter, getDuedOrders);
+
+// Get customers with dues grouped (admin/counter)
+router.get("/customers-with-dues", adminOrCounter, getCustomersWithDues);
+
 // Get all orders (admin or counter)
 router.get("/", adminOrCounter, getAllOrders);
 
@@ -57,4 +67,8 @@ router.get(
 // Create order (counter and admin)
 router.post("/", adminOrCounter, createOrder);
 
+// === NEW: Pay due on an order ===
+router.patch("/:id/pay-due", adminOrCounter, validateOrderId, payDue);
+
 module.exports = router;
+

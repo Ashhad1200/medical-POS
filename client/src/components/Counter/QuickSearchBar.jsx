@@ -1,7 +1,9 @@
 import React, { useRef, useEffect } from "react";
 
-const QuickSearchBar = ({ searchQuery, onSearchChange, isSearching }) => {
-  const searchInputRef = useRef();
+const QuickSearchBar = ({ searchQuery, onSearchChange, isSearching, inputRef }) => {
+  // Use external ref if provided, otherwise use internal
+  const internalRef = useRef();
+  const searchInputRef = inputRef || internalRef;
 
   // Focus search input on mount and keyboard shortcut
   useEffect(() => {
@@ -14,7 +16,12 @@ const QuickSearchBar = ({ searchQuery, onSearchChange, isSearching }) => {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [searchInputRef]);
+
+  // Auto-focus on mount
+  useEffect(() => {
+    searchInputRef.current?.focus();
+  }, [searchInputRef]);
 
   const handleBarcodeSearch = () => {
     // Placeholder for barcode scanning functionality
@@ -66,7 +73,7 @@ const QuickSearchBar = ({ searchQuery, onSearchChange, isSearching }) => {
           <input
             ref={searchInputRef}
             type="text"
-            placeholder="Search medicines by name, manufacturer, or batch number... (Ctrl+K)"
+            placeholder="Search medicine → Enter to add"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-lg"
@@ -75,18 +82,24 @@ const QuickSearchBar = ({ searchQuery, onSearchChange, isSearching }) => {
         </div>
       </div>
 
-      {/* Search Tips */}
+      {/* Quick POS Shortcuts */}
       {searchQuery.length === 0 && (
         <div className="mt-4 flex flex-wrap gap-2">
-          <span className="text-sm text-gray-500">Quick search tips:</span>
-          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-            Medicine name
-          </span>
+          <span className="text-sm text-gray-500">⚡ Quick POS:</span>
           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
-            Manufacturer
+            Enter = Add
+          </span>
+          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+            F1 Cash
           </span>
           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">
-            Batch number
+            F2 Card
+          </span>
+          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-pink-100 text-pink-800">
+            F3 UPI
+          </span>
+          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">
+            F12 Complete
           </span>
         </div>
       )}
@@ -94,7 +107,7 @@ const QuickSearchBar = ({ searchQuery, onSearchChange, isSearching }) => {
       {/* Search Results Count */}
       {searchQuery.length >= 2 && (
         <div className="mt-3 text-sm text-gray-600">
-          {isSearching ? "Searching..." : `Search results will appear below`}
+          {isSearching ? "Searching..." : `Press Enter to add first result`}
         </div>
       )}
     </div>

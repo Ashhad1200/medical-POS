@@ -3,8 +3,13 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const { query } = require("../config/database");
 
-const JWT_SECRET =
-  process.env.JWT_SECRET || "your-secret-key-change-in-production";
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  console.error("FATAL ERROR: JWT_SECRET is not defined in environment variables.");
+  process.exit(1);
+}
+
 const JWT_EXPIRY = process.env.JWT_EXPIRY || "7d";
 
 // Generate unique session token

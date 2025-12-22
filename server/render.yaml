@@ -1,0 +1,35 @@
+services:
+  # POS Backend API Service
+  - type: web
+    name: pos-backend
+    runtime: node
+    region: oregon
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        sync: false
+      - key: POSTGRES_HOST
+        sync: false
+      - key: POSTGRES_PORT
+        value: "5432"
+      - key: POSTGRES_DB
+        sync: false
+      - key: POSTGRES_USER
+        sync: false
+      - key: POSTGRES_PASSWORD
+        sync: false
+      - key: POSTGRES_SSL
+        value: "true"
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: "7d"
+      - key: CLIENT_URL
+        sync: false
+      - key: COMPANY_NAME
+        value: "Medical Store POS"

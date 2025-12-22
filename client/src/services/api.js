@@ -82,6 +82,10 @@ export const medicineServices = {
   update: (id, data) => api.put(`/medicines/${id}`, data),
   delete: (id) => api.delete(`/medicines/${id}`),
   search: (params = {}) => api.get("/medicines/search", { params }),
+  // FEFO-aware search with batch details
+  searchWithBatches: (params = {}) => api.get("/medicines/search", {
+    params: { ...params, includeBatches: 'true' }
+  }),
   getStats: () =>
     api.get("/medicines/stats", {
       headers: {

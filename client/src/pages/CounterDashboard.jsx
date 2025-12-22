@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-hot-toast";
 import { useAuthContext } from "../contexts/AuthContext";
@@ -36,6 +36,9 @@ const CounterDashboard = () => {
     (state) => state.orders
   );
 
+  // Refs for Quick POS
+  const searchInputRef = useRef(null);
+
   // Check if user is counter staff (hide profit info)
   const isCounterStaff = profile?.role_in_pos === "counter";
 
@@ -46,6 +49,11 @@ const CounterDashboard = () => {
   const [showReceipt, setShowReceipt] = useState(false);
   const [lastOrderData, setLastOrderData] = useState(null);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [amountReceived, setAmountReceived] = useState(null); // For partial payments
+
+  // Quick POS Mode State
+  const [quickPOSMode, setQuickPOSMode] = useState(true); // Enabled by default
+  const [autoResetTimer, setAutoResetTimer] = useState(null);
 
   // Quick access medicines (most commonly sold)
   const [quickAccessMedicines] = useState([
@@ -60,6 +68,13 @@ const CounterDashboard = () => {
   // Responsive state
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [showMobileCart, setShowMobileCart] = useState(false);
+
+  // Set default payment method to cash on mount
+  useEffect(() => {
+    if (quickPOSMode && !paymentMethod) {
+      dispatch(setPaymentMethod('cash'));
+    }
+  }, [quickPOSMode, paymentMethod, dispatch]);
 
   // Search with debounce
   useEffect(() => {
@@ -89,6 +104,122 @@ const CounterDashboard = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // Quick-add first search result (Enter key)
+  const handleQuickAdd = useCallback(() => {
+    if (searchResults && searchResults.length > 0) {
+      const firstMedicine = searchResults[0];
+      if (firstMedicine.quantity > 0) {
+        const cartItem = {
+          medicineId: firstMedicine.id,
+          name: firstMedicine.name,
+          unitPrice: firstMedicine.selling_price,
+          cost_price: firstMedicine.cost_price,
+          quantity: 1,
+          discountPercent: 0,
+          available_stock: firstMedicine.quantity,
+          gst_per_unit: firstMedicine.gst_per_unit || 0,
+          manufacturer: firstMedicine.manufacturer,
+          batch_number: firstMedicine.batch_number,
+        };
+        dispatch(addToCart(cartItem));
+        toast.success(`+ ${firstMedicine.name}`);
+        setSearchQuery('');
+        dispatch(clearSearchResults());
+        // Keep focus on search
+        searchInputRef.current?.focus();
+      } else {
+        toast.error('Item out of stock');
+      }
+    }
+  }, [searchResults, dispatch]);
+
+  // Quick complete order
+  const handleQuickComplete = useCallback(async () => {
+    if (cart.length === 0) {
+      toast.error('Cart is empty');
+      return;
+    }
+    // Ensure payment method is set
+    if (!paymentMethod) {
+      dispatch(setPaymentMethod('cash'));
+    }
+    // Call the complete order handler (defined below)
+    // We'll trigger the DOM event for the complete button instead
+    document.getElementById('complete-order-btn')?.click();
+  }, [cart, paymentMethod, dispatch]);
+
+  // Keyboard shortcuts for Quick POS
+  useEffect(() => {
+    if (!quickPOSMode) return;
+
+    const handleKeyDown = (e) => {
+      // Don't handle if typing in input (except for our shortcuts)
+      const isInputFocused = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
+
+      // F-key shortcuts work globally
+      switch (e.key) {
+        case 'F1':
+          e.preventDefault();
+          dispatch(setPaymentMethod('cash'));
+          toast.success('💵 Cash selected', { duration: 1000 });
+          break;
+        case 'F2':
+          e.preventDefault();
+          dispatch(setPaymentMethod('card'));
+          toast.success('💳 Card selected', { duration: 1000 });
+          break;
+        case 'F3':
+          e.preventDefault();
+          dispatch(setPaymentMethod('upi'));
+          toast.success('📱 UPI selected', { duration: 1000 });
+          break;
+        case 'F12':
+          e.preventDefault();
+          handleQuickComplete();
+          break;
+        case 'Escape':
+          if (showReceipt) {
+            setShowReceipt(false);
+            setSearchQuery('');
+            searchInputRef.current?.focus();
+          } else if (searchQuery) {
+            setSearchQuery('');
+            dispatch(clearSearchResults());
+          }
+          break;
+        case 'Enter':
+          if (isInputFocused && searchResults?.length > 0) {
+            e.preventDefault();
+            handleQuickAdd();
+          }
+          break;
+        default:
+          // Ctrl+F = Focus search
+          if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+            e.preventDefault();
+            searchInputRef.current?.focus();
+          }
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [quickPOSMode, dispatch, searchQuery, searchResults, showReceipt, handleQuickAdd, handleQuickComplete]);
+
+  // Auto-reset after order completion (auto-close receipt)
+  useEffect(() => {
+    if (showReceipt && quickPOSMode) {
+      const timer = setTimeout(() => {
+        setShowReceipt(false);
+        setSearchQuery('');
+        searchInputRef.current?.focus();
+      }, 3000); // Auto-close after 3 seconds
+      setAutoResetTimer(timer);
+      return () => clearTimeout(timer);
+    }
+  }, [showReceipt, quickPOSMode]);
+
   // Calculate order totals (hide profit from counter staff)
   const orderTotals = useMemo(() => {
     const subtotal = cart.reduce((total, item) => {
@@ -109,8 +240,8 @@ const CounterDashboard = () => {
         cart.reduce((total, item) => {
           const retailTotal = (item.unitPrice || 0) * (item.quantity || 1);
           const tradeTotal =
-        (item.cost_price || (item.unitPrice || 0) * 0.7) *
-        (item.quantity || 1);
+            (item.cost_price || (item.unitPrice || 0) * 0.7) *
+            (item.quantity || 1);
           const itemDiscount =
             (retailTotal * (item.discountPercent || 0)) / 100;
           const itemGst = (item.gst_per_unit || 0) * (item.quantity || 1);
@@ -275,10 +406,10 @@ const CounterDashboard = () => {
       customer_name: customerInfo.name || '',
       customer_phone: customerInfo.phone || '',
       customer_email: customerInfo.email || '',
-      
+
       // Calculate total GST amount
       tax_amount: cart.reduce((total, item) => total + ((item.gst_per_unit || 0) * (item.quantity || 1)), 0),
-      
+
       // Order totals (flattened)
       total_amount: orderTotals.grandTotal || 0,
       subtotal: cart.reduce((total, item) => {
@@ -290,13 +421,16 @@ const CounterDashboard = () => {
       profit: orderTotals.profit || 0,
       discount: orderTotals.globalDiscount || 0,
       discount_percent: orderTotals.subtotal > 0 ? ((orderTotals.globalDiscount || 0) / orderTotals.subtotal * 100) : 0,
-      
+
       // Payment information
       payment_method: paymentMethod || 'cash',
-      payment_status: 'completed',
+      payment_status: 'completed', // Will be computed by backend based on amount_paid
       status: "completed",
       completed_at: new Date().toISOString(),
-      
+
+      // Partial payment: send amount received
+      amount_paid: amountReceived !== null ? amountReceived : orderTotals.grandTotal,
+
       // Order items
       items: cart.map((item) => {
         const itemSubtotal = item.quantity * item.unitPrice;
@@ -305,7 +439,7 @@ const CounterDashboard = () => {
         const gstAmount = item.gst_per_unit * item.quantity;
         const itemTotal = itemAfterDiscount + gstAmount;
         const itemProfit = (item.unitPrice - (item.cost_price || item.unitPrice * 0.7)) * item.quantity;
-        
+
         return {
           medicine_id: item.medicineId,
           quantity: item.quantity,
@@ -343,6 +477,7 @@ const CounterDashboard = () => {
       dispatch(clearCart());
       setSelectedCustomer(null);
       setDiscountAmount(0);
+      setAmountReceived(null); // Reset amount received
       setActiveTab("search");
       setShowMobileCart(false);
     } catch (error) {
@@ -386,10 +521,10 @@ const CounterDashboard = () => {
       customer_name: customerInfo.name || '',
       customer_phone: customerInfo.phone || '',
       customer_email: customerInfo.email || '',
-      
+
       // Calculate total GST amount
       tax_amount: cart.reduce((total, item) => total + ((item.gst_per_unit || 0) * (item.quantity || 1)), 0),
-      
+
       // Order totals (flattened)
       total_amount: orderTotals.grandTotal || 0,
       subtotal: cart.reduce((total, item) => {
@@ -401,12 +536,12 @@ const CounterDashboard = () => {
       profit: orderTotals.profit || 0,
       discount: orderTotals.globalDiscount || 0,
       discount_percent: orderTotals.subtotal > 0 ? ((orderTotals.globalDiscount || 0) / orderTotals.subtotal * 100) : 0,
-      
+
       // Payment information
       payment_method: paymentMethod || 'pending',
       payment_status: 'pending',
       status: "pending",
-      
+
       // Order items
       items: cart.map((item) => {
         const itemSubtotal = item.quantity * item.unitPrice;
@@ -415,7 +550,7 @@ const CounterDashboard = () => {
         const gstAmount = item.gst_per_unit * item.quantity;
         const itemTotal = itemAfterDiscount + gstAmount;
         const itemProfit = (item.unitPrice - (item.cost_price || item.unitPrice * 0.7)) * item.quantity;
-        
+
         return {
           medicine_id: item.medicineId,
           quantity: item.quantity,
@@ -557,6 +692,8 @@ const CounterDashboard = () => {
             }
             onCompleteOrder={handleCompleteOrder}
             isProcessing={isCreating}
+            amountReceived={amountReceived}
+            onAmountReceivedChange={setAmountReceived}
           />
         </div>
       </div>
@@ -634,6 +771,7 @@ const CounterDashboard = () => {
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
               isSearching={isSearching}
+              inputRef={searchInputRef}
             />
 
             {/* Search Results */}
@@ -683,6 +821,8 @@ const CounterDashboard = () => {
               onCompleteOrder={handleCompleteOrder}
               onSaveOrder={handleSaveOrder}
               isProcessing={isCreating}
+              amountReceived={amountReceived}
+              onAmountReceivedChange={setAmountReceived}
             />
           </div>
         </div>

@@ -27,6 +27,9 @@ import PurchaseOrdersPage from "./pages/PurchaseOrdersPage";
 import Dealers from "./pages/Dealers";
 import SimplifiedOrderPage from "./pages/SimplifiedOrderPage";
 import InventoryPage from "./pages/InventoryPage";
+import RTVSuggestionsPage from "./pages/RTVSuggestionsPage";
+import NewAIDashboard from "./pages/NewAIDashboard";
+import DuedCustomersPage from "./pages/DuedCustomersPage";
 
 // Startup Screen Component
 const StartupScreen = ({ onContinue }) => {
@@ -74,13 +77,12 @@ const StartupScreen = ({ onContinue }) => {
               API Status:
             </span>
             <span
-              className={`px-2 py-1 text-xs rounded-full ${
-                apiStatus === "connected"
-                  ? "bg-green-100 text-green-800"
-                  : apiStatus === "checking"
+              className={`px-2 py-1 text-xs rounded-full ${apiStatus === "connected"
+                ? "bg-green-100 text-green-800"
+                : apiStatus === "checking"
                   ? "bg-yellow-100 text-yellow-800"
                   : "bg-red-100 text-red-800"
-              }`}
+                }`}
             >
               {apiStatus}
             </span>
@@ -178,24 +180,24 @@ const ProtectedRoute = ({ children, requiredRoles = [] }) => {
 // Role-based Dashboard Component
 const RoleDashboard = () => {
   const { profile } = useAuthContext();
-  
+
   // Render CounterDashboard for counter staff, regular Dashboard for others
   if (profile?.role_in_pos === "counter") {
     return <CounterDashboard />;
   }
-  
+
   return <Dashboard />;
 };
 
 // App Routes Component
 const AppRoutes = () => {
-  const { 
-    profile, 
-    isLoading, 
-    initialized, 
-    isAuthenticated, 
-    isAccessValid, 
-    accessExpiredMessage 
+  const {
+    profile,
+    isLoading,
+    initialized,
+    isAuthenticated,
+    isAccessValid,
+    accessExpiredMessage
   } = useAuthContext();
 
   console.log("AppRoutes render:", {
@@ -279,17 +281,41 @@ const AppRoutes = () => {
             }
           >
             <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard" element={<RoleDashboard />} />
-            <Route 
-              path="dashboard/ai-analytics" 
+            <Route path="dashboard" element={<NewAIDashboard />} />
+            <Route
+              path="dashboard/ai-analytics"
               element={
                 <ProtectedRoute requiredRoles={["admin"]}>
                   <AIAnalyticsDashboard />
                 </ProtectedRoute>
-              } 
+              }
+            />
+            <Route
+              path="ai-dashboard"
+              element={
+                <ProtectedRoute requiredRoles={["admin", "manager"]}>
+                  <NewAIDashboard />
+                </ProtectedRoute>
+              }
             />
 
 
+            <Route
+              path="create-order"
+              element={
+                <ProtectedRoute requiredRoles={["admin", "counter"]}>
+                  <CounterDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="dued-customers"
+              element={
+                <ProtectedRoute requiredRoles={["admin", "counter"]}>
+                  <DuedCustomersPage />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="dealers"
               element={
@@ -338,6 +364,14 @@ const AppRoutes = () => {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="rtv-suggestions"
+              element={
+                <ProtectedRoute requiredRoles={["admin", "manager", "warehouse"]}>
+                  <RTVSuggestionsPage />
+                </ProtectedRoute>
+              }
+            />
 
             <Route
               path="users"
@@ -353,7 +387,7 @@ const AppRoutes = () => {
           {/* Catch all route */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
-        
+
         {/* Access Expired Modal - Show when user is authenticated but access is invalid */}
         <AccessExpiredModal
           isOpen={isAuthenticated && isAccessValid === false}

@@ -252,7 +252,8 @@ const getStockMovements = async (req, res) => {
 };
 
 /**
- * Get expiry report
+ * Get expiry report (Phase 2: Batch-aware)
+ * Returns batches that are expired, expiring soon, or expiring within 90 days
  */
 const getExpiryReport = async (req, res) => {
   try {
@@ -260,20 +261,29 @@ const getExpiryReport = async (req, res) => {
 
     const result = await query(
       `SELECT 
-        m.id, m.name, m.batch_number, m.quantity_in_stock, m.expiry_date,
+        b.id as batch_id, 
+        p.id as product_id,
+        p.name, 
+        b.batch_number, 
+        b.quantity, 
+        b.expiry_date,
+        b.selling_price,
         CASE 
-          WHEN m.expiry_date <= CURRENT_DATE THEN 'expired'
-          WHEN m.expiry_date <= CURRENT_DATE + INTERVAL '30 days' THEN 'expiring_soon'
+          WHEN b.expiry_date <= CURRENT_DATE THEN 'expired'
+          WHEN b.expiry_date <= CURRENT_DATE + INTERVAL '7 days' THEN 'critical'
+          WHEN b.expiry_date <= CURRENT_DATE + INTERVAL '30 days' THEN 'expiring_soon'
           ELSE 'valid'
         END as status
-       FROM medicines m
-       WHERE m.organization_id = $1 AND m.is_active = true
-       AND m.expiry_date <= CURRENT_DATE + INTERVAL '90 days'
-       ORDER BY m.expiry_date ASC`,
+       FROM inventory_batches b
+       JOIN products p ON b.product_id = p.id
+       WHERE b.organization_id = $1 AND b.is_active = true
+       AND b.expiry_date <= CURRENT_DATE + INTERVAL '90 days'
+       ORDER BY b.expiry_date ASC`,
       [organizationId]
     );
 
     const expired = result.rows.filter(m => m.status === 'expired');
+    const critical = result.rows.filter(m => m.status === 'critical');
     const expiringSoon = result.rows.filter(m => m.status === 'expiring_soon');
     const valid = result.rows.filter(m => m.status === 'valid');
 
@@ -281,10 +291,12 @@ const getExpiryReport = async (req, res) => {
       success: true,
       data: {
         expired,
+        critical, // NEW: Expiring within 7 days
         expiringSoon,
         valid,
         summary: {
           expiredCount: expired.length,
+          criticalCount: critical.length,
           expiringSoonCount: expiringSoon.length,
           validCount: valid.length,
         },
