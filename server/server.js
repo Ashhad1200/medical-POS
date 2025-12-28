@@ -129,6 +129,11 @@ const corsOptions = {
       return callback(null, true);
     }
 
+    // Allow Heroku domains
+    if (/^https:\/\/.*\.herokuapp\.com$/.test(origin)) {
+      return callback(null, true);
+    }
+
     // For development, allow localhost with any port
     if (/^http:\/\/localhost:\d+$/.test(origin)) {
       return callback(null, true);

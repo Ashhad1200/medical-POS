@@ -15,7 +15,8 @@
     "clean": "rimraf node_modules package-lock.json && npm install",
     "logs": "mkdir -p logs",
     "backup:db": "node scripts/backup.js",
-    "health": "curl -f http://localhost:3001/health || exit 1"
+    "health": "curl -f http://localhost:3001/health || exit 1",
+    "heroku-postbuild": "echo 'Build completed successfully'"
   },
   "dependencies": {
     "axios": "^1.9.0",
@@ -42,6 +43,10 @@
     "jest": "^29.5.0",
     "nodemon": "^2.0.22",
     "supertest": "^6.3.3"
+  },
+  "engines": {
+    "node": ">=18.x",
+    "npm": ">=9.x"
   },
   "jest": {
     "testEnvironment": "node",

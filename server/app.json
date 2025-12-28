@@ -1,0 +1,58 @@
+{
+  "name": "pos-backend",
+  "description": "POS Medical Store Backend API with PostgreSQL",
+  "repository": "https://github.com/yourusername/pos-backend",
+  "keywords": ["nodejs", "express", "postgresql", "pos", "medical-store"],
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ],
+  "addons": [
+    {
+      "plan": "heroku-postgresql:essential-0",
+      "as": "DATABASE"
+    }
+  ],
+  "env": {
+    "NODE_ENV": {
+      "description": "Node environment",
+      "value": "production"
+    },
+    "JWT_SECRET": {
+      "description": "Secret key for JWT token generation",
+      "generator": "secret"
+    },
+    "JWT_EXPIRY": {
+      "description": "JWT token expiry duration",
+      "value": "7d"
+    },
+    "COMPANY_NAME": {
+      "description": "Company name for receipts and reports",
+      "value": "Retailease POS Solution"
+    },
+    "COMPANY_ADDRESS": {
+      "description": "Company address",
+      "value": "123 Medical Street, Healthcare City"
+    },
+    "COMPANY_PHONE": {
+      "description": "Company phone number",
+      "value": "+1234567890"
+    },
+    "COMPANY_EMAIL": {
+      "description": "Company email",
+      "value": "info@medicalstore.com"
+    },
+    "CLIENT_URL": {
+      "description": "Frontend admin panel URL (will be set after frontend deployment)",
+      "value": "https://your-admin-panel.herokuapp.com"
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "stack": "heroku-22"
+}
