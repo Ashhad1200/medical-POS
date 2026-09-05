@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { auth, checkRole } = require("../middleware/auth");
+const { platformAuth } = require("../middleware/platformAuth");
 const {
   getOrganizations,
   getOrganization,
@@ -12,9 +12,8 @@ const {
   resetOrganizationPermissions,
 } = require("../controllers/organizationController");
 
-// All organization routes require authentication and admin role
-router.use(auth);
-router.use(checkRole(["admin"]));
+// Mounted at /api/admin/organizations — cross-tenant, platform operators only.
+router.use(platformAuth);
 
 // Admin organization management routes
 // GET /api/admin/organizations - Get all organizations

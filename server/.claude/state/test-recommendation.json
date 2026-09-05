@@ -1,0 +1,7 @@
+{
+  "timestamp": "2026-09-05T23:20:37Z",
+  "changed_file": "E:/medical-POS/pos/src/routing/app-routing-setup.jsx",
+  "test_command": "npx jest --verbose",
+  "related_test": "",
+  "recommendation": "テストの実行を推奨します"
+}

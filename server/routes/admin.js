@@ -1,11 +1,12 @@
 const express = require("express");
 const router = express.Router();
-const { auth, checkRole } = require("../middleware/auth");
+const { platformAuth } = require("../middleware/platformAuth");
 const { query } = require("../config/database");
 
-// All admin routes require authentication and admin role
-router.use(auth);
-router.use(checkRole(["admin"]));
+// These endpoints are cross-tenant (global stats, all-org user lists) and are
+// therefore restricted to platform operators. Tenant-scoped equivalents live
+// under /api/users and /api/dashboard.
+router.use(platformAuth);
 
 /**
  * GET /api/admin/stats - Get admin dashboard statistics

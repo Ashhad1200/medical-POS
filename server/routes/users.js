@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { auth, checkRole } = require("../middleware/auth");
+const { enforceUserLimit } = require("../middleware/planLimits");
 const {
   getUsers,
   getUser,
@@ -21,7 +22,7 @@ router.get("/", getUsers);
 router.get("/:id", getUser);
 
 // POST /api/users
-router.post("/", createUser);
+router.post("/", enforceUserLimit, createUser);
 
 // PUT /api/users/:id
 router.put("/:id", updateUser);

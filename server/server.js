@@ -29,6 +29,8 @@ const reportRoutes = require("./routes/reports");
 const customerRoutes = require("./routes/customers");
 const securityTestRoutes = require("./routes/security-test");
 const aiAnalyticsRoutes = require("./routes/aiAnalytics");
+const platformRoutes = require("./routes/platform");
+const publicRoutes = require("./routes/public");
 
 const app = express();
 
@@ -195,6 +197,17 @@ const authLimiter = rateLimit({
 });
 app.use("/api/auth/login", authLimiter);
 
+// Signup: strict, IP-based
+const signupLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,
+  message: {
+    success: false,
+    message: "Too many sign-up attempts from this IP. Please try again later.",
+  },
+});
+app.use("/api/public/signup", signupLimiter);
+
 // Apply security middleware
 app.use(removeServerHeaders);
 app.use(addSecurityHeaders);
@@ -238,6 +251,8 @@ app.use("/api/admin/organizations", organizationRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/ai-analytics", aiAnalyticsRoutes);
+app.use("/api/platform", platformRoutes);
+app.use("/api/public", publicRoutes);
 
 // Security test routes (for development/testing only)
 if (process.env.NODE_ENV !== "production") {
