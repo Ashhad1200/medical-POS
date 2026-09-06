@@ -195,6 +195,51 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done (code + tests) · `
 
 ---
 
+## Phase 1f — Custom domains for the storefront  (`PRODUCT_ROADMAP.md` §6a)   `[ ]` not started
+
+**Why:** every store already gets a free subdomain (`<slug>.<platform>`); a pharmacy pointing its own `noorpharmacy.pk` at the store is a standard SaaS feature (Shopify/Webflow) but pulls in DNS, TLS and ownership-verification concerns a subdomain never has. Written as a phase so it's built right the first time.
+
+**Prerequisite (non-negotiable, §6a trust note):** the org's storefront must already be **live on the free subdomain** before the custom-domain UI is offered. A polished custom domain makes an illegitimate medical store look credible — don't hand that to a brand-new unverified tenant on day one.
+
+**Done when:** an eligible pharmacy can add `noorpharmacy.pk` (apex) or `shop.noorpharmacy.pk` (sub) in Storefront Settings, see it move **Pending → Verifying → Active** (or **Failed** with a plain reason), and once Active the consumer store serves on that domain over HTTPS with an auto-issued cert. Suspending or churning the org releases the domain and revokes the cert.
+
+**Build-vs-buy first (§6a):** before any of the below, confirm what the production host of `landing/` offers — Vercel / Netlify / Cloudflare each expose a multi-tenant **Domains API** that does verification + ACME cert issuance for you. If one is in use, 1f-b/1f-d shrink to "call their API + mirror status"; only hand-roll ACME if there is genuinely no host API. **Do not write in-house cert issuance without checking.**
+
+### 1f-a. Schema  (`server/db/migrations/0XX_storefront_domains.sql`, idempotent)
+| # | Task | Tests required |
+|---|---|---|
+| 1f-a.1 | `[ ]` `storefront_domains` (`id`, `organization_id` FK cascade, `domain` **UNIQUE** citext/lower, `kind` (`apex`\|`subdomain`), `status` (`pending`\|`verifying`\|`active`\|`failed`), `verification_token`, `dns_target` (the CNAME/A value we told them to set), `verified_at`, `cert_status` (`none`\|`issuing`\|`issued`\|`failed`), `cert_expires_at`, `last_checked_at`, `failure_reason`, timestamps). One active domain per org is enough for v1 — allow rows in non-active states to be replaced. | migration applies; the `domain` UNIQUE constraint rejects a second org claiming the same host (DB-level, not app-level) |
+| 1f-a.2 | `[ ]` `plans.features.custom_domain` (bool) — on for the paid tiers only, via a migration `UPDATE` like `storefront`. | `requireFeature('custom_domain')` denies a free/basic org |
+
+### 1f-b. Backend — request + verification  (`server/controllers/storefrontDomainController.js`)
+| # | Task | Tests required |
+|---|---|---|
+| 1f-b.1 | `[ ]` `POST /api/storefront/domain` (authed admin/manager, `requireFeature('custom_domain')`) — validates the input host and creates a `pending` row + a fresh `verification_token`, returns the **TXT record** and the **CNAME target (subdomain) / A or ALIAS target (apex)** for the pharmacy to add. Rejects, in order: (a) not a syntactically real registrable domain; (b) the platform's own domain, `localhost`, a raw IP; (c) a host already in `storefront_domains` for another org (relies on the UNIQUE constraint → 409); (d) org suspended or past `access_valid_till`. | each rejection path returns the right status/code; a valid host → 201 `pending` with both DNS records; **cross-org**: org B cannot claim org A's already-active domain |
+| 1f-b.2 | `[ ]` `POST /api/storefront/domain/verify` (or a worker tick) — resolves the TXT token under that exact host; on match → `verifying`, kick cert issuance; on mismatch → stays `pending`, sets `failure_reason`. **No manual override** — no verify, no activation. | token present → `verifying`; token absent/wrong → not advanced, reason set; TXT under a *different* host doesn't count |
+| 1f-b.3 | `[ ]` Cert issuance step (host Domains API call, or ACME) — on success `cert_status='issued'` + `cert_expires_at`, `status='active'`; on failure `cert_status='failed'`, `status='failed'`, reason set. The store is **never** marked `active` before a valid cert. | a stubbed issuer: success path flips to `active`; failure path leaves `status='failed'` and the domain is not served |
+| 1f-b.4 | `[ ]` `GET /api/storefront/domain` — current row + status for the settings screen. `DELETE /api/storefront/domain` — pharmacy removes it (releases the host, revokes/forgets the cert). | GET is org-scoped; DELETE frees the `domain` so another org can now claim it |
+
+### 1f-c. Backend — routing + lifecycle
+| # | Task | Tests required |
+|---|---|---|
+| 1f-c.1 | `[ ]` Public resolution: an incoming request `Host: noorpharmacy.pk` maps to the org's storefront (same view as `/store/<slug>`) **only when** its `storefront_domains` row is `active` and `cert_status='issued'`. Unknown/inactive host → 404, never a half-served page. | active host resolves to the right org's store; a `pending`/`failed` host → 404; a `revoked` org's host → 404 |
+| 1f-c.2 | `[ ]` Suspension / churn cascade — when an org is suspended or its `access_valid_till` passes (reuse the existing suspend path in `platformController`), its custom domain stops resolving and the cert is released; reactivation restores it. | suspend → host 404s + row parked; reactivate → host serves again |
+| 1f-c.3 | `[ ]` Scheduled health re-check (daily) — re-resolve DNS + check `cert_expires_at`; on drift set `status='failed'` + `failure_reason` and flag for the dashboard/email alert. Not a one-time verification. | a row whose DNS no longer resolves is moved to `failed` with a reason; a cert within N days of expiry is flagged |
+
+### 1f-d. Frontend — pharmacy (`pos/`)
+| # | Task | Tests required |
+|---|---|---|
+| 1f-d.1 | `[ ]` Storefront Settings → "Custom domain" panel (only rendered when `hasFeature('custom_domain')` **and** the store is already live on its subdomain): input, the two DNS records to copy, a live **Pending / Verifying / Active / Failed** badge with the failure reason, a "Check now" button, and "Remove domain". | `pos/`: panel hidden without the feature or when store not live; shows the DNS records + status from a mocked API; "Check now" calls verify |
+
+### 1f-e. Legal / ops (not engineering)
+| # | Task | — |
+|---|---|---|
+| 1f-e.1 | `[ ]` ToS clause: the pharmacy owns and is responsible for renewing its own domain; the platform is not a registrar and is not liable for domain disputes, expiry, or transfer. | — |
+
+**Dependencies:** Phase 1 + Phase 1e shipped; the org's store live on its subdomain (prereq above). 1f-a → 1f-b → 1f-c → 1f-d. **Still a Phase 1 add-on** — build only when a real pharmacy asks for their own domain; a free subdomain is enough to launch and sell.
+
+---
+
 ## Phase 0 leftovers  (from 0.7)
 | # | Task | Tests required |
 |---|---|---|
@@ -211,7 +256,7 @@ Listed so nothing is lost; each is blocked by the roadmap itself, not by effort.
 
 | Item | Gate (from `PRODUCT_ROADMAP.md`) |
 |---|---|
-| **§6a Custom domains** for the storefront — DNS TXT verify, CNAME + A/ALIAS, ACME/host-Domains-API TLS, DB uniqueness constraint, `requireFeature` plan gate, daily health re-check, de-provision on suspend/churn. | Phase 1 **add-on** — only once the subdomain store is proven *and* a real pharmacy asks for their own domain. Don't hand-roll ACME (§6a build note). |
+| **§6a Custom domains** — broken out as **Phase 1f** above (schema / verification / routing / lifecycle / pharmacy UI / ToS). | Phase 1 **add-on** — start only once the subdomain store is proven *and* a real pharmacy asks for their own domain. Build-vs-buy check (host Domains API) before any ACME code. |
 | **Phase 2 forward-compat** — store `organizations.org_type` as a role **array** (`["pharmacy"]` / `["supplier"]`) not a scalar. | Was meant to land during Phase 2; cheap now, real rework if left to Phase 5. Safe to do as an isolated migration + read-path shim whenever — **not** the dual-role feature itself. |
 | **4.3 Marketplace opening** — supplier discovery directory, DRAP license capture, ratings, fill-rate guarantees, connection requests from search. | Real two-sided volume on the private network first (§8). |
 | **Phase 5 — Dual-role accounts** (one login = supplier + retail). | "Do not start before Phase 4 complete." Mostly UI if the forward-compat note above is honoured. |
