@@ -15,7 +15,7 @@ const FAQ = () => {
     },
     {
       question: "Do I need to install anything?",
-      answer: "No. Medical POS runs in the browser. Any modern laptop, desktop or tablet at the counter works — just sign in."
+      answer: "No. PharmaFlow runs in the browser. Any modern laptop, desktop or tablet at the counter works — just sign in."
     },
     {
       question: "Can I import my existing product list?",

@@ -39,7 +39,7 @@ export function LoginPage() {
           <div className="flex size-11 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Package className="size-5" />
           </div>
-          <h1 className="text-lg font-semibold text-foreground">Medical POS</h1>
+          <h1 className="text-lg font-semibold text-foreground">PharmaFlow</h1>
           <p className="text-sm text-muted-foreground">Sign in to your store</p>
         </div>
 

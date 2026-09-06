@@ -1,9 +1,9 @@
 export const siteConfig = {
-	name: "Medical POS",
-	url: "https://medical-pos.example.com",
-	ogImage: "https://medical-pos.example.com/og.jpg",
+	name: "PharmaFlow",
+	url: "https://pharmaflow.example.com",
+	ogImage: "https://pharmaflow.example.com/og.jpg",
 	description:
-		"Medical POS — point of sale, batch-aware inventory and analytics for pharmacies and medical stores.",
+		"PharmaFlow — point of sale, batch-aware inventory, supplier ordering and a per-pharmacy online storefront, on one shared data layer.",
 	links: {
 		twitter: "#",
 		github: "#",
@@ -23,5 +23,5 @@ export const apiUrl =
 
 export const appUrls = {
 	// the tenant-facing POS app
-	pos: process.env.NEXT_PUBLIC_POS_URL || "http://localhost:5173",
+	pos: process.env.NEXT_PUBLIC_POS_URL || "http://localhost:5175",
 };

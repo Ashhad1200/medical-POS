@@ -21,6 +21,8 @@ import { cn } from '@/lib/utils';
 import { getPublicPlans, type PublicPlan } from '@/lib/api';
 
 const FEATURE_LABELS: Record<string, string> = {
+  storefront: 'Online storefront & delivery',
+  custom_domain: 'Custom storefront domain',
   ai_analytics: 'AI analytics dashboard',
   purchase_orders: 'Purchase orders & suppliers',
   multi_branch: 'Multiple branches',

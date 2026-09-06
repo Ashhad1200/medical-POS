@@ -20,7 +20,7 @@ const Footer = () => {
   };
 
   const socialLinks = [
-    { icon: Mail, href: 'mailto:support@medical-pos.example.com', label: 'Email' },
+    { icon: Mail, href: 'mailto:support@pharmaflow.example.com', label: 'Email' },
   ];
 
   return (
@@ -92,7 +92,7 @@ const Footer = () => {
 
         <div className="flex flex-col md:flex-row justify-between items-center">
           <p className="text-muted-foreground text-sm">
-            © {new Date().getFullYear()} Medical POS. All rights reserved.
+            © {new Date().getFullYear()} PharmaFlow. All rights reserved.
           </p>
         </div>
       </div>

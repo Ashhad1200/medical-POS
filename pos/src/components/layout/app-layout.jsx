@@ -79,7 +79,7 @@ export function AppLayout() {
             <Package className="size-4" />
           </div>
           <div className="leading-tight">
-            <div className="text-sm font-semibold text-foreground">Medical POS</div>
+            <div className="text-sm font-semibold text-foreground">PharmaFlow</div>
             <div className="text-xs text-muted-foreground truncate">
               {profile?.organization?.name || '—'}
             </div>
@@ -126,7 +126,7 @@ export function AppLayout() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-16 items-center justify-between border-b border-border bg-background px-5">
-          <div className="text-sm font-medium text-foreground lg:hidden">Medical POS</div>
+          <div className="text-sm font-medium text-foreground lg:hidden">PharmaFlow</div>
           <div className="ms-auto flex items-center gap-2">
             <Button
               variant="ghost"

@@ -52,7 +52,7 @@ const Contact = () => {
     {
       icon: Mail,
       title: 'Email',
-      content: 'support@medical-pos.example.com',
+      content: 'support@pharmaflow.example.com',
     },
     {
       icon: Phone,
