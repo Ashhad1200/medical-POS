@@ -106,6 +106,19 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(compression());
 
 // CORS configuration - More permissive for mobile and all deployments
+// Production allowlist comes from env: CORS_ORIGINS (comma-separated exact
+// origins) plus PLATFORM_DOMAIN (allows the apex + any *.<domain> subdomain).
+const ENV_ORIGINS = (process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+const PLATFORM_DOMAIN = (process.env.PLATFORM_DOMAIN || "").toLowerCase().trim();
+const platformOriginRe = PLATFORM_DOMAIN
+  ? new RegExp(
+      `^https://([a-z0-9-]+\\.)*${PLATFORM_DOMAIN.replace(/\./g, "\\.")}$`
+    )
+  : null;
+
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (mobile apps, Postman, etc.)
@@ -114,14 +127,20 @@ const corsOptions = {
     // List of allowed origins
     const allowedOrigins = [
       "http://localhost:5173",
-      "http://localhost:5174", // Added for current Vite dev server
+      "http://localhost:5174",
+      "http://localhost:5175",
       "http://localhost:3000",
-      "https://medical-orpin-mu.vercel.app",
-      "https://medical-osg7l4ms2-syed-ashhads-projects.vercel.app",
+      "http://localhost:3007",
+      ...ENV_ORIGINS,
     ];
 
     // Check if origin is in allowed list
     if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    // apex + any subdomain of the configured platform domain
+    if (platformOriginRe && platformOriginRe.test(origin)) {
       return callback(null, true);
     }
 
@@ -158,17 +177,13 @@ const corsOptions = {
       return callback(null, true);
     }
 
-    // For production, be more restrictive but log the blocked origin
-    console.log(`CORS blocked origin: ${origin}`);
-
-    // TEMPORARY: Allow all origins for debugging (remove after testing)
-    if (process.env.NODE_ENV === "production") {
-      console.log(
-        `⚠️  TEMPORARY: Allowing origin ${origin} for mobile debugging`
-      );
+    // Escape hatch: only when explicitly opted in (never silently in prod).
+    if (process.env.CORS_ALLOW_ALL === "true") {
+      console.warn(`CORS_ALLOW_ALL: permitting ${origin}`);
       return callback(null, true);
     }
 
+    console.log(`CORS blocked origin: ${origin}`);
     callback(new Error("Not allowed by CORS"), false);
   },
   credentials: true,
@@ -185,7 +200,19 @@ const corsOptions = {
   // Only expose essential headers, hide everything else
   exposedHeaders: ["X-Total-Count"],
 };
-app.use(cors(corsOptions));
+// Public storefront/plans/signup endpoints are unauthenticated + rate-limited
+// and are called from pharmacies' own (arbitrary) custom domains — open CORS.
+// Everything else uses the allowlist above.
+app.use(
+  cors((req, cb) =>
+    cb(
+      null,
+      req.path.startsWith("/api/public")
+        ? { origin: true, credentials: false, optionsSuccessStatus: 200 }
+        : corsOptions
+    )
+  )
+);
 
 // Rate limiting (disabled under NODE_ENV=test so the suite isn't throttled)
 const skipRateLimit = () => process.env.NODE_ENV === "test";
