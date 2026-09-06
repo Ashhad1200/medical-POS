@@ -4,12 +4,16 @@ let pool;
 
 // Check if DATABASE_URL exists (Heroku environment)
 if (process.env.DATABASE_URL) {
-  // Use Heroku's DATABASE_URL
+  // Use a full connection string (Heroku / Railway / Coolify).
+  // Managed Postgres wants SSL; a Coolify-internal DB does not — opt out with
+  // DATABASE_SSL=false or PGSSLMODE=disable.
+  const noSsl =
+    process.env.DATABASE_SSL === "false" ||
+    process.env.PGSSLMODE === "disable" ||
+    /[?&]sslmode=disable/.test(process.env.DATABASE_URL);
   pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: {
-      rejectUnauthorized: false,
-    },
+    ssl: noSsl ? false : { rejectUnauthorized: false },
     max: Number(process.env.POSTGRES_POOL_MAX || 10),
     idleTimeoutMillis: Number(process.env.POSTGRES_IDLE_TIMEOUT || 30000),
     connectionTimeoutMillis: Number(
