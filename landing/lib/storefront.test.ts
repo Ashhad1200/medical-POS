@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getStore, placeOrder, getOrderStatus } from './storefront';
+import { getStore, placeOrder, getOrderStatus, storeView } from './storefront';
 
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
@@ -75,6 +75,32 @@ describe('placeOrder', () => {
       res(400, { success: false, message: 'Minimum order is 100' }, false),
     );
     await expect(placeOrder('s', input)).rejects.toThrow(/Minimum order/);
+  });
+});
+
+describe('storeView (customization view-model, 1e-d.2)', () => {
+  const products = [
+    { id: 'a', name: 'A', price: 80, originalPrice: 100, discountPct: 20 },
+    { id: 'b', name: 'B', price: 50 },
+    { id: 'c', name: 'C', price: 30 },
+  ] as never[];
+
+  it('deals = products carrying a discountPct; featured resolves ids to products', () => {
+    const v = storeView({
+      products,
+      banners: [{ headline: 'Hi' }] as never[],
+      featured: ['c', 'missing'],
+    });
+    expect(v.deals.map((p) => p.id)).toEqual(['a']);
+    expect(v.featuredProducts.map((p) => p.id)).toEqual(['c']); // unknown id dropped
+    expect(v.hasCustomization).toBe(true);
+  });
+
+  it('no banners / deals / featured → hasCustomization false (plain layout)', () => {
+    const v = storeView({ products: [{ id: 'b', name: 'B', price: 50 }] as never[] });
+    expect(v.deals).toHaveLength(0);
+    expect(v.featuredProducts).toHaveLength(0);
+    expect(v.hasCustomization).toBe(false);
   });
 });
 

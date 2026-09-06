@@ -8,6 +8,8 @@ export type StoreProduct = {
   category: string | null;
   packSize: string | null;
   price: number;
+  originalPrice?: number;
+  discountPct?: number;
   available: number;
 };
 
@@ -15,6 +17,7 @@ export type Store = {
   slug: string;
   displayName: string;
   logoUrl: string | null;
+  accentColor: string | null;
   theme: Record<string, unknown>;
   deliveryFee: number;
   minOrder: number;
@@ -23,7 +26,43 @@ export type Store = {
   onlineEnabled: boolean;
 };
 
-export type StorePayload = { store: Store; products: StoreProduct[] };
+export type StoreBanner = {
+  headline: string | null;
+  subheadline: string | null;
+  ctaLabel: string | null;
+  ctaHref: string | null;
+  imageUrl: string | null;
+  bgStyle: 'color' | 'gradient' | 'image';
+  bgValue: string | null;
+};
+
+export type StorePayload = {
+  store: Store;
+  products: StoreProduct[];
+  banners: StoreBanner[];
+  featured: string[];
+};
+
+// view-model for the store page: which products are on-deal, the resolved
+// featured list, and whether the pharmacy has customised anything at all.
+export function storeView(payload: {
+  products: StoreProduct[];
+  banners?: StoreBanner[];
+  featured?: string[];
+}) {
+  const banners = payload.banners ?? [];
+  const featured = payload.featured ?? [];
+  const deals = payload.products.filter((p) => p.discountPct);
+  const featuredProducts = featured
+    .map((id) => payload.products.find((p) => p.id === id))
+    .filter((p): p is StoreProduct => Boolean(p));
+  return {
+    banners,
+    deals,
+    featuredProducts,
+    hasCustomization: banners.length > 0 || deals.length > 0 || featuredProducts.length > 0,
+  };
+}
 
 export async function getStore(slug: string): Promise<StorePayload | null> {
   const res = await fetch(`${apiUrl}/public/storefront/${slug}`, {

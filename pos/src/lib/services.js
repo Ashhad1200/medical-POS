@@ -103,6 +103,8 @@ export const storefrontServices = {
   saveSettings: (data) => api.put('/storefront/settings', data),
   getOrders: (params = {}) => api.get('/storefront/orders', { params }),
   updateOrder: (id, data) => api.patch(`/storefront/orders/${id}`, data),
+  getCustomization: () => api.get('/storefront/customization'),
+  saveCustomization: (data) => api.put('/storefront/customization', data),
 };
 
 // --- supplier network (Phase 2 + 3) --------------------------------------

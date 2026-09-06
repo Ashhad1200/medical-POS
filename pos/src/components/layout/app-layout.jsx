@@ -12,6 +12,7 @@ import {
   Moon,
   Package,
   PackageSearch,
+  Palette,
   RotateCcw,
   ShoppingCart,
   ShoppingBag,
@@ -45,6 +46,7 @@ const PHARMACY_NAV = [
   { to: '/connections', label: 'Connections', icon: Link2, roles: ['admin', 'manager'] },
   { to: '/rtv-suggestions', label: 'RTV suggestions', icon: RotateCcw, roles: ['admin', 'manager', 'warehouse'] },
   { to: '/store-settings', label: 'Online store', icon: Store, roles: ['admin', 'manager'], feature: 'storefront' },
+  { to: '/store-customize', label: 'Storefront design', icon: Palette, roles: ['admin', 'manager'], feature: 'storefront' },
   { to: '/users', label: 'Users', icon: Users, roles: ['admin'] },
 ];
 

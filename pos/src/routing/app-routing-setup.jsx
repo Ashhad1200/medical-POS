@@ -16,6 +16,7 @@ import { RtvSuggestionsPage } from '@/pages/rtv-suggestions';
 import { DealersPage } from '@/pages/dealers';
 import { AiAnalyticsPage } from '@/pages/ai-analytics';
 import { StorefrontSettingsPage } from '@/pages/storefront-settings';
+import { StorefrontCustomizePage } from '@/pages/storefront-customize';
 import { StorefrontOrdersPage } from '@/pages/storefront-orders';
 import { SupplierCataloguePage } from '@/pages/supplier/catalogue';
 import { SupplierOrdersPage } from '@/pages/supplier/incoming-orders';
@@ -145,6 +146,14 @@ export function AppRoutingSetup() {
           element={
             <Protected roles={['admin', 'manager']}>
               <StorefrontSettingsPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/store-customize"
+          element={
+            <Protected roles={['admin', 'manager']}>
+              <StorefrontCustomizePage />
             </Protected>
           }
         />

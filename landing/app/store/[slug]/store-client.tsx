@@ -16,14 +16,26 @@ import {
 } from '@/lib/cart';
 import {
   placeOrder,
+  storeView,
   type PaymentInit,
   type PlacedOrder,
   type Store,
+  type StoreBanner,
   type StoreProduct,
 } from '@/lib/storefront';
 
 const money = (n: number) =>
   `Rs ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(n)}`;
+
+function bannerBg(b: StoreBanner): React.CSSProperties {
+  if (b.bgStyle === 'image' && b.bgValue)
+    return { backgroundImage: `url(${b.bgValue})`, backgroundSize: 'cover', backgroundPosition: 'center' };
+  if (b.bgStyle === 'gradient' && b.bgValue) {
+    const [from, to] = b.bgValue.split(',').map((s) => s.trim());
+    return { backgroundImage: `linear-gradient(135deg, ${from}, ${to || from})` };
+  }
+  return { background: b.bgValue || '#0ea5e9' };
+}
 
 const key = (slug: string) => `medpos_cart_${slug}`;
 
@@ -47,11 +59,17 @@ export default function StoreClient({
   slug,
   store,
   products,
+  banners = [],
+  featured = [],
 }: {
   slug: string;
   store: Store;
   products: StoreProduct[];
+  banners?: StoreBanner[];
+  featured?: string[];
 }) {
+  const accent = store.accentColor || undefined;
+  const { deals, featuredProducts } = storeView({ products, banners, featured });
   const [cart, dispatch] = useReducer(cartReducer, emptyCart);
   const [checkout, setCheckout] = useState(false);
   const [form, setForm] = useState({
@@ -139,19 +157,113 @@ export default function StoreClient({
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-10">
+    <div
+      className="mx-auto max-w-6xl px-6 py-10"
+      style={accent ? ({ ['--accent' as string]: accent } as React.CSSProperties) : undefined}
+    >
       <header className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{store.displayName}</h1>
-          <p className="text-sm text-muted-foreground">
-            OTC medicines · delivery {money(store.deliveryFee)}
-            {store.minOrder > 0 ? ` · min order ${money(store.minOrder)}` : ''}
-          </p>
+        <div className="flex items-center gap-3">
+          {store.logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={store.logoUrl} alt={store.displayName} className="h-10 w-auto" />
+          )}
+          <div>
+            <h1 className="text-2xl font-bold">{store.displayName}</h1>
+            <p className="text-sm text-muted-foreground">
+              OTC medicines · delivery {money(store.deliveryFee)}
+              {store.minOrder > 0 ? ` · min order ${money(store.minOrder)}` : ''}
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <ShoppingCart className="size-4" /> {cartCount(cart)}
         </div>
       </header>
+
+      {banners.length > 0 && (
+        <div className="mb-8 flex snap-x gap-4 overflow-x-auto pb-2">
+          {banners.map((b, i) => (
+            <div
+              key={i}
+              className="min-w-[85%] shrink-0 snap-start rounded-xl p-6 text-white sm:min-w-[420px]"
+              style={bannerBg(b)}
+            >
+              {b.headline && <div className="text-lg font-bold">{b.headline}</div>}
+              {b.subheadline && <div className="mt-1 text-sm opacity-90">{b.subheadline}</div>}
+              {b.ctaLabel && b.ctaHref && (
+                <a
+                  href={b.ctaHref}
+                  className="mt-3 inline-block rounded-md bg-white/20 px-3 py-1 text-sm font-medium hover:bg-white/30"
+                >
+                  {b.ctaLabel}
+                </a>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {deals.length > 0 && (
+        <section className="mb-8">
+          <h2 className="mb-3 text-lg font-semibold" style={accent ? { color: accent } : undefined}>
+            Today&apos;s deals
+          </h2>
+          <div className="flex gap-3 overflow-x-auto pb-2">
+            {deals.map((p) => (
+              <Card key={p.id} className="min-w-[200px] shrink-0">
+                <CardContent className="p-4">
+                  <div className="truncate font-medium">{p.name}</div>
+                  <div className="mt-1 text-sm">
+                    <span className="font-semibold">{money(p.price)}</span>{' '}
+                    {p.originalPrice != null && (
+                      <span className="text-xs text-muted-foreground line-through">
+                        {money(p.originalPrice)}
+                      </span>
+                    )}
+                    <span className="ml-1 text-xs font-medium text-green-600">
+                      −{p.discountPct}%
+                    </span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="mt-2 w-full"
+                    onClick={() => dispatch({ type: 'add', product: p })}
+                  >
+                    Add
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {featuredProducts.length > 0 && (
+        <section className="mb-8">
+          <h2 className="mb-3 text-lg font-semibold" style={accent ? { color: accent } : undefined}>
+            Featured
+          </h2>
+          <div className="flex gap-3 overflow-x-auto pb-2">
+            {featuredProducts.map((p) => (
+              <Card key={p.id} className="min-w-[200px] shrink-0">
+                <CardContent className="p-4">
+                  <div className="truncate font-medium">{p.name}</div>
+                  <div className="mt-1 text-sm font-semibold">{money(p.price)}</div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="mt-2 w-full"
+                    onClick={() => dispatch({ type: 'add', product: p })}
+                  >
+                    Add
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="grid gap-8 lg:grid-cols-3">
         {/* products */}
@@ -173,6 +285,11 @@ export default function StoreClient({
                       </div>
                       <div className="mt-1 text-sm font-semibold">
                         {money(p.price)}
+                        {p.originalPrice != null && (
+                          <span className="ml-1 text-xs font-normal text-muted-foreground line-through">
+                            {money(p.originalPrice)}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <Button

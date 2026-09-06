@@ -23,6 +23,12 @@ export default async function StorePage({
   if (!data) notFound();
 
   return (
-    <StoreClient slug={slug} store={data.store} products={data.products} />
+    <StoreClient
+      slug={slug}
+      store={data.store}
+      products={data.products}
+      banners={data.banners ?? []}
+      featured={data.featured ?? []}
+    />
   );
 }

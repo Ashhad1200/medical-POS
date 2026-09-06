@@ -42,6 +42,8 @@ export function StorefrontSettingsPage() {
       setF({
         display_name: q.data?.display_name || '',
         slug: q.data?.slug || '',
+        logo_url: q.data?.logo_url || '',
+        accent_color: q.data?.accent_color || '',
         delivery_fee: q.data?.delivery_fee ?? 0,
         min_order: q.data?.min_order ?? 0,
         delivery_radius_km: q.data?.delivery_radius_km ?? '',
@@ -125,6 +127,31 @@ export function StorefrontSettingsPage() {
               {f.slug && (
                 <p className="text-xs text-muted-foreground">/store/{f.slug}</p>
               )}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Logo URL</Label>
+              <Input
+                value={f.logo_url}
+                onChange={(e) => set('logo_url', e.target.value)}
+                placeholder="https://…/logo.png"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Accent colour</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  className="size-9 rounded border border-border bg-transparent"
+                  value={f.accent_color || '#0ea5e9'}
+                  onChange={(e) => set('accent_color', e.target.value)}
+                />
+                <Input
+                  value={f.accent_color}
+                  onChange={(e) => set('accent_color', e.target.value)}
+                  placeholder="#0ea5e9"
+                  className="max-w-[9rem]"
+                />
+              </div>
             </div>
           </CardContent>
         </Card>
