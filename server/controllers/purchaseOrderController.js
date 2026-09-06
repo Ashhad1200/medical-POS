@@ -311,8 +311,11 @@ const deletePurchaseOrder = async (req, res) => {
       [id]
     );
 
-    // Delete purchase order
-    await query("DELETE FROM purchase_orders WHERE id = $1", [id]);
+    // Delete purchase order (re-assert org scope)
+    await query(
+      "DELETE FROM purchase_orders WHERE id = $1 AND organization_id = $2",
+      [id, organizationId]
+    );
 
     res.json({
       success: true,

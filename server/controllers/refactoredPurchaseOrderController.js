@@ -362,7 +362,10 @@ const deletePurchaseOrder = async (req, res) => {
       [id]
     );
 
-    await query("DELETE FROM refactored_purchase_orders WHERE id = $1", [id]);
+    await query(
+      "DELETE FROM refactored_purchase_orders WHERE id = $1 AND organization_id = $2",
+      [id, organizationId]
+    );
 
     res.json({
       success: true,

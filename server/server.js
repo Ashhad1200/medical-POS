@@ -15,6 +15,7 @@ const {
   addSecurityHeaders,
   sanitizeErrors,
 } = require("./middleware/securityHeaders");
+const { requestId, accessLog, logError } = require("./utils/logger");
 
 // Import routes
 const authRoutes = require("./routes/auth");
@@ -271,28 +272,27 @@ app.use(removeServerHeaders);
 app.use(addSecurityHeaders);
 app.use(sanitizeResponse);
 
-// Logging middleware (sanitized in production)
+// Request id + logging. Dev: readable morgan. Prod: one structured JSON line
+// per request (utils/logger), consumable by any log aggregator.
+app.use(requestId);
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 } else {
-  // In production, use combined format but don't log sensitive data
-  app.use(
-    morgan("combined", {
-      skip: (req, res) => {
-        // Skip logging for health checks
-        return req.url === "/health";
-      },
-    })
-  );
+  app.use(accessLog);
 }
 
-// Health check endpoint (minimal information for security)
-app.get("/health", (req, res) => {
-  res.json({
-    success: true,
-    status: "OK",
-    timestamp: new Date().toISOString(),
-  });
+// Health check — deep: verifies the DB is reachable so the container's
+// healthcheck (and Coolify) actually catch a database outage, not just a
+// crashed process. Minimal body for security.
+app.get("/health", async (req, res) => {
+  try {
+    await query("SELECT 1");
+    res.json({ success: true, status: "OK", timestamp: new Date().toISOString() });
+  } catch (e) {
+    res
+      .status(503)
+      .json({ success: false, status: "DEGRADED", timestamp: new Date().toISOString() });
+  }
 });
 
 // API routes
@@ -327,7 +327,7 @@ app.use(sanitizeErrors);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  logError(err, req);
 
   // PostgreSQL specific errors
   if (err.code === "23505") {
