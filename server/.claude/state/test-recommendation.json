@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-09-06T03:52:42Z",
-  "changed_file": "E:/medical-POS/pos/src/pages/supplier-network-p3.test.jsx",
+  "timestamp": "2026-09-06T15:48:56Z",
+  "changed_file": "E:/medical-POS/pos/src/pages/storefront-domain-panel.jsx",
   "test_command": "npx jest --verbose",
   "related_test": "",
   "recommendation": "テストの実行を推奨します"

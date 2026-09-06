@@ -1,6 +1,6 @@
 # Medical POS — Market Analysis & Product Roadmap
 **Two-sided vision: Supplier (distributor) system + Retail (pharmacy) system with per-pharmacy storefront & delivery**
-Last updated: 2026-09-06 (v1.3 — added Phase 5: dual-role accounts) · Owner: Ashhad / BD Matrix
+Last updated: 2026-09-06 (v1.4 — added custom domain SOP for the storefront) · Owner: Ashhad / BD Matrix
 
 ---
 
@@ -136,6 +136,36 @@ No rewrite needed — this extends the current schema and module layout.
 
 ---
 
+## 6a. Custom domains for the storefront — SOP & approval requirements
+
+Every pharmacy's storefront gets a free subdomain by default (`landing/store/[slug]`, e.g. `noor-pharmacy.[platform].com`). Custom domain support (a pharmacy pointing their own `noorpharmacy.pk` at their store) is a **real, standard SaaS feature** — Shopify, Webflow, and most storefront platforms offer exactly this — but it brings in DNS, TLS, and ownership-verification concerns that a subdomain never has to deal with. Written down here so it's built correctly the first time, not bolted on carelessly later.
+
+**How it works, step by step:**
+1. Pharmacy enters their domain (or subdomain, e.g. `shop.noorpharmacy.pk`) in Storefront Settings.
+2. The platform generates two things for them to add at their own domain registrar: a **DNS TXT verification record** (a one-time token, proves they control the domain) and a **CNAME target** for a subdomain, or an **A-record/ALIAS target** for a root/apex domain (CNAMEs aren't valid on a bare root domain — this needs both paths supported, not just one).
+3. The platform polls DNS until both records resolve correctly. Status shown to the pharmacy the whole time: **Pending → Verifying → Active**, or **Failed** with a plain-language reason — never a silent hang. Set the expectation up front that DNS can take anywhere from a few minutes to 48 hours.
+4. Once verified, the platform auto-issues a TLS certificate for the domain (via Let's Encrypt/ACME) and only then starts routing real traffic to it over HTTPS.
+
+**What must be checked before a domain is approved and activated (non-negotiable, in order):**
+1. **Ownership proof first.** The TXT verification token must resolve under that exact domain. No verification, no activation — full stop, no manual override "just this once."
+2. **Uniqueness.** A domain already active on another organization is rejected outright (DB unique constraint, not just a UI warning) — this is what stops one tenant from squatting or accidentally hijacking another's domain.
+3. **Format/safety validation.** Reject the platform's own domain, `localhost`, raw IP addresses, and anything that isn't a syntactically real registrable domain.
+4. **Plan eligibility.** Custom domains should be a paid-tier feature, not available on trial/basic plans — this slots directly into the `plans.features` jsonb + `requireFeature()` pattern that already exists in this codebase (`middleware/planLimits.js`); no new gating mechanism needed.
+5. **Account standing.** An org that's suspended or past `access_valid_till` should not be able to add, or keep active, a custom domain.
+6. **TLS actually issued and passing** before the domain is marked live to customers. Never serve a custom domain over plain HTTP or with a failed/expired certificate — that's worse for trust than not offering the feature at all, especially for a pharmacy where "does this look like a real, safe website" matters.
+7. **Ongoing health check**, not just a one-time verification. Recheck DNS + certificate validity on a schedule (e.g. daily); if a pharmacy's registrar record changes or a cert fails to renew, alert them (dashboard banner + email) — don't let their storefront silently go dark or insecure.
+8. **De-provisioning on suspension or churn.** If an org is suspended or cancels, release the domain mapping and revoke the cert — don't leave it dangling, and don't let a churned tenant's abandoned domain block a future legitimate use of it.
+
+**Trust/sequencing recommendation specific to this being medical commerce:** don't let a brand-new, unverified pharmacy attach a custom domain on day one. A polished-looking custom domain makes an illegitimate storefront look more credible, which cuts against the DRAP-license-capture trust work already planned for Phase 3/4. Require the storefront to be live and running on the default subdomain first, before custom domain becomes available — a small delay that costs nothing and closes an obvious abuse path.
+
+**Legal/ops, not engineering, but real:** the Terms of Service need a line that the pharmacy owns and is responsible for renewing their own domain — the platform is not a registrar and isn't liable for domain disputes, expiry, or transfer issues.
+
+**Build recommendation — don't build DNS/TLS provisioning from scratch.** This is exactly the kind of infrastructure that hosting platforms already solve well: Vercel, Netlify, and Cloudflare all expose a "Domains API" built specifically for multi-tenant SaaS apps to let end-customers attach their own domain, handling verification and certificate issuance for you. Whatever host ends up serving `landing` in production should be checked for this capability before writing custom ACME/cert-issuance code in-house — reinventing that is a lot of ongoing security-sensitive infrastructure work for a feature that doesn't need to be novel.
+
+**Sequencing:** this is meaningfully more scope than the subdomain-based storefront in Phase 1, and Phase 1's actual goal (one pharmacy tenant fully live end-to-end) doesn't need it — a free subdomain is enough to launch and sell. Treat custom domains as a Phase 1 **add-on**, built once the subdomain storefront is proven and there's a real pharmacy asking to use their own domain, not a blocker on Phase 1 shipping.
+
+---
+
 ## 7. Phased roadmap
 
 **Phase 0 — finish what's already in flight (before adding new scope)**
@@ -145,7 +175,7 @@ No rewrite needed — this extends the current schema and module layout.
 **Phase 1 — Retail POS hardening + first storefront (Category B, part 1)**
 - `medicines.is_prescription_required` flag + admin UI to set it.
 - `storefront_settings` + a minimal public store page per pharmacy (`landing/store/[slug]`) listing only OTC items, live-priced from the same `medicines`/`user_inventory` data the counter uses.
-- **Self-serve storefront customization**, so a pharmacy owner never needs a developer to run a promotion: `storefront_banners` (image/gradient, headline, CTA, start/end date, active toggle — a small ordered list, not a full CMS), `storefront_deals` (medicine_id, discount %, start/end date, active toggle — surfaces on a "Today's Deals" carousel), `storefront_featured_products` (a short curated list for the homepage), plus `theme_accent_color` and a logo upload on `storefront_settings`. All of it editable from inside the pharmacy's existing dashboard (a new "Storefront" section, not a separate app). See mockup: [Pharmacy Storefront Customization](https://claude.ai/code/artifact/81874c3c-4826-4913-8980-437152be4464) — shows the owner-side customization panel next to the resulting customer-facing store; DVAGO.pk's layout conventions (deals carousel, category quick-links, themed banners) were used as structural reference, but the visual identity is a distinct, generic white-label template — each tenant supplies its own name, logo, and brand color, never DVAGO's.
+- **Self-serve storefront customization**, so a pharmacy owner never needs a developer to run a promotion: `storefront_banners` (image/gradient, headline, CTA, start/end date, active toggle — a small ordered list, not a full CMS), `storefront_deals` (medicine_id, discount %, start/end date, active toggle — surfaces on a "Today's Deals" carousel), `storefront_featured_products` (a short curated list for the homepage), plus `theme_accent_color` and a logo upload on `storefront_settings`. All of it editable from inside the pharmacy's existing dashboard (a new "Storefront" section, not a separate app). See mockup: [Pharmacy Storefront Customization](https://claude.ai/code/artifact/81874c3c-4826-4913-8980-437152be4464). (Custom domain support for this storefront is specified separately in §6a — treat it as an add-on once this ships, not a Phase 1 requirement.) — shows the owner-side customization panel next to the resulting customer-facing store; DVAGO.pk's layout conventions (deals carousel, category quick-links, themed banners) were used as structural reference, but the visual identity is a distinct, generic white-label template — each tenant supplies its own name, logo, and brand color, never DVAGO's.
 - Cart → checkout → `storefront_orders` (payment: cash-on-delivery / in-store pay to start; add JazzCash/EasyPaisa or card processing once there's real order volume).
 - Manual delivery assignment inside the pharmacy's order dashboard (rider name/phone/status only — no API yet).
 - **Goal:** one pharmacy tenant fully live with a real online store — including running its own banner/deal — end to end, before touching Category A at all.
