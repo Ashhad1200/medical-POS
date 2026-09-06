@@ -14,9 +14,18 @@ import { UsersPage } from '@/pages/users';
 import { OrderDetailPage } from '@/pages/order-detail';
 import { RtvSuggestionsPage } from '@/pages/rtv-suggestions';
 import { DealersPage } from '@/pages/dealers';
+import { AiAnalyticsPage } from '@/pages/ai-analytics';
+import { StorefrontSettingsPage } from '@/pages/storefront-settings';
+import { StorefrontOrdersPage } from '@/pages/storefront-orders';
+import { SupplierCataloguePage } from '@/pages/supplier/catalogue';
+import { SupplierOrdersPage } from '@/pages/supplier/incoming-orders';
+import { SupplierAnalyticsPage } from '@/pages/supplier/analytics';
+import { ConnectionsPage } from '@/pages/connections';
+import { ReorderPage } from '@/pages/reorder';
+import { ReturnsPage } from '@/pages/returns';
 
-function Protected({ roles, children }) {
-  const { ready, isAuthenticated, isAccessValid, role } = useAuth();
+function Protected({ roles, orgTypes, children }) {
+  const { ready, isAuthenticated, isAccessValid, role, orgType } = useAuth();
   if (!ready)
     return (
       <div className="flex h-full items-center justify-center text-muted-foreground">
@@ -25,6 +34,8 @@ function Protected({ roles, children }) {
     );
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (!isAccessValid) return <AccessExpired />;
+  if (orgTypes && !orgTypes.includes(orgType))
+    return <Navigate to="/dashboard" replace />;
   if (roles && roles.length && !roles.includes(role))
     return <Navigate to="/dashboard" replace />;
   return children;
@@ -48,6 +59,14 @@ export function AppRoutingSetup() {
       >
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route
+          path="/ai-analytics"
+          element={
+            <Protected roles={['admin', 'manager']}>
+              <AiAnalyticsPage />
+            </Protected>
+          }
+        />
 
         <Route
           path="/create-order"
@@ -118,6 +137,70 @@ export function AppRoutingSetup() {
           element={
             <Protected roles={STOCK}>
               <RtvSuggestionsPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/store-settings"
+          element={
+            <Protected roles={['admin', 'manager']}>
+              <StorefrontSettingsPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/store-orders"
+          element={
+            <Protected roles={['admin', 'manager', 'counter']}>
+              <StorefrontOrdersPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/connections"
+          element={
+            <Protected roles={['admin', 'manager']}>
+              <ConnectionsPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/reorder"
+          element={
+            <Protected orgTypes={['pharmacy']} roles={STOCK}>
+              <ReorderPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/supplier/catalogue"
+          element={
+            <Protected orgTypes={['supplier']} roles={['admin', 'manager']}>
+              <SupplierCataloguePage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/supplier/orders"
+          element={
+            <Protected orgTypes={['supplier']} roles={['admin', 'manager']}>
+              <SupplierOrdersPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/supplier/analytics"
+          element={
+            <Protected orgTypes={['supplier']} roles={['admin', 'manager']}>
+              <SupplierAnalyticsPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/returns"
+          element={
+            <Protected roles={['admin', 'manager', 'warehouse']}>
+              <ReturnsPage />
             </Protected>
           }
         />

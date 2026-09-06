@@ -9,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Mail, Phone, MapPin } from 'lucide-react';
+import { Mail, Phone } from 'lucide-react';
 import { toast } from "sonner";
 import { CustomBadge } from '@/components/custom/badge';
 import { CustomSubtitle } from '@/components/custom/subtitle';
@@ -52,17 +52,12 @@ const Contact = () => {
     {
       icon: Mail,
       title: 'Email',
-      content: 'hello@kt.com',
+      content: 'support@medical-pos.example.com',
     },
     {
       icon: Phone,
-      title: 'Phone',
-      content: '+1 (555) 123-4567',
-    },
-    {
-      icon: MapPin,
-      title: 'Address',
-      content: '123 Business St, Suite 100\nSan Francisco, CA 94102',
+      title: 'Sales',
+      content: 'Book a walkthrough — mention your store size and branch count.',
     },
   ];
 
@@ -84,8 +79,8 @@ const Contact = () => {
           </CustomTitle>
           
           <CustomSubtitle>
-            Have questions or ready to get started with Metronic ?
-            Send us a message and we&apos;ll respond as soon as possible.
+            Questions about a rollout, multi-branch setup or migrating from
+            another system? Send a message and we&apos;ll get back to you.
           </CustomSubtitle>
         </motion.div>
 
@@ -103,8 +98,8 @@ const Contact = () => {
                 Let&apos;s Start a Conversation
               </h3>
               <p className="text-muted-foreground mb-8">
-                Whether you&apos;re looking to streamline your workflow, boost productivity, 
-                or transform your business operations, we&apos;re here to help you succeed.
+                Tell us about your pharmacy — how many counters, branches and
+                staff — and we&apos;ll help you get set up.
               </p>
             </div>
 

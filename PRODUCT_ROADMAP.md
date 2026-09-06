@@ -1,6 +1,6 @@
 # Medical POS — Market Analysis & Product Roadmap
 **Two-sided vision: Supplier (distributor) system + Retail (pharmacy) system with per-pharmacy storefront & delivery**
-Last updated: 2026-09-05 (v1.1 — added future-version supplier network + testing discipline) · Owner: Ashhad / BD Matrix
+Last updated: 2026-09-06 (v1.3 — added Phase 5: dual-role accounts) · Owner: Ashhad / BD Matrix
 
 ---
 
@@ -86,6 +86,20 @@ Secondary, more tactical USPs that fall out of the research and are worth using 
 
 ---
 
+## 4a. Growth philosophy — retention over extraction
+
+Explicit product principle, not just a nice sentiment — it should actually change pricing and support decisions, not sit in a values statement nobody reads:
+
+**The growth model is happy customers spreading the product, not contract terms trapping them in it.** Concretely, that means:
+- No punitive lock-in: month-to-month should be a genuinely fine way to use this, not a worse tier designed to push people into annual contracts. If the product is good, pharmacies stay because leaving is a downgrade, not because leaving is contractually painful.
+- The pharmacy's *own customers* being happy is a growth input for us, not just for them. This is the direct reason the storefront (§7 Phase 1) is being built with real self-serve customization (banners, deals, featured products — see the update below) rather than a bare product listing: a pharmacy that can run its own "Wellness Week" promotion and make its own customers happy has a reason to tell other pharmacy owners about the platform. A happy pharmacist is the sales channel.
+- Support and reliability get weighted accordingly — the research in §2.1 flags "support disappearance post-sale" as a recurring complaint about incumbent pharmacy software; that's specifically the failure mode this principle is meant to prevent, not a generic aspiration.
+- Practical effect on §5's decisions and on any future pricing work: prefer transparent, simple pricing over hidden fees or aggressive upsells; prefer fixing a bad experience over contractually preventing a customer from leaving over it.
+
+This doesn't mean underpricing the product or avoiding hard business decisions — it means the growth engine this roadmap is betting on is word-of-mouth from genuinely satisfied pharmacy owners, so decisions that would win a customer short-term while making them resentful long-term should be treated as a cost, not a win.
+
+---
+
 ## 5. Decisions locked in for v1 (2026-09-05)
 
 These were decided explicitly to keep scope shippable for a 2-client, early-stage product, and should be treated as binding unless revisited on purpose:
@@ -96,12 +110,15 @@ These were decided explicitly to keep scope shippable for a 2-client, early-stag
 | Storefront scope | **OTC / general medical items only in v1.** No prescription upload, no controlled-substance sales through the storefront. Keeps the first release out of the regulatory grey zone entirely. |
 | Delivery | **Manual/own-rider assignment first.** The pharmacy (or its staff) manually assigns a rider/courier per order inside the app. No courier-API integration in v1 — that's a Phase 4 add-on once order volume justifies it. |
 | Build order | **Retail POS + storefront before the supplier platform.** Builds on the product and clients that already exist; the supplier side is a two-sided cold-start problem that's much easier to solve once there's a base of pharmacy tenants worth selling into. |
+| Storefront customization (added 2026-09-06) | **Self-serve, structurally inspired by DVAGO.pk** (deals carousel, category quick-links, themed banners — see §7 Phase 1 and the mockup linked there) **but a distinct, white-label visual identity per tenant** — own logo, own brand color, own banners/offers. Never DVAGO's actual branding/colors; each pharmacy is clearly its own store, not a reskin of a named competitor. |
 
 ---
 
 ## 6. Architecture, grounded in the existing repo
 
 No rewrite needed — this extends the current schema and module layout.
+
+**For the avoidance of doubt:** the public storefront, cart, and checkout are a **Category B (retail medical store) feature only.** Category A (supplier) tenants get a portal — catalog, pricing, incoming-order queue, fulfillment — and nothing consumer-facing. A supplier never gets a public storefront or a cart; only the medical store selling to end consumers does.
 
 **Schema additions (new migrations under `server/db/migrations/`, which currently doesn't exist as a real directory — see Gotchas in `CLAUDE.md` — this is the moment to actually start it properly):**
 - `organizations.org_type` (`pharmacy` | `supplier`) — the only structural change needed to let a supplier become a first-class tenant instead of a contact record.
@@ -128,12 +145,14 @@ No rewrite needed — this extends the current schema and module layout.
 **Phase 1 — Retail POS hardening + first storefront (Category B, part 1)**
 - `medicines.is_prescription_required` flag + admin UI to set it.
 - `storefront_settings` + a minimal public store page per pharmacy (`landing/store/[slug]`) listing only OTC items, live-priced from the same `medicines`/`user_inventory` data the counter uses.
+- **Self-serve storefront customization**, so a pharmacy owner never needs a developer to run a promotion: `storefront_banners` (image/gradient, headline, CTA, start/end date, active toggle — a small ordered list, not a full CMS), `storefront_deals` (medicine_id, discount %, start/end date, active toggle — surfaces on a "Today's Deals" carousel), `storefront_featured_products` (a short curated list for the homepage), plus `theme_accent_color` and a logo upload on `storefront_settings`. All of it editable from inside the pharmacy's existing dashboard (a new "Storefront" section, not a separate app). See mockup: [Pharmacy Storefront Customization](https://claude.ai/code/artifact/81874c3c-4826-4913-8980-437152be4464) — shows the owner-side customization panel next to the resulting customer-facing store; DVAGO.pk's layout conventions (deals carousel, category quick-links, themed banners) were used as structural reference, but the visual identity is a distinct, generic white-label template — each tenant supplies its own name, logo, and brand color, never DVAGO's.
 - Cart → checkout → `storefront_orders` (payment: cash-on-delivery / in-store pay to start; add JazzCash/EasyPaisa or card processing once there's real order volume).
 - Manual delivery assignment inside the pharmacy's order dashboard (rider name/phone/status only — no API yet).
-- **Goal:** one pharmacy tenant fully live with a real online store, end to end, before touching Category A at all.
+- **Goal:** one pharmacy tenant fully live with a real online store — including running its own banner/deal — end to end, before touching Category A at all.
 
 **Phase 2 — B2B reorder, private network (Category A, part 1)**
 - `organizations.org_type = supplier`, `supplier_connections` table, supplier-side login/portal (catalog + incoming-order queue) inside `pos/` under a supplier role.
+- **Forward-compatibility note (for Phase 5, don't build yet):** store `organizations.org_type` as a small list/array of roles (e.g. `["pharmacy"]` or `["supplier"]`) rather than a single fixed value. Costs almost nothing to do now, while this table is first being built; avoids a rework across Phases 2–4 later if dual-role accounts (Phase 5) turn out to be needed. Don't build the dual-role feature itself now — just don't paint the schema into a corner.
 - Pharmacy-side reorder screen: browse a connected supplier's live catalog/pricing, cart-style order that writes into `purchase_orders`.
 - Low-stock alerts (already exist) get a "reorder from [supplier]" action wired to this screen.
 - Credit terms via `organization_ledger`.
@@ -148,6 +167,20 @@ No rewrite needed — this extends the current schema and module layout.
 - Pluggable courier API layer (PostEx/Bykea/Trax for Pakistan; Shipday/Onfleet/Uber Direct elsewhere) behind the existing `storefront_orders` status field.
 - Online payment methods beyond COD.
 - Only once there's enough tenant volume on both sides: revisit opening the supplier network from private to a discoverable marketplace, with the verification/trust tooling that requires (DRAP license capture, ratings, fill-rate guarantees).
+
+**Phase 5 — Dual-role accounts: one login for a business that is both (added 2026-09-06, deliberately last)**
+
+Real case this covers: a business that is simultaneously a supplier/distributor *and* runs its own retail medical store — one login, one account, with access to both the supplier portal (Category A) and the retail POS + storefront (Category B), instead of two separate signups.
+
+**Do not start this before Phase 4 is complete.** It's a real scenario, but narrower than the two core categories — most suppliers are pure wholesalers and most pharmacies are pure retail; a business that's genuinely both is the exception. Building for it before the core two-category product is proven would be solving an edge case ahead of the main case.
+
+Three ways to build it, ranked, when the time actually comes:
+
+1. **One account, two roles (recommended).** A single organization can carry both roles at once (this is exactly what Phase 2's forward-compatibility note above protects) — one login, one dashboard, both the Storefront/POS section and the Supplier Portal section in the same navigation. The closest match to "a single user that [has] both of the panel."
+2. **Linked organizations with a switcher.** Keep two separate org records (a pharmacy org and a supplier org) linked by "owned by the same person," with a workspace switcher, similar to switching Google accounts. No change needed to how `org_type`/roles work elsewhere; more isolated, but the experience is switching rather than one unified view.
+3. **Two unlinked accounts.** No engineering work at all — the same person just signs up twice. Available today. Not what was asked for (it's genuinely two logins), but the cheapest fallback if Phase 5 never gets prioritized.
+
+**Honest cost of doing this last:** close to zero, on the condition that Phase 2's forward-compatibility note above is actually followed. If it is, Phase 5 is mostly UI work (a combined dashboard/nav for orgs with both roles) rather than a data-model change. If it's skipped, Phase 5 starts with an audit of every place in Phases 2–4 that assumed an org is either a supplier or a pharmacy, never both, and fixing each one — real rework, but not a rewrite.
 
 ---
 

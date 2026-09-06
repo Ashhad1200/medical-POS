@@ -1,17 +1,25 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import {
+  BarChart3,
   Boxes,
   ClipboardList,
   CreditCard,
+  Inbox,
   LayoutDashboard,
+  Link2,
   LogOut,
   Moon,
   Package,
+  PackageSearch,
   RotateCcw,
   ShoppingCart,
+  ShoppingBag,
+  Sparkles,
+  Store,
   Sun,
   Truck,
+  Undo2,
   Users,
   Wallet,
 } from 'lucide-react';
@@ -19,25 +27,47 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/auth/auth-context';
 
-// each item lists the roles allowed to see it (empty = everyone)
-const NAV = [
+// each item lists the roles allowed to see it (empty = everyone);
+// `feature` (optional) additionally requires that plan feature flag.
+const PHARMACY_NAV = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: [] },
+  { to: '/ai-analytics', label: 'AI analytics', icon: Sparkles, roles: ['admin', 'manager'] },
   { to: '/create-order', label: 'New order', icon: ShoppingCart, roles: ['admin', 'counter'] },
   { to: '/orders', label: 'Orders', icon: ClipboardList, roles: ['admin', 'manager', 'counter'] },
+  { to: '/store-orders', label: 'Store orders', icon: ShoppingBag, roles: ['admin', 'manager', 'counter'], feature: 'storefront' },
   { to: '/dued-customers', label: 'Dued customers', icon: Wallet, roles: ['admin', 'counter'] },
   { to: '/dealers', label: 'Dealers', icon: CreditCard, roles: ['admin', 'counter'] },
   { to: '/inventory', label: 'Inventory', icon: Boxes, roles: ['admin', 'manager', 'warehouse'] },
   { to: '/purchase-orders', label: 'Purchase orders', icon: Truck, roles: ['admin', 'manager', 'warehouse'] },
+  { to: '/reorder', label: 'Reorder', icon: PackageSearch, roles: ['admin', 'manager', 'warehouse'] },
+  { to: '/returns', label: 'Returns', icon: Undo2, roles: ['admin', 'manager', 'warehouse'] },
   { to: '/suppliers', label: 'Suppliers', icon: Package, roles: ['admin', 'manager', 'warehouse'] },
+  { to: '/connections', label: 'Connections', icon: Link2, roles: ['admin', 'manager'] },
   { to: '/rtv-suggestions', label: 'RTV suggestions', icon: RotateCcw, roles: ['admin', 'manager', 'warehouse'] },
+  { to: '/store-settings', label: 'Online store', icon: Store, roles: ['admin', 'manager'], feature: 'storefront' },
+  { to: '/users', label: 'Users', icon: Users, roles: ['admin'] },
+];
+
+const SUPPLIER_NAV = [
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: [] },
+  { to: '/supplier/analytics', label: 'Analytics', icon: BarChart3, roles: ['admin', 'manager'] },
+  { to: '/supplier/catalogue', label: 'Catalogue', icon: Boxes, roles: ['admin', 'manager'] },
+  { to: '/supplier/orders', label: 'Incoming orders', icon: Inbox, roles: ['admin', 'manager'] },
+  { to: '/returns', label: 'Returns', icon: Undo2, roles: ['admin', 'manager'] },
+  { to: '/connections', label: 'Connections', icon: Link2, roles: ['admin', 'manager'] },
   { to: '/users', label: 'Users', icon: Users, roles: ['admin'] },
 ];
 
 export function AppLayout() {
-  const { profile, role, logout } = useAuth();
+  const { profile, role, orgType, logout, hasFeature } = useAuth();
   const { resolvedTheme, setTheme } = useTheme();
 
-  const items = NAV.filter((n) => !n.roles.length || n.roles.includes(role));
+  const nav = orgType === 'supplier' ? SUPPLIER_NAV : PHARMACY_NAV;
+  const items = nav.filter(
+    (n) =>
+      (!n.roles.length || n.roles.includes(role)) &&
+      (!n.feature || hasFeature(n.feature)),
+  );
 
   return (
     <div className="flex h-full w-full">

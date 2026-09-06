@@ -11,7 +11,7 @@ import { authServices } from '@/lib/services';
 
 const AuthContext = createContext(null);
 
-function accessValidity(profile) {
+export function accessValidity(profile) {
   if (profile?.organization_is_active === false) {
     return { valid: false, message: 'Your organization has been deactivated.' };
   }
@@ -80,11 +80,16 @@ export function AuthProvider({ children }) {
 
   const value = useMemo(() => {
     const access = accessValidity(profile);
+    const features = profile?.planFeatures || {};
     return {
       profile,
       ready,
       isAuthenticated: !!profile,
       role: profile?.role_in_pos || null,
+      orgType: profile?.orgType || 'pharmacy',
+      plan: profile?.plan || null,
+      planFeatures: features,
+      hasFeature: (key) => features[key] === true,
       isAccessValid: profile ? access.valid : true,
       accessMessage: access.message,
       login,

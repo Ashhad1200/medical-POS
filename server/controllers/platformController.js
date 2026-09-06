@@ -354,12 +354,15 @@ const createOrganization = async (req, res) => {
       email,
       phone,
       planCode = "basic",
+      orgType = "pharmacy",
       admin = {},
       trialDays,
     } = req.body || {};
 
     if (!name || !code)
       return fail(res, 400, "Organization name and code are required", "VALIDATION_ERROR");
+    if (!["pharmacy", "supplier"].includes(orgType))
+      return fail(res, 400, "orgType must be 'pharmacy' or 'supplier'", "VALIDATION_ERROR");
     if (!admin.email || !admin.password || !admin.username)
       return fail(
         res,
@@ -382,8 +385,9 @@ const createOrganization = async (req, res) => {
       const orgResult = await client.query(
         `INSERT INTO organizations
            (name, code, email, phone, plan_id, plan_status, plan_started_at,
-            plan_current_period_end, access_valid_till, subscription_tier, max_users, is_active)
-         VALUES ($1,$2,$3,$4,$5,$6, now(), $7, $7, $8, $9, true)
+            plan_current_period_end, access_valid_till, subscription_tier, max_users,
+            org_type, is_active)
+         VALUES ($1,$2,$3,$4,$5,$6, now(), $7, $7, $8, $9, $10, true)
          RETURNING *`,
         [
           name,
@@ -395,6 +399,7 @@ const createOrganization = async (req, res) => {
           accessValidTill,
           planRow.code,
           planRow.max_users,
+          orgType,
         ]
       );
       const org = orgResult.rows[0];

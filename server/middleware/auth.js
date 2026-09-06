@@ -29,7 +29,7 @@ const auth = async (req, res, next) => {
 
     // Get user profile from database with organization data
     const result = await query(
-      `SELECT u.*, o.id as org_id, o.name as org_name, o.access_valid_till, o.is_active as org_is_active
+      `SELECT u.*, o.id as org_id, o.name as org_name, o.access_valid_till, o.is_active as org_is_active, o.org_type
        FROM users u
        LEFT JOIN organizations o ON u.organization_id = o.id
        WHERE u.id = $1`,
@@ -93,6 +93,7 @@ const auth = async (req, res, next) => {
       role: profile.role,
       role_in_pos: profile.role_in_pos,
       organization_id: profile.organization_id,
+      org_type: profile.org_type || "pharmacy",
       permissions: profile.permissions,
       is_active: profile.is_active,
       organization: {
@@ -132,6 +133,24 @@ const checkRole = (roles) => {
   };
 };
 
+// Gate a route by the caller's organization type (pharmacy | supplier).
+const requireOrgType = (type) => (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ success: false, message: "Authentication required" });
+  }
+  if ((req.user.org_type || "pharmacy") !== type) {
+    return res.status(403).json({
+      success: false,
+      message: `This area is for ${type} accounts only`,
+      code: "WRONG_ORG_TYPE",
+    });
+  }
+  next();
+};
+
+const requireSupplierOrg = requireOrgType("supplier");
+const requirePharmacyOrg = requireOrgType("pharmacy");
+
 // Optional middleware - doesn't fail if no token
 const optionalAuth = async (req, res, next) => {
   try {
@@ -142,7 +161,7 @@ const optionalAuth = async (req, res, next) => {
         const decoded = jwt.verify(token, JWT_SECRET);
 
         const result = await query(
-          `SELECT u.*, o.id as org_id, o.name as org_name, o.access_valid_till, o.is_active as org_is_active
+          `SELECT u.*, o.id as org_id, o.name as org_name, o.access_valid_till, o.is_active as org_is_active, o.org_type
            FROM users u
            LEFT JOIN organizations o ON u.organization_id = o.id
            WHERE u.id = $1`,
@@ -170,6 +189,7 @@ const optionalAuth = async (req, res, next) => {
               role: profile.role,
               role_in_pos: profile.role_in_pos,
               organization_id: profile.organization_id,
+      org_type: profile.org_type || "pharmacy",
               permissions: profile.permissions,
               is_active: profile.is_active,
               organization: {
@@ -194,4 +214,11 @@ const optionalAuth = async (req, res, next) => {
   }
 };
 
-module.exports = { auth, checkRole, optionalAuth };
+module.exports = {
+  auth,
+  checkRole,
+  optionalAuth,
+  requireOrgType,
+  requireSupplierOrg,
+  requirePharmacyOrg,
+};

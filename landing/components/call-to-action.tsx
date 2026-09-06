@@ -52,8 +52,8 @@ const CallToAction = () => {
             transition={{ duration: 0.6, delay: 0.3 }}
             viewport={{ once: true }}
           >
-            <Button variant="outline" size="lg" className="font-semibold" onMouseEnter={handleConfetti}>
-              <Link href="#cta">Get started for free</Link>
+            <Button variant="outline" size="lg" className="font-semibold" onMouseEnter={handleConfetti} asChild>
+              <Link href="/signup">Start free trial</Link>
             </Button>
           </motion.div>
         </motion.div>

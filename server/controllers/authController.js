@@ -242,9 +242,12 @@ const register = async (req, res) => {
 const getProfile = async (req, res) => {
   try {
     const result = await query(
-      `SELECT u.*, o.id as org_id, o.name as org_name, o.access_valid_till, o.is_active as org_is_active
+      `SELECT u.*, o.id as org_id, o.name as org_name, o.access_valid_till,
+              o.is_active as org_is_active, o.org_type,
+              p.code as plan_code, p.features as plan_features
        FROM users u
        LEFT JOIN organizations o ON u.organization_id = o.id
+       LEFT JOIN plans p ON p.id = o.plan_id
        WHERE u.id = $1`,
       [req.user.id]
     );
@@ -303,6 +306,9 @@ const getProfile = async (req, res) => {
             access_valid_till: profile.access_valid_till,
             is_active: profile.org_is_active,
           },
+          plan: profile.plan_code || null,
+          planFeatures: profile.plan_features || {},
+          orgType: profile.org_type || "pharmacy",
           organization_access_valid_till: profile.access_valid_till,
           organization_is_active: profile.org_is_active,
         },

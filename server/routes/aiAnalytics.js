@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { auth, checkRole } = require('../middleware/auth');
+const { auth, checkRole, requirePharmacyOrg } = require('../middleware/auth');
 const {
     getAIInsights,
     getAIPredictions,
@@ -10,6 +10,7 @@ const {
 
 // All routes require authentication
 router.use(auth);
+router.use(requirePharmacyOrg);
 
 // AI Insights - Smart recommendations based on DB analysis
 router.get('/insights', checkRole(['admin', 'manager']), getAIInsights);

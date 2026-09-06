@@ -1,3 +1,7 @@
+// Load .env BEFORE anything that reads process.env at import time
+// (config/database.js builds its pg Pool on require).
+require("dotenv").config();
+
 const express = require("express");
 const { query } = require("./config/database");
 const cors = require("cors");
@@ -11,7 +15,6 @@ const {
   addSecurityHeaders,
   sanitizeErrors,
 } = require("./middleware/securityHeaders");
-require("dotenv").config();
 
 // Import routes
 const authRoutes = require("./routes/auth");
@@ -31,6 +34,15 @@ const securityTestRoutes = require("./routes/security-test");
 const aiAnalyticsRoutes = require("./routes/aiAnalytics");
 const platformRoutes = require("./routes/platform");
 const publicRoutes = require("./routes/public");
+const {
+  publicRouter: storefrontPublicRoutes,
+  authedRouter: storefrontRoutes,
+} = require("./routes/storefront");
+const {
+  supplierRouter,
+  connectionsRouter,
+  b2bRouter,
+} = require("./routes/supplierNetwork");
 
 const app = express();
 
@@ -175,10 +187,13 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// Rate limiting
+// Rate limiting (disabled under NODE_ENV=test so the suite isn't throttled)
+const skipRateLimit = () => process.env.NODE_ENV === "test";
+
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
+  skip: skipRateLimit,
   message: {
     success: false,
     message: "Too many requests from this IP, please try again later.",
@@ -190,6 +205,7 @@ app.use("/api/", limiter);
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 1000, // Temporarily increased for testing
+  skip: skipRateLimit,
   message: {
     success: false,
     message: "Too many authentication attempts, please try again later.",
@@ -201,12 +217,25 @@ app.use("/api/auth/login", authLimiter);
 const signupLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 10,
+  skip: skipRateLimit,
   message: {
     success: false,
     message: "Too many sign-up attempts from this IP. Please try again later.",
   },
 });
 app.use("/api/public/signup", signupLimiter);
+
+// Storefront order placement: strict, IP-based
+const storefrontOrderLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  skip: skipRateLimit,
+  message: {
+    success: false,
+    message: "Too many orders from this IP. Please try again shortly.",
+  },
+});
+app.use("/api/public/storefront/:slug/order", storefrontOrderLimiter);
 
 // Apply security middleware
 app.use(removeServerHeaders);
@@ -253,6 +282,11 @@ app.use("/api/customers", customerRoutes);
 app.use("/api/ai-analytics", aiAnalyticsRoutes);
 app.use("/api/platform", platformRoutes);
 app.use("/api/public", publicRoutes);
+app.use("/api/public/storefront", storefrontPublicRoutes);
+app.use("/api/storefront", storefrontRoutes);
+app.use("/api/supplier", supplierRouter);
+app.use("/api/connections", connectionsRouter);
+app.use("/api/b2b", b2bRouter);
 
 // Security test routes (for development/testing only)
 if (process.env.NODE_ENV !== "production") {
@@ -356,4 +390,10 @@ const startServer = async () => {
   }
 };
 
-startServer();
+// Only boot the HTTP listener when run directly (`node server.js`).
+// When required by tests, export the app for supertest instead.
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = app;

@@ -1,10 +1,11 @@
 const express = require("express");
 const router = express.Router();
-const { auth, checkRole } = require("../middleware/auth");
+const { auth, checkRole, requirePharmacyOrg } = require("../middleware/auth");
 const { query } = require("../config/database");
 
 // Protected routes - only admin role
 router.use(auth);
+router.use(requirePharmacyOrg);
 router.use(checkRole(["admin"]));
 
 // GET /api/reports/sales

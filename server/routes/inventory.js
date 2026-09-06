@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { auth, checkRole } = require("../middleware/auth");
+const { auth, checkRole, requirePharmacyOrg } = require("../middleware/auth");
 const {
   getInventorySummary,
   getInventoryAdjustments,
@@ -12,6 +12,7 @@ const {
 
 // Protected routes
 router.use(auth);
+router.use(requirePharmacyOrg);
 
 // GET /api/inventory/stats - Get inventory statistics
 router.get(

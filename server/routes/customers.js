@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { auth, checkRole } = require("../middleware/auth");
+const { auth, checkRole, requirePharmacyOrg } = require("../middleware/auth");
 const {
   searchCustomers,
   getCustomer,

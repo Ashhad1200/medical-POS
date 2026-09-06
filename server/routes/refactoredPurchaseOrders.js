@@ -15,7 +15,7 @@ const {
   generatePurchaseOrderReport,
   applyPurchaseOrder,
 } = require("../controllers/refactoredPurchaseOrderController");
-const { auth, checkRole } = require("../middleware/auth");
+const { auth, checkRole, requirePharmacyOrg } = require("../middleware/auth");
 const {
   validatePurchaseOrderInput,
   validatePurchaseOrderUpdate,
@@ -27,6 +27,7 @@ const { defaultLimiter, reportLimiter } = require("../middleware/rateLimiter");
 
 // Apply authentication to all routes
 router.use(auth);
+router.use(requirePharmacyOrg);
 
 // Apply role-based access control
 router.use(checkRole(["admin", "manager", "warehouse"]));

@@ -4,18 +4,19 @@ import { Card, CardContent } from '@/components/ui/card';
 import { CustomBadge } from '@/components/custom/badge';
 import { CustomTitle } from '@/components/custom/title';
 import { CustomSubtitle } from '@/components/custom/subtitle';
-import { Zap, Shield, BarChart3, Users } from 'lucide-react';
+import { Boxes, ShieldCheck, BarChart3, Truck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const Features = () => {
   const features = [
     {
-      id: 'task-automation',
-      icon: Zap,
-      title: 'Lightning Workflows',
-      description: 'Supercharge your daily operations with automation that not only saves time, but intelligently adapts to your evolving business routines..',
-      stats: '10x faster',
-      metric: 'Speed Increase',
+      id: 'batch-inventory',
+      icon: Boxes,
+      title: 'Batch-aware inventory',
+      description:
+        'Every product tracked by batch and expiry. Sales pick the earliest-expiring stock automatically (FEFO), so you sell before you write off.',
+      stats: 'FEFO',
+      metric: 'Auto stock pick',
       colors: {
         bg: 'bg-blue-100/40 dark:bg-blue-950/40',
         icon: 'text-blue-600',
@@ -26,12 +27,13 @@ const Features = () => {
       }
     },
     {
-      id: 'workflow-optimization',
-      icon: Shield,
-      title: 'Adaptive Safeguards',
-      description: 'Protect your data and streamline processes with real-time AI security, adapting instantly to threats and keeping your operations resilient and confidential.',
-      stats: '99.9%',
-      metric: 'Uptime',
+      id: 'fast-counter',
+      icon: ShieldCheck,
+      title: 'Fast, controlled counter',
+      description:
+        'Type-to-search checkout, partial payments and credit, prescription prompts on Rx items, and role-based access for counter, warehouse and manager staff.',
+      stats: 'Rx',
+      metric: 'Prescription checks',
       colors: {
         bg: 'bg-red-100/40 dark:bg-red-950/40',
         icon: 'text-red-600',
@@ -42,12 +44,13 @@ const Features = () => {
       }
     },
     {
-      id: 'intelligent-scheduling',
-      icon: Users,
-      title: 'Smart Team Sync',
-      description: 'Let AI handle the chaos of calendars and meetings—Smart Team Sync coordinates, schedules, and adapts to your team’s needs, so you can focus on what matters most.',
-      stats: '10k+',
-      metric: 'Active Users',
+      id: 'purchasing',
+      icon: Truck,
+      title: 'Purchasing & suppliers',
+      description:
+        'Raise purchase orders, approve and receive them into batch stock, track supplier terms and credit, and get return-to-vendor suggestions before items expire.',
+      stats: 'RTV',
+      metric: 'Return suggestions',
       colors: {
         bg: 'bg-emerald-100/40 dark:bg-emerald-950/40',
         icon: 'text-emerald-600',
@@ -58,12 +61,13 @@ const Features = () => {
       }
     },
     {
-      id: 'ai-analytics',
+      id: 'analytics',
       icon: BarChart3,
-      title: 'Predictive Insights',
-      description: 'Reveal hidden trends and forecast outcomes with analytics that learn from your unique data, giving you a competitive edge and actionable clarity.',
-      stats: '25%',
-      metric: 'Growth Boost',
+      title: 'Sales & margin analytics',
+      description:
+        'Daily revenue and profit, low-stock and expiry alerts, dued-customer tracking, and AI insights on your fastest and slowest movers.',
+      stats: 'Live',
+      metric: 'Revenue & profit',
       colors: {
         bg: 'bg-amber-100/40 dark:bg-amber-950/20',
         icon: 'text-amber-600',
@@ -84,16 +88,16 @@ const Features = () => {
           transition={{ duration: 0.8 }}
           viewport={{ once: true }} className="flex items-center justify-center flex-col text-center gap-5 mb-16">
           <CustomBadge>
-            Key Features
+            Features
           </CustomBadge>
 
           <CustomTitle>
-            Key Features
+            Everything a medical store runs on
           </CustomTitle>
-          
+
           <CustomSubtitle>
-            Our platform provides all the tools and features you need to build, scale, 
-            and optimize your business operations efficiently.
+            Inventory, counter, purchasing and reporting in one system —
+            built around batches, expiry and prescriptions.
           </CustomSubtitle>
         </motion.div>
 

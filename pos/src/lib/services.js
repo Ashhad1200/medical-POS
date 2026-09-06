@@ -86,17 +86,51 @@ export const dashboardServices = {
 };
 
 export const aiAnalyticsServices = {
-  getInsights: (timeRange = '30d') =>
-    api.get(`/dashboard/ai-insights`, { params: { timeRange } }),
-  getPredictions: (metric = 'revenue', timeRange = '30d') =>
-    api.get(`/dashboard/ai-predictions`, { params: { metric, timeRange } }),
-  getSmartAlerts: () => api.get('/dashboard/smart-alerts'),
-  getPerformance: (timeRange = '30d') =>
-    api.get(`/dashboard/performance-analytics`, { params: { timeRange } }),
+  getKpis: () => api.get('/ai-analytics/kpis'),
+  getInsights: () => api.get('/ai-analytics/insights'),
+  getPredictions: () => api.get('/ai-analytics/predictions'),
+  getAlerts: () => api.get('/ai-analytics/alerts'),
 };
 
 export const reportServices = {
   inventory: () => api.get('/reports/inventory'),
   sales: () => api.get('/reports/sales'),
   rtvSuggestions: () => api.get('/reports/rtv-suggestions'),
+};
+
+export const storefrontServices = {
+  getSettings: () => api.get('/storefront/settings'),
+  saveSettings: (data) => api.put('/storefront/settings', data),
+  getOrders: (params = {}) => api.get('/storefront/orders', { params }),
+  updateOrder: (id, data) => api.patch(`/storefront/orders/${id}`, data),
+};
+
+// --- supplier network (Phase 2 + 3) --------------------------------------
+export const supplierPortalServices = {
+  getCatalogue: () => api.get('/supplier/catalogue'),
+  createItem: (data) => api.post('/supplier/catalogue', data),
+  updateItem: (id, data) => api.put(`/supplier/catalogue/${id}`, data),
+  deleteItem: (id) => api.delete(`/supplier/catalogue/${id}`),
+  getIncomingOrders: (params = {}) => api.get('/supplier/orders', { params }),
+  updateIncomingOrder: (id, data) => api.patch(`/supplier/orders/${id}`, data),
+  getReturns: () => api.get('/supplier/returns'),
+  resolveReturn: (id, data) => api.patch(`/supplier/returns/${id}`, data),
+  analytics: () => api.get('/supplier/analytics'),
+};
+
+export const connectionServices = {
+  list: () => api.get('/connections'),
+  request: (supplierCode) => api.post('/connections/request', { supplierCode }),
+  respond: (id, data) => api.patch(`/connections/${id}`, data),
+};
+
+export const b2bServices = {
+  connectedSuppliers: () => api.get('/b2b/suppliers'),
+  search: (q) => api.get('/b2b/search', { params: { q } }),
+  catalogue: (supplierOrgId) =>
+    api.get(`/b2b/suppliers/${supplierOrgId}/catalogue`),
+  order: (supplierOrgId, data) =>
+    api.post(`/b2b/suppliers/${supplierOrgId}/order`, data),
+  getReturns: () => api.get('/b2b/returns'),
+  createReturn: (data) => api.post('/b2b/returns', data),
 };

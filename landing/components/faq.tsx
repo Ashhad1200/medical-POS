@@ -10,36 +10,36 @@ import Link from 'next/link';
 const FAQ = () => {
   const faqs = [
     {
-      question: "What's included in the free trial?",
-      answer: "All plans include a 14-day free trial with full access to all features. No credit card required to start your trial."
+      question: "How does the free trial work?",
+      answer: "Every paid plan starts with a free trial (14 days on Basic and Pro, 30 on Enterprise). No card required — you get full access, and your data stays if you subscribe."
     },
     {
-      question: "Can I change my plan anytime?",
-      answer: "Yes, you can upgrade or downgrade your plan at any time. Changes take effect immediately, and we'll prorate the billing accordingly."
+      question: "Do I need to install anything?",
+      answer: "No. Medical POS runs in the browser. Any modern laptop, desktop or tablet at the counter works — just sign in."
     },
     {
-      question: "What payment methods do you accept?",
-      answer: "We accept all major credit cards (Visa, MasterCard, American Express), PayPal, and bank transfers for annual plans."
+      question: "Can I import my existing product list?",
+      answer: "Yes. You can add products manually or bulk-import them with batch numbers, expiry dates and prices so you're selling from day one."
     },
     {
-      question: "Is there a setup fee?",
-      answer: "No, there are no setup fees or hidden costs. You only pay for your chosen plan, and the price includes everything listed in the features."
+      question: "How does batch and expiry tracking work?",
+      answer: "Stock is held per batch with its own expiry date. At checkout the system sells the earliest-expiring batch first (FEFO), and flags anything expiring soon so you can return or discount it."
     },
     {
-      question: "Do you offer refunds?",
-      answer: "Yes, we offer a 30-day money-back guarantee. If you're not satisfied with our service, we'll provide a full refund within 30 days of purchase."
+      question: "Can I add staff with different permissions?",
+      answer: "Yes. Counter, warehouse, manager and admin roles each see only what they need — the plan's user limit sets how many active staff you can have."
     },
     {
-      question: "How does the yearly discount work?",
-      answer: "When you choose yearly billing, you get 2 months free (equivalent to a 20% discount). The discount is applied automatically to your total."
+      question: "Can I change plans later?",
+      answer: "Yes, you can move up or down a plan at any time from your dashboard, or an operator can do it for you. Your data and settings carry over."
     },
     {
-      question: "Can I cancel my subscription anytime?",
-      answer: "Yes, you can cancel your subscription at any time. Your service will continue until the end of your current billing period."
+      question: "Is my data separated from other pharmacies?",
+      answer: "Every store is a separate tenant. Your products, sales, customers and staff are isolated to your organization."
     },
     {
-      question: "Do you offer custom enterprise solutions?",
-      answer: "Absolutely! For large organizations with specific needs, we offer custom pricing and features. Contact our sales team to discuss your requirements."
+      question: "Do you offer custom or enterprise setups?",
+      answer: "For multi-branch operations or specific requirements, the Enterprise plan lifts the user and catalogue limits. Get in touch to talk through anything beyond that."
     }
   ];
 

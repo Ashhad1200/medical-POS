@@ -1,0 +1,100 @@
+{
+  "artifactType": "precompact-snapshot",
+  "context_reset": {
+    "policy": {
+      "mode": "auto",
+      "dryRun": false,
+      "thresholds": {
+        "wipTasks": 4,
+        "blockedTasks": 1,
+        "recentEdits": 8,
+        "failedChecks": 1,
+        "sessionAgeMinutes": 120
+      }
+    },
+    "recommended": true,
+    "summary": "Context reset recommended (auto): 20 recent edit count exceed threshold 8; 734 session age (minutes) exceed threshold 120",
+    "reasons": [
+      "20 recent edit count exceed threshold 8",
+      "734 session age (minutes) exceed threshold 120"
+    ],
+    "candidates": [
+      {
+        "key": "wip_tasks",
+        "label": "WIP task count",
+        "actual": 0,
+        "threshold": 4,
+        "triggered": false
+      },
+      {
+        "key": "blocked_tasks",
+        "label": "blocked task count",
+        "actual": 0,
+        "threshold": 1,
+        "triggered": false
+      },
+      {
+        "key": "recent_edits",
+        "label": "recent edit count",
+        "actual": 20,
+        "threshold": 8,
+        "triggered": true
+      },
+      {
+        "key": "failed_checks",
+        "label": "failed check count",
+        "actual": 0,
+        "threshold": 1,
+        "triggered": false
+      },
+      {
+        "key": "session_age_minutes",
+        "label": "session age (minutes)",
+        "actual": 734,
+        "threshold": 120,
+        "triggered": true
+      }
+    ],
+    "counters": {
+      "wipTasks": 0,
+      "blockedTasks": 0,
+      "recentEdits": 20,
+      "failedChecks": 0,
+      "sessionAgeMinutes": 734
+    }
+  },
+  "continuity": {
+    "plugin_first_workflow": true,
+    "resume_aware_effort_continuity": true,
+    "effort_hint": "medium",
+    "summary": "plugin-first workflow: enabled; resume-aware effort continuity: medium"
+  },
+  "legacy_version": "1.0.0",
+  "metrics": null,
+  "recentEdits": [
+    "server/_legacy/check-db-data.js",
+    "server/_legacy/check-user-role.js",
+    "server/_legacy/create-admin-user.js",
+    "server/_legacy/create-test-po.js",
+    "server/_legacy/seed-sample-data.js",
+    "server/_legacy/test-complete-inventory.js",
+    "server/_legacy/test-fixed-status-transitions.js",
+    "server/_legacy/test-inventory-updates.js",
+    "server/_legacy/test-login-response.js",
+    "server/_legacy/test-status-transitions.js",
+    "server/_legacy/test-supplier-id-issue.js",
+    ".claude/sessions/.last_inbox_check",
+    ".claude/sessions/broadcast.md",
+    ".claude/sessions/leases/1c4546f50fd47b693eefc02372e2527ff64dce480ce3482ecbe52319be376c18.lock",
+    ".claude/sessions/leases/438ca3fc4a6de3e49d8390f52731630cf7a9b69fd8b6f904fb7a0e16ae24fd2d.lock",
+    ".claude/sessions/leases/6d350e9c758791fde07a0f5ec36b7f05f4658ebcc9ac5cc254f51b83cf1fc911.lock",
+    ".claude/sessions/leases/6ebdb617a8104a7756d0cf36578ab01103dc9f07e4dc6feb751296b9c402faf7.lock",
+    ".claude/sessions/leases/71a2b257700fa8e23080fd1ef759543e3abe421b7d1419c527263d3a88394104.lock",
+    ".claude/sessions/leases/8150987131e217d28e7a1f74b455c7d52f1c323fc20429be2df0d42d04d4ee28.lock",
+    ".claude/sessions/leases/a33e431ece0e9728390f524bf663157ea651e0f4f8841a4fbf6f7b220fd5c029.lock"
+  ],
+  "sessionId": "",
+  "timestamp": "2026-09-06T03:57:19Z",
+  "version": "1.0.0",
+  "wipTasks": null
+}

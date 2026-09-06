@@ -17,31 +17,31 @@ const HowItWorks = () => {
   const steps = [
     {
       id: 1,
-      title: "Connect Your Data",
-      description: "Seamlessly integrate your existing tools and data sources.",
+      title: "Create your store",
+      description: "Sign up, name your pharmacy and pick a plan. Your workspace is ready in under a minute.",
       image: "/screens/4.png",
-      icon: Cable
+      icon: CloudUpload
     },
     {
       id: 2,
-      title: "AI-Powered Analysis",
-      description: "Our advanced AI algorithms analyze your data patterns.",
+      title: "Load your catalogue",
+      description: "Add products with batch numbers, expiry dates and cost/sell prices — or import them.",
       image: "/screens/5.png",
-      icon: ChartNoAxesCombined
+      icon: Cable
     },
     {
-      id: 4,
-      title: "Configure & Optimize",
-      description: "Launch your optimized solution and watch it scale automatically.",
+      id: 3,
+      title: "Add your team",
+      description: "Invite counter, warehouse and manager staff, each with the access their role needs.",
       image: "/screens/3.png",
       icon: Cog
     },
     {
-      id: 5,
-      title: "Deploy & Scale",
-      description: "Launch your optimized solution and watch it scale automatically.",
+      id: 4,
+      title: "Start selling",
+      description: "Ring up sales at the counter — stock, expiry alerts and daily reports update as you go.",
       image: "/screens/4.png",
-      icon: CloudUpload
+      icon: ChartNoAxesCombined
     },
   ];
 
@@ -98,7 +98,7 @@ const HowItWorks = () => {
           </CustomTitle>
           
           <CustomSubtitle>
-            Our streamlined process gets you up and running quickly, with powerful AI doing the heavy lifting.
+            From sign-up to your first sale in four steps.
           </CustomSubtitle>
         </motion.div>
 
@@ -176,7 +176,7 @@ const HowItWorks = () => {
             Ready to get started? It takes less than 5 minutes.
           </p>
           <Button size="lg" asChild>
-            <Link href="#cta">Start Your Journey</Link>
+            <Link href="/signup">Start free trial</Link>
           </Button>
         </div>
       </div>

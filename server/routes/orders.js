@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { auth, checkRole } = require("../middleware/auth");
+const { auth, checkRole, requirePharmacyOrg } = require("../middleware/auth");
 
 // Role-based middleware
 const adminOrCounter = checkRole(['admin', 'counter']);
@@ -36,6 +36,7 @@ const validateOrderId = (req, res, next) => {
 
 // Protected routes
 router.use(auth);
+router.use(requirePharmacyOrg);
 
 // Get dashboard data (admin only)
 router.get("/dashboard", adminOnly, getDashboardData);

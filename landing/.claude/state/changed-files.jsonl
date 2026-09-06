@@ -1,1 +1,7 @@
 {"file":"app/layout.tsx","action":"Edit","timestamp":"2026-09-05T22:58:25Z","important":false}
+{"file":"vitest.config.ts","action":"Write","timestamp":"2026-09-06T00:14:36Z","important":false}
+{"file":"lib/api.test.ts","action":"Write","timestamp":"2026-09-06T00:14:54Z","important":true}
+{"file":"app/store/[slug]/store-client.tsx","action":"Write","timestamp":"2026-09-06T01:05:12Z","important":false}
+{"file":"app/store/[slug]/order/[number]/page.tsx","action":"Write","timestamp":"2026-09-06T01:05:27Z","important":false}
+{"file":"lib/storefront.test.ts","action":"Write","timestamp":"2026-09-06T01:05:44Z","important":true}
+{"file":"lib/cart.test.ts","action":"Write","timestamp":"2026-09-06T01:06:01Z","important":true}

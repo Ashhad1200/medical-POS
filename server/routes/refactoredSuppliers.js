@@ -13,13 +13,14 @@ const {
   validateSupplierData,
   exportSuppliers
 } = require('../controllers/refactoredSupplierController');
-const { auth, checkRole } = require('../middleware/auth');
+const { auth, checkRole, requirePharmacyOrg } = require('../middleware/auth');
 const { validateSupplierInput, validateSupplierUpdate } = require('../middleware/validation');
 const { searchLimiter, exportLimiter, createCustomLimiter } = require('../middleware/rateLimiter');
 const rateLimiter = createCustomLimiter;
 
 // Apply authentication to all routes
 router.use(auth);
+router.use(requirePharmacyOrg);
 
 // Apply role-based access control
 router.use(checkRole(['admin', 'manager', 'warehouse']));

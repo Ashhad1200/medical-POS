@@ -1,21 +1,26 @@
 
 import { motion } from 'framer-motion';
-import { Github, X, Linkedin, Mail } from 'lucide-react';
+import { Mail } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import Logo from '@/components/logo';
+import { appUrls } from '@/config/site';
 
 const Footer = () => {
   const links = {
-    product: ['Features', 'Pricing', 'API', 'Documentation'],
-    company: ['About', 'Blog', 'Careers', 'Contact'],
-    support: ['Help Center', 'Community', 'Status', 'Security']
+    product: [
+      { label: 'Features', href: '#features' },
+      { label: 'Pricing', href: '#pricing' },
+      { label: 'Start free trial', href: '/signup' },
+    ],
+    resources: [
+      { label: 'FAQ', href: '#faq' },
+      { label: 'Contact', href: '#contact' },
+      { label: 'Sign in', href: appUrls.pos },
+    ],
   };
 
   const socialLinks = [
-    { icon: X, href: '#', label: 'X (Twitter)' },
-    { icon: Github, href: '#', label: 'GitHub' },
-    { icon: Linkedin, href: '#', label: 'LinkedIn' },
-    { icon: Mail, href: '#', label: 'Email' }
+    { icon: Mail, href: 'mailto:support@medical-pos.example.com', label: 'Email' },
   ];
 
   return (
@@ -34,7 +39,7 @@ const Footer = () => {
                 <Logo />
               </div>
               <p className="text-muted-foreground mb-6 max-w-sm">
-                Transform your business with our powerful SaaS platform. Scale faster, work smarter, grow bigger.
+                Point of sale, batch-aware inventory and analytics for pharmacies and medical stores.
               </p>
               <div className="flex space-x-4">
                 {socialLinks.map((social, index) => (
@@ -55,7 +60,7 @@ const Footer = () => {
 
           {/* 3 Column Menu - Right aligned */}
           <div className="w-full grow lg:w-auto lg:grow-0 lg:w-2/3 flex justify-end">
-            <div className="w-full lg:w-auto flex justify-between flex-wrap lg:grid lg:grid-cols-3 gap-8 lg:gap-16">
+            <div className="w-full lg:w-auto flex justify-between flex-wrap lg:grid lg:grid-cols-2 gap-8 lg:gap-16">
               {Object.entries(links).map(([category, items], categoryIndex) => (
                 <motion.div
                   key={category}
@@ -69,10 +74,10 @@ const Footer = () => {
                     {items.map((item, index) => (
                       <li key={index}>
                         <a
-                          href="#"
+                          href={item.href}
                           className="text-accent-foreground hover:text-indigo-600 transition-colors hover:underline"
                         >
-                          {item}
+                          {item.label}
                         </a>
                       </li>
                     ))}
@@ -87,10 +92,7 @@ const Footer = () => {
 
         <div className="flex flex-col md:flex-row justify-between items-center">
           <p className="text-muted-foreground text-sm">
-            © 2025 Metronic SaaS. All rights reserved.
-          </p>
-          <p className="text-muted-foreground text-sm mt-4 md:mt-0">
-            Product by <a href="https://keenthemes.com" target="_blank" rel="noopener noreferrer" className="text-foreground hover:text-indigo-600 hover:underline">KeenThemes</a>
+            © {new Date().getFullYear()} Medical POS. All rights reserved.
           </p>
         </div>
       </div>

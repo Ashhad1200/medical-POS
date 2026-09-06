@@ -431,4 +431,4 @@ chromatic.log
 # Keep schema files
 !*.sql
 !schema.sql
-!migrations/*.sql 
+!migrations/*.sql coverage/

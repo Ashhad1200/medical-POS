@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { auth, checkRole } = require("../middleware/auth");
+const { auth, checkRole, requirePharmacyOrg } = require("../middleware/auth");
 const { validateUserMiddleware } = require("../utils/userValidation");
 const {
   getAllMedicines,
@@ -25,6 +25,7 @@ const upload = multer({ storage });
 
 // Protected routes
 router.use(auth);
+router.use(requirePharmacyOrg);
 
 // Search medicines route (must be before /:id route)
 router.get("/search", searchMedicines);
