@@ -47,6 +47,29 @@ describe('placeOrder', () => {
     expect(JSON.parse(opts.body).items[0]).toEqual({ productId: 'p1', quantity: 2 });
   });
 
+  it('returns the payment init block for an online order', async () => {
+    mockFetch.mockResolvedValue(
+      res(201, {
+        success: true,
+        data: {
+          orderNumber: 'SF-10',
+          total: 110,
+          paymentStatus: 'unpaid',
+          payment: {
+            provider: 'jazzcash',
+            ref: 'T123',
+            redirectUrl: 'https://sandbox.jazzcash.com.pk/x',
+            fields: { pp_TxnRefNo: 'T123' },
+          },
+        },
+      }),
+    );
+    const out = await placeOrder('s', { ...input, paymentMethod: 'online' });
+    expect(out.payment?.provider).toBe('jazzcash');
+    expect(out.payment?.redirectUrl).toMatch(/^https:/);
+    expect(out.paymentStatus).toBe('unpaid');
+  });
+
   it('surfaces the server message on rejection', async () => {
     mockFetch.mockResolvedValue(
       res(400, { success: false, message: 'Minimum order is 100' }, false),

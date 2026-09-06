@@ -16,6 +16,7 @@ import {
 } from '@/lib/cart';
 import {
   placeOrder,
+  type PaymentInit,
   type PlacedOrder,
   type Store,
   type StoreProduct,
@@ -25,6 +26,22 @@ const money = (n: number) =>
   `Rs ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(n)}`;
 
 const key = (slug: string) => `medpos_cart_${slug}`;
+
+// JazzCash Page-Redirection: POST the signed fields to the gateway.
+function redirectToGateway(payment: PaymentInit) {
+  const f = document.createElement('form');
+  f.method = 'POST';
+  f.action = payment.redirectUrl;
+  for (const [k, v] of Object.entries(payment.fields || {})) {
+    const i = document.createElement('input');
+    i.type = 'hidden';
+    i.name = k;
+    i.value = String(v);
+    f.appendChild(i);
+  }
+  document.body.appendChild(f);
+  f.submit();
+}
 
 export default function StoreClient({
   slug,
@@ -81,17 +98,21 @@ export default function StoreClient({
           address: form.address,
           city: form.city || undefined,
         },
-        paymentMethod: form.paymentMethod as 'cod' | 'in_store',
+        paymentMethod: form.paymentMethod as 'cod' | 'in_store' | 'online',
         items: cart.lines.map((l) => ({
           productId: l.productId,
           quantity: l.quantity,
         })),
       });
-      setDone(res);
       dispatch({ type: 'clear' });
       try {
         localStorage.removeItem(key(slug));
       } catch {}
+      if (res.payment?.redirectUrl) {
+        redirectToGateway(res.payment); // leaves the page for JazzCash
+        return;
+      }
+      setDone(res);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Order failed');
     } finally {
@@ -289,6 +310,9 @@ export default function StoreClient({
                       )}
                       {store.payInStoreEnabled && (
                         <option value="in_store">Pay in store</option>
+                      )}
+                      {store.onlineEnabled && (
+                        <option value="online">Pay online (JazzCash)</option>
                       )}
                     </select>
                     {error && (

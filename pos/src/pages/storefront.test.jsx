@@ -53,7 +53,7 @@ describe('StorefrontSettingsPage', () => {
 
   it('loads existing settings into the form', async () => {
     svc.getSettings.mockResolvedValue({
-      data: { data: { display_name: 'My Pharmacy', slug: 'my-pharmacy', is_live: true, delivery_fee: 60, min_order: 200 } },
+      data: { data: { display_name: 'My Pharmacy', slug: 'my-pharmacy', is_live: true, delivery_fee: 60, min_order: 200, online_enabled: true } },
     });
     const { StorefrontSettingsPage } = await import('./storefront-settings');
     wrap(<StorefrontSettingsPage />);
@@ -61,6 +61,10 @@ describe('StorefrontSettingsPage', () => {
       expect(screen.getByDisplayValue('My Pharmacy')).toBeInTheDocument(),
     );
     expect(screen.getByDisplayValue('my-pharmacy')).toBeInTheDocument();
+    // the "Pay online" switch reflects the saved setting
+    expect(
+      screen.getByRole('switch', { name: /pay online/i }),
+    ).toBeChecked();
   });
 });
 

@@ -47,6 +47,7 @@ export function StorefrontSettingsPage() {
         delivery_radius_km: q.data?.delivery_radius_km ?? '',
         cod_enabled: q.data?.cod_enabled ?? true,
         pay_in_store_enabled: q.data?.pay_in_store_enabled ?? true,
+        online_enabled: q.data?.online_enabled ?? false,
         is_live: q.data?.is_live ?? false,
       });
     }
@@ -175,6 +176,18 @@ export function StorefrontSettingsPage() {
               <Switch
                 checked={f.pay_in_store_enabled}
                 onCheckedChange={(v) => set('pay_in_store_enabled', v)}
+              />
+            </label>
+            <label className="flex items-center justify-between text-sm">
+              <span>
+                Pay online (JazzCash)
+                <span className="block text-xs text-muted-foreground">
+                  Orders stay unconfirmed until payment clears
+                </span>
+              </span>
+              <Switch
+                checked={f.online_enabled}
+                onCheckedChange={(v) => set('online_enabled', v)}
               />
             </label>
           </CardContent>

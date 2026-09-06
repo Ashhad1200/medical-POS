@@ -20,6 +20,7 @@ export type Store = {
   minOrder: number;
   codEnabled: boolean;
   payInStoreEnabled: boolean;
+  onlineEnabled: boolean;
 };
 
 export type StorePayload = { store: Store; products: StoreProduct[] };
@@ -35,9 +36,16 @@ export async function getStore(slug: string): Promise<StorePayload | null> {
 
 export type PlaceOrderInput = {
   customer: { name: string; phone: string; address: string; city?: string };
-  paymentMethod: 'cod' | 'in_store';
+  paymentMethod: 'cod' | 'in_store' | 'online';
   items: { productId: string; quantity: number }[];
   notes?: string;
+};
+
+export type PaymentInit = {
+  provider: string;
+  ref: string;
+  redirectUrl: string;
+  fields: Record<string, string>;
 };
 
 export type PlacedOrder = {
@@ -46,6 +54,8 @@ export type PlacedOrder = {
   deliveryFee: number;
   total: number;
   status: string;
+  paymentStatus?: string;
+  payment?: PaymentInit;
 };
 
 export async function placeOrder(
