@@ -6,6 +6,7 @@ import { storefrontServices } from '@/lib/services';
 import { apiError } from '@/lib/api';
 import { useAuth } from '@/auth/auth-context';
 import { PageHeader } from '@/components/page-header';
+import { CustomDomainPanel } from './storefront-domain-panel';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -237,6 +238,8 @@ export function StorefrontSettingsPage() {
             </label>
           </CardContent>
         </Card>
+
+        <CustomDomainPanel storeIsLive={q.data?.is_live ?? f.is_live} />
       </div>
 
       <div className="mt-4">

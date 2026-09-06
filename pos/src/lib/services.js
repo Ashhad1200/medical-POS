@@ -107,6 +107,10 @@ export const storefrontServices = {
   updateOrder: (id, data) => api.patch(`/storefront/orders/${id}`, data),
   getCustomization: () => api.get('/storefront/customization'),
   saveCustomization: (data) => api.put('/storefront/customization', data),
+  getDomain: () => api.get('/storefront/domain'),
+  addDomain: (domain) => api.post('/storefront/domain', { domain }),
+  verifyDomain: () => api.post('/storefront/domain/verify'),
+  removeDomain: () => api.delete('/storefront/domain'),
 };
 
 // --- supplier network (Phase 2 + 3) --------------------------------------
