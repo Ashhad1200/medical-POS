@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Minus, Plus, Search } from 'lucide-react';
@@ -27,9 +28,11 @@ import {
 } from '@/components/ui/table';
 
 export function ReorderPage() {
-  const [supplierId, setSupplierId] = useState('');
+  const [sp] = useSearchParams();
+  // deep-link from the low-stock alert: /reorder?supplier=<orgId>&sku=<name>
+  const [supplierId, setSupplierId] = useState(sp.get('supplier') || '');
   const [cart, setCart] = useState({}); // supplierProductId -> qty
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(sp.get('sku') || '');
 
   const suppliers = useQuery({
     queryKey: ['b2b', 'suppliers'],

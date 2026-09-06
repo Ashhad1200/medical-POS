@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
   Bot,
@@ -7,6 +8,7 @@ import {
   Lightbulb,
   ShoppingCart,
   TrendingUp,
+  Truck,
   Users,
 } from 'lucide-react';
 import { aiAnalyticsServices } from '@/lib/services';
@@ -215,6 +217,19 @@ export function AiAnalyticsPage() {
                   <p className="text-sm text-muted-foreground">
                     {ins.description}
                   </p>
+                  {(ins.data || [])
+                    .filter((r) => r && r.reorder)
+                    .map((r) => (
+                      <Link
+                        key={r.id}
+                        to={`/reorder?supplier=${r.reorder.supplierOrgId}&sku=${encodeURIComponent(r.name)}`}
+                        className="mt-2 flex items-center gap-1.5 text-xs text-primary hover:underline"
+                      >
+                        <Truck className="size-3.5" />
+                        Reorder {r.name} from {r.reorder.supplierName} ·{' '}
+                        {money(r.reorder.unitPrice)} · MOQ {r.reorder.moq}
+                      </Link>
+                    ))}
                 </div>
               ))}
             </div>
