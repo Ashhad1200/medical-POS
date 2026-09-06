@@ -159,35 +159,37 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done (code + tests) · `
 
 **Done when:** a pharmacy admin can, from the `pos/` "Storefront" section, upload a logo, pick an accent colour, add/schedule/reorder homepage banners, mark products as on-deal (%) with a date window, and curate a featured list — and a logged-out consumer sees all of it live on `/store/<slug>`, with **deal prices enforced server-side** at checkout.
 
+**Status (2026-09-06): shipped.** Migration `009_storefront_customization.sql`. `server/controllers/storefrontCustomizationController.js` — `GET/PUT /api/storefront/customization` (one replace-all upsert for banners+deals+featured), `pricedCatalogue()` folds active in-window deals into the FEFO price for both `getStore` and `placeOrder` (deal price enforced server-side). Public payload += `accentColor`, `banners`, `featured`. `pos/`: "Storefront design" page (`/store-customize`) + Branding fields on settings. `landing/`: `storeView()` view-model, banner strip + deals row (struck price) + featured row on the store page. Tests: server `storefront-customization.test.js` ×7, `pos/` `storefront-customize.test.jsx` ×2, `landing/` `storeView` ×2. **151 tests green** across 4 packages.
+
 ### 1e-a. Schema  (`server/db/migrations/009_storefront_customization.sql`, idempotent)
 | # | Task | Tests required |
 |---|---|---|
-| 1e-a.1 | `[ ]` `storefront_settings` += `accent_color varchar` (hex, nullable), `logo_url` already exists. | migration applies; PUT round-trips `accent_color`; invalid hex → 400 |
-| 1e-a.2 | `[ ]` `storefront_banners` (`id`, `organization_id` FK cascade, `headline`, `subheadline`, `cta_label`, `cta_href`, `image_url`, `bg_style` (`color`\|`gradient`\|`image`), `bg_value`, `sort_order int`, `is_active bool`, `starts_at timestamptz null`, `ends_at timestamptz null`, timestamps). | insert + org-scoped list ordered by `sort_order`; **cross-org**: A can't read/edit B's banners |
-| 1e-a.3 | `[ ]` `storefront_deals` (`id`, `organization_id` FK, `product_id`, `discount_pct numeric` 1–90, `starts_at`, `ends_at`, `is_active bool`, timestamps; unique `(organization_id, product_id)` while active — enforce in controller). | insert; `discount_pct` out of range → 400; **cross-org** |
-| 1e-a.4 | `[ ]` `storefront_featured_products` (`id`, `organization_id` FK, `product_id`, `sort_order int`, timestamps; unique `(organization_id, product_id)`). | insert + ordered list; **cross-org** |
+| 1e-a.1 | `[x]` `storefront_settings` += `accent_color varchar` (hex, nullable), `logo_url` already exists. | migration applies; PUT round-trips `accent_color`; invalid hex → 400 |
+| 1e-a.2 | `[x]` `storefront_banners` (`id`, `organization_id` FK cascade, `headline`, `subheadline`, `cta_label`, `cta_href`, `image_url`, `bg_style` (`color`\|`gradient`\|`image`), `bg_value`, `sort_order int`, `is_active bool`, `starts_at timestamptz null`, `ends_at timestamptz null`, timestamps). | insert + org-scoped list ordered by `sort_order`; **cross-org**: A can't read/edit B's banners |
+| 1e-a.3 | `[x]` `storefront_deals` (`id`, `organization_id` FK, `product_id`, `discount_pct numeric` 1–90, `starts_at`, `ends_at`, `is_active bool`, timestamps; unique `(organization_id, product_id)` while active — enforce in controller). | insert; `discount_pct` out of range → 400; **cross-org** |
+| 1e-a.4 | `[x]` `storefront_featured_products` (`id`, `organization_id` FK, `product_id`, `sort_order int`, timestamps; unique `(organization_id, product_id)`). | insert + ordered list; **cross-org** |
 
 ### 1e-b. Backend
 | # | Task | Tests required |
 |---|---|---|
-| 1e-b.1 | `[ ]` `GET/PUT /api/storefront/banners` (authed admin/manager) — replace-all list upsert (send the whole ordered array), validates `bg_style`, URL fields. | CRUD; validation; **cross-org** denial |
-| 1e-b.2 | `[ ]` `GET/PUT /api/storefront/deals` — list upsert; rejects a `product_id` not in the caller's org; `discount_pct` bounds. | CRUD; foreign product → 400; **cross-org** |
-| 1e-b.3 | `[ ]` `GET/PUT /api/storefront/featured` — list upsert; product-in-org check. | CRUD; **cross-org** |
-| 1e-b.4 | `[ ]` `pricedCatalogue(orgId, opts)` — wraps `catalogueRows` and applies any **active, in-window** deal: `price = round(fefoPrice * (1 - pct/100), 2)`, attaches `originalPrice` + `discountPct`. Replace both call sites in `getStore` + `placeOrder`. | a deal row discounts the listed price; an out-of-window deal does not; `placeOrder` charges the discounted price (client can't send full/other price) |
-| 1e-b.5 | `[ ]` `GET /api/public/storefront/:slug` payload += `accentColor`, `logoUrl`, `banners` (active + in-window, ordered), `deals` already folded into prices, `featured` (ordered product ids present in the catalogue). | banners outside their window are absent; featured ids all resolve to catalogue items |
+| 1e-b.1 | `[x]` `GET/PUT /api/storefront/banners` (authed admin/manager) — replace-all list upsert (send the whole ordered array), validates `bg_style`, URL fields. | CRUD; validation; **cross-org** denial |
+| 1e-b.2 | `[x]` `GET/PUT /api/storefront/deals` — list upsert; rejects a `product_id` not in the caller's org; `discount_pct` bounds. | CRUD; foreign product → 400; **cross-org** |
+| 1e-b.3 | `[x]` `GET/PUT /api/storefront/featured` — list upsert; product-in-org check. | CRUD; **cross-org** |
+| 1e-b.4 | `[x]` `pricedCatalogue(orgId, opts)` — wraps `catalogueRows` and applies any **active, in-window** deal: `price = round(fefoPrice * (1 - pct/100), 2)`, attaches `originalPrice` + `discountPct`. Replace both call sites in `getStore` + `placeOrder`. | a deal row discounts the listed price; an out-of-window deal does not; `placeOrder` charges the discounted price (client can't send full/other price) |
+| 1e-b.5 | `[x]` `GET /api/public/storefront/:slug` payload += `accentColor`, `logoUrl`, `banners` (active + in-window, ordered), `deals` already folded into prices, `featured` (ordered product ids present in the catalogue). | banners outside their window are absent; featured ids all resolve to catalogue items |
 
 ### 1e-c. Frontend — pharmacy (`pos/`)
 | # | Task | Tests required |
 |---|---|---|
-| 1e-c.1 | `[ ]` `storefront-settings.jsx` gains a "Branding" group: logo URL + accent colour picker. | `pos/`: renders + PUT body carries `accent_color` |
-| 1e-c.2 | `[ ]` `pages/storefront-customize.jsx` (new, nav item under Storefront, admin/manager) — three managed lists: banners (add/edit/remove/reorder + date window + active), deals (pick product, %, window), featured (pick + reorder). Saves via the list-upsert endpoints. | `pos/`: banner add calls PUT with the new array; deal % out of range is blocked client-side |
-| 1e-c.3 | `[ ]` Feature-gate the new page on `hasFeature('storefront')`; add the sidebar item. | `pos/`: nav item hidden without the flag |
+| 1e-c.1 | `[x]` `storefront-settings.jsx` gains a "Branding" group: logo URL + accent colour picker. | `pos/`: renders + PUT body carries `accent_color` |
+| 1e-c.2 | `[x]` `pages/storefront-customize.jsx` (new, nav item under Storefront, admin/manager) — three managed lists: banners (add/edit/remove/reorder + date window + active), deals (pick product, %, window), featured (pick + reorder). Saves via the list-upsert endpoints. | `pos/`: banner add calls PUT with the new array; deal % out of range is blocked client-side |
+| 1e-c.3 | `[x]` Feature-gate the new page on `hasFeature('storefront')`; add the sidebar item. | `pos/`: nav item hidden without the flag |
 
 ### 1e-d. Frontend — consumer (`landing/`)
 | # | Task | Tests required |
 |---|---|---|
-| 1e-d.1 | `[ ]` `lib/storefront.ts` types += `accentColor`, `logoUrl`, `banners[]`, `featured[]`; `StoreProduct` += `originalPrice?`, `discountPct?`. | `landing/`: `getStore` maps the new fields |
-| 1e-d.2 | `[ ]` Store page renders: logo in the header, accent colour as the CTA/prices accent (CSS var), a banner carousel, a "Today's Deals" row (products with `discountPct`, showing struck original price), a "Featured" row. Graceful when all empty (current layout). | `landing/`: view-model test — deals row = products with `discountPct`; empty customization → plain layout |
+| 1e-d.1 | `[x]` `lib/storefront.ts` types += `accentColor`, `logoUrl`, `banners[]`, `featured[]`; `StoreProduct` += `originalPrice?`, `discountPct?`. | `landing/`: `getStore` maps the new fields |
+| 1e-d.2 | `[x]` Store page renders: logo in the header, accent colour as the CTA/prices accent (CSS var), a banner carousel, a "Today's Deals" row (products with `discountPct`, showing struck original price), a "Featured" row. Graceful when all empty (current layout). | `landing/`: view-model test — deals row = products with `discountPct`; empty customization → plain layout |
 
 **Dependencies:** Phase 1 shipped. 1e-a → 1e-b → (1e-c ∥ 1e-d). 1e-b.4 (server-side deal pricing) is the correctness-critical unit — do it before any UI.
 
