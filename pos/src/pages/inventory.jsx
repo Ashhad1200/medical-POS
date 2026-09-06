@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Pencil, Plus, Search } from 'lucide-react';
+import { Pencil, Plus, Search, Upload } from 'lucide-react';
 import { medicineServices } from '@/lib/services';
+import { InventoryImportDialog } from './inventory-import';
 import { apiError } from '@/lib/api';
 import { int, money } from '@/lib/format';
 import { useAuth } from '@/auth/auth-context';
@@ -277,6 +278,7 @@ export function InventoryPage() {
   const [search, setSearch] = useState('');
   const [stockFilter, setStockFilter] = useState('all');
   const [dialog, setDialog] = useState(undefined); // undefined=closed, null=new, obj=edit
+  const [importOpen, setImportOpen] = useState(false);
 
   const q = useQuery({
     queryKey: ['inventory', { search, stockFilter }],
@@ -299,11 +301,19 @@ export function InventoryPage() {
         description="Products and batch-level stock (FEFO)."
       >
         {canEdit && (
-          <Button onClick={() => setDialog(null)}>
-            <Plus className="size-4" /> New product
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setImportOpen(true)}>
+              <Upload className="size-4" /> Import
+            </Button>
+            <Button onClick={() => setDialog(null)}>
+              <Plus className="size-4" /> New product
+            </Button>
+          </div>
         )}
       </PageHeader>
+      {canEdit && (
+        <InventoryImportDialog open={importOpen} onOpenChange={setImportOpen} />
+      )}
 
       <div className="mb-4 flex flex-wrap gap-2">
         <div className="relative w-72">

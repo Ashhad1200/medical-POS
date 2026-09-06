@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Minus, Plus, Search, Trash2 } from 'lucide-react';
+import { Minus, Plus, Printer, Search, Trash2 } from 'lucide-react';
 import { medicineServices, orderServices } from '@/lib/services';
 import { apiError } from '@/lib/api';
 import { money } from '@/lib/format';
 import { PageHeader } from '@/components/page-header';
+import { OrderReceipt } from '@/components/order-receipt';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,6 +22,7 @@ import {
 export function CreateOrderPage() {
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState([]); // {id, name, unit_price, quantity, stock}
+  const [lastReceipt, setLastReceipt] = useState(null);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
@@ -83,6 +85,23 @@ export function CreateOrderPage() {
     onSuccess: (res) => {
       const num = res.data?.data?.order_number || res.data?.data?.orderNumber;
       toast.success(`Order ${num || ''} completed`);
+      setLastReceipt({
+        order_number: num,
+        created_at: new Date().toISOString(),
+        customer_name: customerName || 'Walk-in',
+        customer_phone: customerPhone || undefined,
+        subtotal,
+        discount: 0,
+        tax_amount: 0,
+        total_amount: subtotal,
+        order_items: cart.map((x) => ({
+          id: x.id,
+          medicine_name: x.name,
+          quantity: x.quantity,
+          unit_price: x.unit_price,
+          total_price: x.unit_price * x.quantity,
+        })),
+      });
       setCart([]);
       setCustomerName('');
       setCustomerPhone('');
@@ -94,7 +113,16 @@ export function CreateOrderPage() {
 
   return (
     <>
-      <PageHeader title="New order" description="Search products and check out." />
+      <PageHeader title="New order" description="Search products and check out.">
+        {lastReceipt && (
+          <Button variant="outline" size="sm" onClick={() => window.print()}>
+            <Printer className="size-4" /> Print receipt {lastReceipt.order_number}
+          </Button>
+        )}
+      </PageHeader>
+
+      {lastReceipt && <OrderReceipt order={lastReceipt} />}
+
 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* search + results */}

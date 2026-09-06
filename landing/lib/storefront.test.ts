@@ -22,9 +22,17 @@ describe('getStore', () => {
     expect(mockFetch.mock.calls[0][0]).toMatch(/\/public\/storefront\/s$/);
   });
 
-  it('returns null on 404 (unknown / not live)', async () => {
+  it('returns null on 404 (unknown / not live) — store page then notFound()s', async () => {
     mockFetch.mockResolvedValue(res(404, {}));
     expect(await getStore('nope')).toBeNull();
+  });
+
+  it('throws on a non-404 failure — the page catches it and notFound()s too (1d.2)', async () => {
+    mockFetch.mockResolvedValue(res(500, { message: 'boom' }, false));
+    await expect(getStore('s')).rejects.toThrow(/Failed to load store/);
+    // page.tsx: `getStore(slug).catch(() => null)` -> null -> notFound()
+    const guarded = await getStore('s').catch(() => null);
+    expect(guarded).toBeNull();
   });
 });
 

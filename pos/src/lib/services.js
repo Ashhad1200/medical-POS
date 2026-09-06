@@ -12,6 +12,8 @@ export const medicineServices = {
   getAll: (params = {}) => api.get('/medicines', { params }),
   getById: (id) => api.get(`/medicines/${id}`),
   create: (data) => api.post('/medicines', data),
+  bulkImport: (rows, dryRun = false) =>
+    api.post('/medicines/bulk-import', { rows, dryRun }),
   update: (id, data) => api.put(`/medicines/${id}`, data),
   delete: (id) => api.delete(`/medicines/${id}`),
   search: (params = {}) => api.get('/medicines/search', { params }),

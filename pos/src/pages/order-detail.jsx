@@ -1,12 +1,14 @@
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Printer } from 'lucide-react';
 import { orderServices } from '@/lib/services';
 import { apiError } from '@/lib/api';
 import { dateTime, money } from '@/lib/format';
 import { PageHeader } from '@/components/page-header';
+import { OrderReceipt } from '@/components/order-receipt';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -53,7 +55,13 @@ export function OrderDetailPage() {
         <Badge variant={PAY[o.payment_status] || 'secondary'} appearance="light">
           {o.payment_status}
         </Badge>
+        <Button variant="outline" size="sm" onClick={() => window.print()}>
+          <Printer className="size-4" /> Print receipt
+        </Button>
       </PageHeader>
+
+      <OrderReceipt order={o} />
+
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card>

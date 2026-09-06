@@ -60,6 +60,65 @@ describe('POST /api/medicines', () => {
   });
 });
 
+describe('POST /api/medicines/bulk-import', () => {
+  it('inserts valid rows, reports bad ones, partial success', async () => {
+    const good1 = `Bulk A ${uniq('m')}`;
+    const good2 = `Bulk B ${uniq('m')}`;
+    const res = await authed(a.token)(
+      request(app)
+        .post('/api/medicines/bulk-import')
+        .send({
+          rows: [
+            { name: good1, manufacturer: 'Acme', selling_price: 10, cost_price: 5, quantity: 30, expiry_date: '2029-01-01' },
+            { name: '', manufacturer: 'Acme' }, // bad: no name
+            { name: good2, manufacturer: 'Acme', quantity: 'lots' }, // bad: quantity
+            { name: good2, manufacturer: 'Acme', selling_price: 8, quantity: 12 }, // ok
+          ],
+        })
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.data.inserted).toBe(2);
+    expect(res.body.data.errorCount).toBe(2);
+    expect(res.body.data.errors.map((e) => e.row).sort()).toEqual([2, 3]);
+
+    const list = await authed(a.token)(request(app).get('/api/medicines'));
+    expect(list.body.data.medicines.some((m) => m.name === good1)).toBe(true);
+  });
+
+  it('dryRun validates without inserting', async () => {
+    const name = `Dry ${uniq('m')}`;
+    const res = await authed(a.token)(
+      request(app)
+        .post('/api/medicines/bulk-import')
+        .send({ dryRun: true, rows: [{ name, manufacturer: 'Acme', quantity: 5 }, { name: '', manufacturer: '' }] })
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.data.inserted).toBe(0);
+    expect(res.body.data.errorCount).toBe(1);
+
+    const list = await authed(a.token)(request(app).get('/api/medicines'));
+    expect(list.body.data.medicines.some((m) => m.name === name)).toBe(false);
+  });
+
+  it('rejects an empty payload (400)', async () => {
+    const res = await authed(a.token)(
+      request(app).post('/api/medicines/bulk-import').send({ rows: [] })
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('imports land in the caller org only (cross-tenant)', async () => {
+    const name = `Scoped ${uniq('m')}`;
+    await authed(a.token)(
+      request(app)
+        .post('/api/medicines/bulk-import')
+        .send({ rows: [{ name, manufacturer: 'Acme', quantity: 3 }] })
+    );
+    const bList = await authed(b.token)(request(app).get('/api/medicines'));
+    expect(bList.body.data.medicines.some((m) => m.name === name)).toBe(false);
+  });
+});
+
 describe('PUT /api/medicines/:id', () => {
   it('updates product metadata incl. the prescription flag', async () => {
     const name = `Ibuprofen ${uniq('m')}`;

@@ -513,6 +513,129 @@ const getInventoryStats = async (req, res) => {
   }
 }
 
+/**
+ * Bulk import medicines from a parsed row array (the pos client parses the CSV).
+ * Body: { rows: [{ name, manufacturer, generic_name?, category?, batch_number?,
+ *   selling_price?, cost_price?, quantity?, low_stock_threshold?, expiry_date?,
+ *   prescription_required? }], dryRun?: boolean }
+ * Per-row validation; valid rows are inserted (find-or-create product + a batch),
+ * bad rows are reported by 1-based row number. Partial success is normal.
+ * ponytail: naive per-row txn, fine for a few hundred rows; batch it if imports get huge.
+ */
+const TRUTHY = new Set(["1", "true", "yes", "y", "rx"]);
+const bulkImport = async (req, res) => {
+  try {
+    const organizationId = req.user.organization_id;
+    const userId = req.user.id;
+    const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
+    const dryRun = req.body?.dryRun === true;
+
+    if (!rows.length)
+      return res.status(400).json({ success: false, message: "rows[] is required" });
+    if (rows.length > 1000)
+      return res.status(400).json({ success: false, message: "Max 1000 rows per import" });
+
+    const results = [];
+    let inserted = 0;
+
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i] || {};
+      const name = String(r.name ?? "").trim();
+      const manufacturer = String(r.manufacturer ?? "").trim();
+      const errs = [];
+      if (!name) errs.push("name is required");
+      if (!manufacturer) errs.push("manufacturer is required");
+
+      const qty = Number(r.quantity);
+      if (r.quantity != null && r.quantity !== "" && (!Number.isFinite(qty) || qty < 0))
+        errs.push("quantity must be a non-negative number");
+      const sp = Number(r.selling_price);
+      if (r.selling_price != null && r.selling_price !== "" && (!Number.isFinite(sp) || sp < 0))
+        errs.push("selling_price must be a non-negative number");
+      const cp = Number(r.cost_price);
+      if (r.cost_price != null && r.cost_price !== "" && (!Number.isFinite(cp) || cp < 0))
+        errs.push("cost_price must be a non-negative number");
+      if (r.expiry_date && Number.isNaN(Date.parse(r.expiry_date)))
+        errs.push("expiry_date is not a valid date");
+
+      if (errs.length) {
+        results.push({ row: i + 1, status: "error", message: errs.join("; ") });
+        continue;
+      }
+      if (dryRun) {
+        results.push({ row: i + 1, status: "ok" });
+        continue;
+      }
+
+      try {
+        const productId = await withTransaction(async (client) => {
+          const existing = await client.query(
+            "SELECT id FROM products WHERE name = $1 AND manufacturer = $2 AND organization_id = $3",
+            [name, manufacturer, organizationId]
+          );
+          let pid;
+          if (existing.rows.length) {
+            pid = existing.rows[0].id;
+          } else {
+            const p = await client.query(
+              `INSERT INTO products
+                 (name, generic_name, manufacturer, category, prescription_required,
+                  low_stock_threshold, is_active, organization_id, created_by)
+               VALUES ($1,$2,$3,$4,$5,$6,true,$7,$8) RETURNING id`,
+              [
+                name,
+                r.generic_name || null,
+                manufacturer,
+                r.category || null,
+                TRUTHY.has(String(r.prescription_required ?? "").toLowerCase()),
+                Number(r.low_stock_threshold) || 10,
+                organizationId,
+                userId,
+              ]
+            );
+            pid = p.rows[0].id;
+          }
+          await client.query(
+            `INSERT INTO inventory_batches
+               (product_id, batch_number, expiry_date, quantity, selling_price,
+                cost_price, is_active, organization_id)
+             VALUES ($1,$2,$3,$4,$5,$6,true,$7)`,
+            [
+              pid,
+              r.batch_number || `IMP-${Date.now()}-${i}`,
+              r.expiry_date || "2029-12-31",
+              Number.isFinite(qty) ? qty : 0,
+              Number.isFinite(sp) ? sp : 0,
+              Number.isFinite(cp) ? cp : 0,
+              organizationId,
+            ]
+          );
+          return pid;
+        });
+        inserted++;
+        results.push({ row: i + 1, status: "ok", productId });
+      } catch (e) {
+        results.push({ row: i + 1, status: "error", message: e.message });
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        total: rows.length,
+        inserted,
+        errorCount: results.filter((x) => x.status === "error").length,
+        errors: results.filter((x) => x.status === "error"),
+        results,
+        dryRun,
+      },
+    });
+  } catch (error) {
+    console.error("bulkImport error:", error);
+    res.status(500).json({ success: false, message: "Bulk import failed: " + error.message });
+  }
+};
+
 // Export functions
 module.exports = {
   getAllMedicines,
@@ -526,6 +649,6 @@ module.exports = {
   getLowStockMedicines: async (req, res) => res.json({ data: { medicines: [] } }), // Placeholder
   getExpiredMedicines: async (req, res) => res.json({ data: { medicines: [] } }), // Placeholder
   getExpiringSoonMedicines: async (req, res) => res.json({ data: { medicines: [] } }), // Placeholder
-  bulkImport: async (req, res) => res.status(501).json({ message: "Not implemented yet" }),
+  bulkImport,
   exportInventory: async (req, res) => res.status(501).json({ message: "Not implemented yet" }),
 };

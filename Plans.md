@@ -21,7 +21,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done (code + tests) · `
 | 0.4 | `[x]` Frontend test harness (Vitest) in `pos/` / `admin/` / `landing/`. | 21 client tests green |
 | 0.5 | `[x]` Remove dead MongoDB files + leaked credential from the tree. | n/a (deletion) — **user still must revoke the Atlas DB user** |
 | 0.6 | `[-]` **Cutover** — deferred by user (nothing is deployed anywhere yet). Revisit when there's a deploy target. |
-| 0.7 | `[~]` `medicines` create/edit form in `pos/` (dialog on the Inventory page) with the `prescription_required` toggle + Rx badge — DONE & tested (`server/tests/medicines.test.js` ×4, `pos/` inventory.test ×2). Order receipt/print + bulk-import UI still `[ ]`. | done |
+| 0.7 | `[x]` `medicines` create/edit form in `pos/` + Rx badge; **order receipt/print** (`components/order-receipt.jsx` on create-order + order-detail) and **bulk import** (`pos/` Inventory → Import dialog, CSV parse + dry-run + per-row errors; `POST /api/medicines/bulk-import`) — see 0.7a/0.7b. | done |
 | 0.8 | `[x]` Legacy `server/test-*.js` / `check-*.js` / `create-*.js` / mongo `seed*.js` moved to `server/_legacy/`; `npm run seed` → `seed-postgres.js`. | n/a |
 
 **Dependency:** nothing. Do 0.6–0.8 before starting Phase 1.
@@ -68,7 +68,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done (code + tests) · `
 | # | Task | Tests required |
 |---|---|---|
 | 1d.1 | `[x]` `lib/storefront.ts` — `getStore(slug)`, `placeOrder(slug, payload)`, `getOrderStatus(slug, number, phone)` (mirror `lib/api.ts`). | `landing/`: all three with `fetch` mocked — URL, method, body, error message surfacing |
-| 1d.2 | `[ ]` `store/[slug]/page.tsx` — SSR store header + product grid from `getStore`. `notFound()` when the API 404s. | `landing/`: (logic only) a helper that maps API payload → view model; 404 path |
+| 1d.2 | `[x]` `store/[slug]/page.tsx` — SSR header + grid from `getStore`; `storeView()` view-model (see Phase 1e); `notFound()` on 404 **and** on any non-404 failure (`getStore` throws → `page.tsx` `.catch(()=>null)` → `notFound()`). | `landing/` `storefront.test.ts` — 404→null, 500→throws→null |
 | 1d.3 | `[x]` Client cart (context or `useReducer`, `localStorage`-persisted), add/remove/qty, running subtotal + delivery fee + min-order warning. | `landing/`: cart reducer unit tests — add merges qty, remove, clear, totals, min-order boundary |
 | 1d.4 | `[x]` Checkout page — name/phone/address/city, payment method, submit → `placeOrder`, success screen with `order_number` + status-lookup link. | `landing/`: checkout submit handler calls `placeOrder` with the cart; disables on invalid form |
 | 1d.5 | `[x]` `store/[slug]/order/[number]` — status lookup by phone, renders the pipeline. | `landing/`: view-model mapping test |
@@ -198,10 +198,10 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done (code + tests) · `
 ## Phase 0 leftovers  (from 0.7)
 | # | Task | Tests required |
 |---|---|---|
-| 0.7a | `[ ]` Order receipt / print view in `pos/` (create-order + order-detail). | `pos/`: receipt component renders line items + totals from a mocked order |
-| 0.7b | `[ ]` Bulk medicine import UI in `pos/` (CSV → `POST /api/medicines` batched, with a dry-run preview + per-row errors). | `server/`: batch import endpoint — valid rows inserted, bad rows reported, partial success; `pos/`: parse+preview helper |
+| 0.7a | `[x]` Order receipt / print view in `pos/` (create-order + order-detail). `components/order-receipt.jsx` (print-only stylesheet, `window.print()`); create-order keeps a receipt snapshot of the last sale. | `pos/` `order-receipt.test.jsx` ×3 — renders line items + totals, hides zero discount/tax, null-safe |
+| 0.7b | `[x]` Bulk medicine import — `POST /api/medicines/bulk-import` `{rows[],dryRun}`: per-row validation, find-or-create product + batch, partial success, 1-based error rows, org-scoped. `pos/` Inventory → **Import** dialog: `lib/csv.js` parser (header aliases) + dry-run + error table. | `server/` `medicines.test.js` ×4 (partial success, dryRun, empty→400, cross-tenant); `pos/` `csv.test.js` ×3 + `inventory-import.test.jsx` ×2 |
 | 0.6 | `[-]` Cutover — still deferred (no deploy target). Revisit when there's somewhere to deploy. |
-| 1d.2 | `[ ]` `store/[slug]/page.tsx` SSR view-model + `notFound()` test (leftover from Phase 1). | `landing/`: payload→view-model helper; 404 path |
+| 1d.2 | `[x]` `store/[slug]/page.tsx` SSR view-model + `notFound()` test — done (see Phase 1 §1d table). | done |
 
 ---
 
