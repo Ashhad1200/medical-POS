@@ -2,10 +2,15 @@
 
 import { useEffect, useMemo, useReducer, useState } from 'react';
 import Link from 'next/link';
-import { Minus, Plus, ShoppingCart, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
+import {
+  Check,
+  Minus,
+  Plus,
+  ShieldCheck,
+  ShoppingBag,
+  Truck,
+  X,
+} from 'lucide-react';
 import {
   cartReducer,
   emptyCart,
@@ -24,22 +29,13 @@ import {
   type StoreProduct,
 } from '@/lib/storefront';
 
+/* ---------- helpers ---------------------------------------------------- */
+
 const money = (n: number) =>
   `Rs ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(n)}`;
 
-function bannerBg(b: StoreBanner): React.CSSProperties {
-  if (b.bgStyle === 'image' && b.bgValue)
-    return { backgroundImage: `url(${b.bgValue})`, backgroundSize: 'cover', backgroundPosition: 'center' };
-  if (b.bgStyle === 'gradient' && b.bgValue) {
-    const [from, to] = b.bgValue.split(',').map((s) => s.trim());
-    return { backgroundImage: `linear-gradient(135deg, ${from}, ${to || from})` };
-  }
-  return { background: b.bgValue || '#0ea5e9' };
-}
-
 const key = (slug: string) => `medpos_cart_${slug}`;
 
-// JazzCash Page-Redirection: POST the signed fields to the gateway.
 function redirectToGateway(payment: PaymentInit) {
   const f = document.createElement('form');
   f.method = 'POST';
@@ -55,6 +51,130 @@ function redirectToGateway(payment: PaymentInit) {
   f.submit();
 }
 
+function bannerBg(b: StoreBanner): React.CSSProperties {
+  if (b.bgStyle === 'image' && b.bgValue)
+    return {
+      backgroundImage: `linear-gradient(120deg, rgba(0,45,38,.72), rgba(0,45,38,.35)), url(${b.bgValue})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+    };
+  if (b.bgStyle === 'gradient' && b.bgValue) {
+    const [from, to] = b.bgValue.split(',').map((s) => s.trim());
+    return { backgroundImage: `linear-gradient(130deg, ${from}, ${to || from})` };
+  }
+  return {
+    backgroundImage:
+      'linear-gradient(130deg, var(--sf-primary-strong), var(--sf-primary), var(--sf-secondary))',
+  };
+}
+
+/* pill / capsule glyph used as a clean product placeholder */
+function PillTile({ label }: { label: string }) {
+  const hue =
+    label.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
+  return (
+    <div
+      className="flex h-40 items-center justify-center rounded-lg"
+      style={{ background: `hsl(${hue} 40% 96%)` }}
+    >
+      <svg width="52" height="52" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <rect
+          x="2.5"
+          y="8"
+          width="19"
+          height="8"
+          rx="4"
+          stroke={`hsl(${hue} 45% 42%)`}
+          strokeWidth="1.6"
+        />
+        <path d="M12 8v8" stroke={`hsl(${hue} 45% 42%)`} strokeWidth="1.6" />
+      </svg>
+    </div>
+  );
+}
+
+/* ---------- product card -------------------------------------------------- */
+
+function ProductCard({
+  p,
+  onAdd,
+  inCart,
+}: {
+  p: StoreProduct;
+  onAdd: () => void;
+  inCart: number;
+}) {
+  const out = p.available <= 0;
+  return (
+    <div className="flex flex-col overflow-hidden rounded-xl border border-[var(--sf-outline)] bg-[var(--sf-surface)] transition-shadow hover:shadow-[0_6px_24px_-8px_rgba(37,75,98,.18)]">
+      <div className="flex items-center justify-between px-3 pt-3">
+        <span className="rounded bg-[var(--sf-surface-mid)] px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-[var(--sf-primary-strong)]">
+          {p.category || 'OTC'}
+        </span>
+        {p.discountPct ? (
+          <span className="rounded bg-[var(--sf-error-container)] px-1.5 py-0.5 font-mono text-[10px] font-bold text-[#8a1112]">
+            {p.discountPct}% OFF
+          </span>
+        ) : (
+          <span className="flex items-center gap-1 font-mono text-[10px] text-[var(--sf-on-variant)]">
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ background: out ? 'var(--sf-error)' : 'var(--sf-primary)' }}
+            />
+            {out ? 'Out' : 'In stock'}
+          </span>
+        )}
+      </div>
+
+      <div className="px-3 pt-2">
+        <PillTile label={p.name} />
+      </div>
+
+      <div className="flex flex-1 flex-col justify-between gap-3 p-3">
+        <div>
+          <h3 className="font-head text-[15px] font-bold leading-tight text-[var(--sf-on)]">
+            {p.name}
+          </h3>
+          <p className="mt-0.5 line-clamp-1 text-xs text-[var(--sf-on-variant)]">
+            {p.genericName || p.manufacturer}
+            {p.packSize ? ` · ${p.packSize}` : ''}
+          </p>
+        </div>
+
+        <div>
+          <div className="mb-2 flex items-baseline gap-2">
+            <span className="font-mono text-lg font-bold text-[var(--sf-primary-strong)]">
+              {money(p.price)}
+            </span>
+            {p.originalPrice != null && (
+              <span className="font-mono text-xs text-[var(--sf-on-variant)] line-through">
+                {money(p.originalPrice)}
+              </span>
+            )}
+          </div>
+          <button
+            disabled={out}
+            onClick={onAdd}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-[var(--sf-primary)] py-2 text-sm font-semibold text-white transition-colors hover:bg-[var(--sf-primary-strong)] disabled:opacity-40"
+          >
+            {inCart > 0 ? (
+              <>
+                <Check size={15} /> In cart ({inCart})
+              </>
+            ) : (
+              <>
+                <Plus size={15} /> Add to cart
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- main -------------------------------------------------------- */
+
 export default function StoreClient({
   slug,
   store,
@@ -68,22 +188,36 @@ export default function StoreClient({
   banners?: StoreBanner[];
   featured?: string[];
 }) {
-  const accent = store.accentColor || undefined;
-  const { deals, featuredProducts } = storeView({ products, banners, featured });
   const [cart, dispatch] = useReducer(cartReducer, emptyCart);
+  const [drawer, setDrawer] = useState(false);
   const [checkout, setCheckout] = useState(false);
   const [form, setForm] = useState({
     name: '',
     phone: '',
     address: '',
     city: '',
-    paymentMethod: store.codEnabled ? 'cod' : 'in_store',
+    paymentMethod: store.codEnabled
+      ? 'cod'
+      : store.payInStoreEnabled
+        ? 'in_store'
+        : 'online',
   });
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<PlacedOrder | null>(null);
 
-  // hydrate + persist cart
+  const view = storeView({ products, banners, featured });
+  const hero = view.banners[0];
+  const categories = useMemo(
+    () =>
+      Array.from(
+        new Set(products.map((p) => p.category).filter(Boolean)),
+      ) as string[],
+    [products],
+  );
+  const qtyOf = (id: string) =>
+    cart.lines.find((l) => l.productId === id)?.quantity ?? 0;
+
   useEffect(() => {
     let persisted: CartState | undefined;
     try {
@@ -104,6 +238,11 @@ export default function StoreClient({
   const subtotal = useMemo(() => cartSubtotal(cart), [cart]);
   const total = subtotal + (cart.lines.length ? store.deliveryFee : 0);
   const tooLow = belowMinimum(cart, store.minOrder) && cart.lines.length > 0;
+
+  const add = (p: StoreProduct) => {
+    dispatch({ type: 'add', product: p });
+    setDrawer(true);
+  };
 
   const submit = async () => {
     setPlacing(true);
@@ -127,7 +266,7 @@ export default function StoreClient({
         localStorage.removeItem(key(slug));
       } catch {}
       if (res.payment?.redirectUrl) {
-        redirectToGateway(res.payment); // leaves the page for JazzCash
+        redirectToGateway(res.payment);
         return;
       }
       setDone(res);
@@ -138,191 +277,339 @@ export default function StoreClient({
     }
   };
 
+  const accentStyle = {
+    '--sf-bg': '#f4faff',
+    '--sf-surface': '#ffffff',
+    '--sf-surface-low': '#e7f6ff',
+    '--sf-surface-mid': '#def1fb',
+    '--sf-surface-high': '#d9ebf5',
+    '--sf-on': '#0c1e25',
+    '--sf-on-variant': '#3e4946',
+    '--sf-outline': '#d3e0e6',
+    '--sf-primary': store.accentColor || '#0d7a68',
+    '--sf-primary-strong': store.accentColor || '#005f50',
+    '--sf-on-primary': '#ffffff',
+    '--sf-secondary': '#254b62',
+    '--sf-tertiary': '#0284c7',
+    '--sf-error': '#ba1a1a',
+    '--sf-error-container': '#ffdad6',
+  } as React.CSSProperties;
+
+  /* ---------- success screen ---------- */
   if (done) {
     return (
-      <div className="mx-auto max-w-md px-6 py-20 text-center">
-        <h1 className="text-2xl font-bold">Order placed</h1>
-        <p className="mt-2 text-muted-foreground">
-          Order <span className="font-medium">{done.orderNumber}</span> · total{' '}
-          {money(done.total)}. We&apos;ll call {form.phone} to confirm.
+      <div
+        style={accentStyle}
+        className="flex min-h-screen flex-col items-center justify-center bg-[var(--sf-bg)] px-6 text-center"
+      >
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700&family=JetBrains+Mono:wght@500;600&display=swap"
+        />
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--sf-primary)] text-white">
+          <Check size={30} />
+        </div>
+        <h1 className="mt-4 font-head text-2xl font-bold text-[var(--sf-on)]">
+          Order confirmed
+        </h1>
+        <p className="mt-2 max-w-sm text-sm text-[var(--sf-on-variant)]">
+          Order <span className="font-mono font-semibold">{done.orderNumber}</span>{' '}
+          · total {money(done.total)}. We&apos;ll call {form.phone} to confirm
+          dispatch.
         </p>
-        <Link
-          href={`/store/${slug}/order/${done.orderNumber}`}
-          className="mt-4 inline-block text-indigo-600 hover:underline"
-        >
-          Track this order
-        </Link>
+        <div className="mt-5 flex gap-3">
+          <Link
+            href={`/store/${slug}/order/${done.orderNumber}?phone=${encodeURIComponent(form.phone)}`}
+            className="rounded-lg bg-[var(--sf-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--sf-primary-strong)]"
+          >
+            Track this order
+          </Link>
+          <button
+            onClick={() => {
+              setDone(null);
+              setCheckout(false);
+            }}
+            className="rounded-lg border border-[var(--sf-outline)] bg-white px-4 py-2 text-sm font-semibold text-[var(--sf-secondary)]"
+          >
+            Back to store
+          </button>
+        </div>
       </div>
     );
   }
 
+  /* ---------- storefront ---------- */
   return (
     <div
-      className="mx-auto max-w-6xl px-6 py-10"
-      style={accent ? ({ ['--accent' as string]: accent } as React.CSSProperties) : undefined}
+      style={accentStyle}
+      className="min-h-screen bg-[var(--sf-bg)] font-sans text-[var(--sf-on)]"
     >
-      <header className="mb-8 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {store.logoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={store.logoUrl} alt={store.displayName} className="h-10 w-auto" />
-          )}
-          <div>
-            <h1 className="text-2xl font-bold">{store.displayName}</h1>
-            <p className="text-sm text-muted-foreground">
-              OTC medicines · delivery {money(store.deliveryFee)}
-              {store.minOrder > 0 ? ` · min order ${money(store.minOrder)}` : ''}
-            </p>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700&family=JetBrains+Mono:wght@500;600&display=swap"
+      />
+      <style>{`
+        .font-head{font-family:'Plus Jakarta Sans',ui-sans-serif,system-ui,sans-serif;letter-spacing:-.01em}
+        .font-mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+      `}</style>
+
+      {/* utility bar */}
+      <div className="bg-[var(--sf-secondary)] px-4 py-1.5 text-center text-xs text-[#e1f3fe]">
+        <span className="inline-flex items-center gap-1.5">
+          <Truck size={13} /> Orders before 6 PM dispatched same-day across the
+          city
+        </span>
+      </div>
+
+      {/* header */}
+      <header className="sticky top-0 z-40 border-b border-[var(--sf-outline)] bg-white/90 backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
+          <div className="flex items-center gap-3">
+            {store.logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={store.logoUrl} alt={store.displayName} className="h-9 w-auto" />
+            )}
+            <div className="leading-tight">
+              <div className="font-head text-lg font-bold text-[var(--sf-primary-strong)]">
+                {store.displayName}
+              </div>
+              <div className="font-mono text-[10px] uppercase tracking-widest text-[var(--sf-secondary)]">
+                Licensed E-Pharmacy
+              </div>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <ShoppingCart className="size-4" /> {cartCount(cart)}
+          <button
+            onClick={() => setDrawer(true)}
+            className="relative flex items-center gap-2 rounded-lg bg-[var(--sf-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--sf-primary-strong)]"
+          >
+            <ShoppingBag size={16} />
+            <span className="hidden sm:inline">Cart</span>
+            <span className="font-mono">{cartCount(cart)}</span>
+          </button>
         </div>
       </header>
 
-      {banners.length > 0 && (
-        <div className="mb-8 flex snap-x gap-4 overflow-x-auto pb-2">
-          {banners.map((b, i) => (
-            <div
-              key={i}
-              className="min-w-[85%] shrink-0 snap-start rounded-xl p-6 text-white sm:min-w-[420px]"
-              style={bannerBg(b)}
-            >
-              {b.headline && <div className="text-lg font-bold">{b.headline}</div>}
-              {b.subheadline && <div className="mt-1 text-sm opacity-90">{b.subheadline}</div>}
-              {b.ctaLabel && b.ctaHref && (
-                <a
-                  href={b.ctaHref}
-                  className="mt-3 inline-block rounded-md bg-white/20 px-3 py-1 text-sm font-medium hover:bg-white/30"
-                >
-                  {b.ctaLabel}
-                </a>
-              )}
-            </div>
-          ))}
+      <main className="mx-auto max-w-6xl px-4 py-8">
+        {/* regulatory strip */}
+        <div className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg bg-[var(--sf-surface-high)] px-4 py-2.5 font-mono text-[11px] tracking-wide">
+          <span className="inline-flex items-center gap-1.5 font-bold uppercase text-[var(--sf-primary-strong)]">
+            <ShieldCheck size={14} /> OTC dispensary · verified inventory
+          </span>
+          <span className="text-[var(--sf-on-variant)]">
+            Delivery {money(store.deliveryFee)}
+            {store.minOrder > 0 && ` · min order ${money(store.minOrder)}`}
+          </span>
         </div>
-      )}
 
-      {deals.length > 0 && (
-        <section className="mb-8">
-          <h2 className="mb-3 text-lg font-semibold" style={accent ? { color: accent } : undefined}>
-            Today&apos;s deals
-          </h2>
-          <div className="flex gap-3 overflow-x-auto pb-2">
-            {deals.map((p) => (
-              <Card key={p.id} className="min-w-[200px] shrink-0">
-                <CardContent className="p-4">
-                  <div className="truncate font-medium">{p.name}</div>
-                  <div className="mt-1 text-sm">
-                    <span className="font-semibold">{money(p.price)}</span>{' '}
-                    {p.originalPrice != null && (
-                      <span className="text-xs text-muted-foreground line-through">
-                        {money(p.originalPrice)}
-                      </span>
-                    )}
-                    <span className="ml-1 text-xs font-medium text-green-600">
-                      −{p.discountPct}%
-                    </span>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="mt-2 w-full"
-                    onClick={() => dispatch({ type: 'add', product: p })}
+        {/* hero */}
+        {hero ? (
+          <section
+            className="relative mb-8 overflow-hidden rounded-2xl p-8 text-white sm:p-12"
+            style={bannerBg(hero)}
+          >
+            <div className="pointer-events-none absolute -right-16 -bottom-16 opacity-10">
+              <svg width="240" height="240" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 10.5V8H14V3H10V8H5V10.5H10V15.5H5V18H10V23H14V18H19V15.5H14V10.5H19Z" />
+              </svg>
+            </div>
+            <div className="relative max-w-xl">
+              {hero.headline && (
+                <h1 className="font-head text-3xl font-bold sm:text-4xl">
+                  {hero.headline}
+                </h1>
+              )}
+              {hero.subheadline && (
+                <p className="mt-3 text-white/85">{hero.subheadline}</p>
+              )}
+              <div className="mt-6 flex flex-wrap gap-3">
+                {view.deals.length > 0 && (
+                  <a
+                    href="#deals"
+                    className="rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-[var(--sf-primary-strong)]"
                   >
-                    Add
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </section>
-      )}
+                    See today&apos;s deals
+                  </a>
+                )}
+                <button
+                  onClick={() => setDrawer(true)}
+                  className="rounded-lg bg-white/15 px-4 py-2.5 text-sm font-semibold backdrop-blur hover:bg-white/25"
+                >
+                  View cart ({cartCount(cart)})
+                </button>
+              </div>
+            </div>
+          </section>
+        ) : (
+          <section
+            className="mb-8 rounded-2xl p-8 text-white"
+            style={{
+              backgroundImage:
+                'linear-gradient(130deg, var(--sf-primary-strong), var(--sf-primary), var(--sf-secondary))',
+            }}
+          >
+            <h1 className="font-head text-3xl font-bold">{store.displayName}</h1>
+            <p className="mt-2 text-white/85">
+              OTC medicines &amp; wellness essentials, delivered.
+            </p>
+          </section>
+        )}
 
-      {featuredProducts.length > 0 && (
-        <section className="mb-8">
-          <h2 className="mb-3 text-lg font-semibold" style={accent ? { color: accent } : undefined}>
-            Featured
-          </h2>
-          <div className="flex gap-3 overflow-x-auto pb-2">
-            {featuredProducts.map((p) => (
-              <Card key={p.id} className="min-w-[200px] shrink-0">
-                <CardContent className="p-4">
-                  <div className="truncate font-medium">{p.name}</div>
-                  <div className="mt-1 text-sm font-semibold">{money(p.price)}</div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="mt-2 w-full"
-                    onClick={() => dispatch({ type: 'add', product: p })}
-                  >
-                    Add
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </section>
-      )}
+        {/* categories */}
+        {categories.length > 1 && (
+          <section className="mb-10">
+            <h2 className="mb-3 font-head text-lg font-bold">Browse by category</h2>
+            <div className="flex flex-wrap gap-2">
+              <a
+                href="#catalogue"
+                className="rounded-full border border-[var(--sf-outline)] bg-white px-4 py-1.5 text-sm font-medium hover:border-[var(--sf-primary)]"
+              >
+                All
+              </a>
+              {categories.map((c) => (
+                <a
+                  key={c}
+                  href="#catalogue"
+                  className="rounded-full border border-[var(--sf-outline)] bg-white px-4 py-1.5 text-sm font-medium capitalize hover:border-[var(--sf-primary)]"
+                >
+                  {c}
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
 
-      <div className="grid gap-8 lg:grid-cols-3">
-        {/* products */}
-        <div className="lg:col-span-2">
+        {/* deals */}
+        {view.deals.length > 0 && (
+          <section id="deals" className="mb-10">
+            <div className="mb-4">
+              <div className="font-mono text-[11px] font-bold uppercase tracking-widest text-[var(--sf-error)]">
+                Limited-time pricing
+              </div>
+              <h2 className="font-head text-xl font-bold">Today&apos;s deals</h2>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {view.deals.map((p) => (
+                <ProductCard
+                  key={p.id}
+                  p={p}
+                  inCart={qtyOf(p.id)}
+                  onAdd={() => add(p)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* featured */}
+        {view.featuredProducts.length > 0 && (
+          <section className="mb-10">
+            <h2 className="mb-4 font-head text-xl font-bold">Featured</h2>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {view.featuredProducts.map((p) => (
+                <ProductCard
+                  key={p.id}
+                  p={p}
+                  inCart={qtyOf(p.id)}
+                  onAdd={() => add(p)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* full catalogue */}
+        <section id="catalogue">
+          <h2 className="mb-4 font-head text-xl font-bold">All medications</h2>
           {products.length === 0 ? (
-            <p className="text-muted-foreground">
+            <p className="text-sm text-[var(--sf-on-variant)]">
               Nothing in stock right now — check back soon.
             </p>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {products.map((p) => (
-                <Card key={p.id}>
-                  <CardContent className="flex items-center justify-between gap-3 p-4">
-                    <div className="min-w-0">
-                      <div className="truncate font-medium">{p.name}</div>
-                      <div className="truncate text-xs text-muted-foreground">
-                        {p.manufacturer}
-                        {p.packSize ? ` · ${p.packSize}` : ''}
-                      </div>
-                      <div className="mt-1 text-sm font-semibold">
-                        {money(p.price)}
-                        {p.originalPrice != null && (
-                          <span className="ml-1 text-xs font-normal text-muted-foreground line-through">
-                            {money(p.originalPrice)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => dispatch({ type: 'add', product: p })}
-                    >
-                      Add
-                    </Button>
-                  </CardContent>
-                </Card>
+                <ProductCard
+                  key={p.id}
+                  p={p}
+                  inCart={qtyOf(p.id)}
+                  onAdd={() => add(p)}
+                />
               ))}
             </div>
           )}
-        </div>
+        </section>
+      </main>
 
-        {/* cart / checkout */}
-        <Card className="h-fit lg:sticky lg:top-6">
-          <CardContent className="space-y-4 p-5">
-            {cart.lines.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">
-                Your cart is empty.
-              </p>
-            ) : (
-              <>
-                <div className="space-y-3">
+      <footer className="mt-12 border-t border-[var(--sf-outline)] bg-white">
+        <div className="mx-auto max-w-6xl px-4 py-8 text-xs text-[var(--sf-on-variant)]">
+          <div className="font-head text-base font-bold text-[var(--sf-primary-strong)]">
+            {store.displayName}
+          </div>
+          <p className="mt-1 max-w-md">
+            Licensed retail pharmacy. OTC items only — prescription medicines are
+            dispensed in person against a valid prescription.
+          </p>
+          <p className="mt-4 font-mono">
+            © {new Date().getFullYear()} {store.displayName} · Real-time stock
+          </p>
+        </div>
+      </footer>
+
+      {/* cart drawer */}
+      {drawer && (
+        <div className="fixed inset-0 z-50">
+          <div
+            className="absolute inset-0 bg-[#0f172a]/45"
+            onClick={() => setDrawer(false)}
+          />
+          <aside className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-white shadow-2xl">
+            <div className="flex items-center justify-between bg-[var(--sf-surface-low)] px-5 py-4">
+              <div className="flex items-center gap-2">
+                <span className="rounded bg-[var(--sf-primary)] p-1.5 text-white">
+                  <ShoppingBag size={16} />
+                </span>
+                <h3 className="font-head font-bold">Cart &amp; checkout</h3>
+              </div>
+              <button
+                onClick={() => setDrawer(false)}
+                className="rounded p-1 text-[var(--sf-on-variant)] hover:bg-[var(--sf-surface-high)]"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 space-y-4 overflow-y-auto p-5">
+              {cart.lines.length === 0 ? (
+                <p className="py-10 text-center text-sm text-[var(--sf-on-variant)]">
+                  Your cart is empty.
+                </p>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-[var(--sf-secondary)]">
+                      {cartCount(cart)} item(s)
+                    </span>
+                    <button
+                      onClick={() => dispatch({ type: 'clear' })}
+                      className="font-mono text-[11px] text-[var(--sf-error)] hover:underline"
+                    >
+                      Clear
+                    </button>
+                  </div>
+
                   {cart.lines.map((l) => (
-                    <div key={l.productId} className="flex items-center gap-2 text-sm">
-                      <div className="min-w-0 flex-1 truncate">{l.name}</div>
+                    <div
+                      key={l.productId}
+                      className="flex items-center gap-3 rounded-lg bg-[var(--sf-surface-low)] p-3"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold">{l.name}</div>
+                        <div className="font-mono text-xs text-[var(--sf-primary-strong)]">
+                          {money(l.price)}
+                        </div>
+                      </div>
                       <div className="flex items-center gap-1">
                         <button
                           aria-label="decrease"
-                          className="rounded border border-border p-1"
                           onClick={() =>
                             dispatch({
                               type: 'setQty',
@@ -330,13 +617,15 @@ export default function StoreClient({
                               quantity: l.quantity - 1,
                             })
                           }
+                          className="rounded border border-[var(--sf-outline)] p-1"
                         >
-                          <Minus className="size-3" />
+                          <Minus size={12} />
                         </button>
-                        <span className="w-6 text-center">{l.quantity}</span>
+                        <span className="w-7 text-center font-mono text-sm">
+                          {l.quantity}
+                        </span>
                         <button
                           aria-label="increase"
-                          className="rounded border border-border p-1"
                           onClick={() =>
                             dispatch({
                               type: 'setQty',
@@ -344,117 +633,112 @@ export default function StoreClient({
                               quantity: l.quantity + 1,
                             })
                           }
+                          className="rounded border border-[var(--sf-outline)] p-1"
                         >
-                          <Plus className="size-3" />
+                          <Plus size={12} />
                         </button>
-                      </div>
-                      <div className="w-16 text-end">
-                        {money(l.price * l.quantity)}
                       </div>
                       <button
                         aria-label="remove"
                         onClick={() =>
                           dispatch({ type: 'remove', productId: l.productId })
                         }
+                        className="text-[var(--sf-on-variant)] hover:text-[var(--sf-error)]"
                       >
-                        <Trash2 className="size-3.5 text-muted-foreground" />
+                        <X size={16} />
                       </button>
                     </div>
                   ))}
-                </div>
 
-                <div className="border-t border-border pt-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Subtotal</span>
-                    <span>{money(subtotal)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Delivery</span>
-                    <span>{money(store.deliveryFee)}</span>
-                  </div>
-                  <div className="mt-1 flex justify-between font-semibold">
-                    <span>Total</span>
-                    <span>{money(total)}</span>
-                  </div>
-                  {tooLow && (
-                    <p className="mt-2 text-xs text-destructive">
-                      Minimum order is {money(store.minOrder)}.
-                    </p>
-                  )}
-                </div>
-
-                {!checkout ? (
-                  <Button
-                    className="w-full"
-                    disabled={tooLow}
-                    onClick={() => setCheckout(true)}
-                  >
-                    Checkout
-                  </Button>
-                ) : (
-                  <div className="space-y-3">
-                    <Input
-                      placeholder="Full name"
-                      value={form.name}
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    />
-                    <Input
-                      placeholder="Phone"
-                      value={form.phone}
-                      onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                    />
-                    <Input
-                      placeholder="Delivery address"
-                      value={form.address}
-                      onChange={(e) =>
-                        setForm({ ...form, address: e.target.value })
-                      }
-                    />
-                    <Input
-                      placeholder="City"
-                      value={form.city}
-                      onChange={(e) => setForm({ ...form, city: e.target.value })}
-                    />
-                    <select
-                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                      value={form.paymentMethod}
-                      onChange={(e) =>
-                        setForm({ ...form, paymentMethod: e.target.value })
-                      }
-                    >
-                      {store.codEnabled && (
-                        <option value="cod">Cash on delivery</option>
-                      )}
-                      {store.payInStoreEnabled && (
-                        <option value="in_store">Pay in store</option>
-                      )}
-                      {store.onlineEnabled && (
-                        <option value="online">Pay online (JazzCash)</option>
-                      )}
-                    </select>
-                    {error && (
-                      <p className="text-xs text-destructive">{error}</p>
+                  <div className="space-y-1 border-t border-[var(--sf-outline)] pt-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-[var(--sf-on-variant)]">Subtotal</span>
+                      <span className="font-mono">{money(subtotal)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[var(--sf-on-variant)]">Delivery</span>
+                      <span className="font-mono">{money(store.deliveryFee)}</span>
+                    </div>
+                    <div className="flex justify-between pt-1 font-head font-bold">
+                      <span>Total</span>
+                      <span className="font-mono">{money(total)}</span>
+                    </div>
+                    {tooLow && (
+                      <p className="pt-1 text-xs text-[var(--sf-error)]">
+                        Minimum order is {money(store.minOrder)}.
+                      </p>
                     )}
-                    <Button
-                      className="w-full"
-                      disabled={
-                        placing ||
-                        tooLow ||
-                        !form.name ||
-                        !form.phone ||
-                        !form.address
-                      }
-                      onClick={submit}
-                    >
-                      {placing ? 'Placing…' : `Place order · ${money(total)}`}
-                    </Button>
                   </div>
-                )}
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+
+                  {!checkout ? (
+                    <button
+                      disabled={tooLow}
+                      onClick={() => setCheckout(true)}
+                      className="w-full rounded-lg bg-[var(--sf-primary)] py-2.5 text-sm font-semibold text-white hover:bg-[var(--sf-primary-strong)] disabled:opacity-40"
+                    >
+                      Checkout
+                    </button>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {(
+                        [
+                          ['name', 'Full name'],
+                          ['phone', 'Phone'],
+                          ['address', 'Delivery address'],
+                          ['city', 'City'],
+                        ] as const
+                      ).map(([k, ph]) => (
+                        <input
+                          key={k}
+                          placeholder={ph}
+                          value={form[k]}
+                          onChange={(e) =>
+                            setForm({ ...form, [k]: e.target.value })
+                          }
+                          className="h-10 w-full rounded-lg border border-[var(--sf-outline)] bg-white px-3 text-sm outline-none focus:border-[var(--sf-primary)] focus:ring-2 focus:ring-[var(--sf-primary)]/15"
+                        />
+                      ))}
+                      <select
+                        value={form.paymentMethod}
+                        onChange={(e) =>
+                          setForm({ ...form, paymentMethod: e.target.value })
+                        }
+                        className="h-10 w-full rounded-lg border border-[var(--sf-outline)] bg-white px-3 text-sm"
+                      >
+                        {store.codEnabled && (
+                          <option value="cod">Cash on delivery</option>
+                        )}
+                        {store.payInStoreEnabled && (
+                          <option value="in_store">Pay in store</option>
+                        )}
+                        {store.onlineEnabled && (
+                          <option value="online">Pay online</option>
+                        )}
+                      </select>
+                      {error && (
+                        <p className="text-xs text-[var(--sf-error)]">{error}</p>
+                      )}
+                      <button
+                        disabled={
+                          placing ||
+                          tooLow ||
+                          !form.name ||
+                          !form.phone ||
+                          !form.address
+                        }
+                        onClick={submit}
+                        className="w-full rounded-lg bg-[var(--sf-primary)] py-2.5 text-sm font-semibold text-white hover:bg-[var(--sf-primary-strong)] disabled:opacity-40"
+                      >
+                        {placing ? 'Placing…' : `Place order · ${money(total)}`}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </aside>
+        </div>
+      )}
     </div>
   );
 }
