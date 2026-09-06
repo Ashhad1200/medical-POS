@@ -238,6 +238,36 @@ describe("POST /api/public/storefront/payment/webhook/:provider", () => {
     expect(noRef.status).toBe(404);
   });
 
+  it("302s a browser (form-encoded) return to the consumer order page", async () => {
+    const placed = await placeOnline();
+    const r = await request(app)
+      .post("/api/public/storefront/payment/webhook/jazzcash")
+      .type("form")
+      .send(signedWebhook(placed.body.data.payment.ref, "000"));
+    expect(r.status).toBe(302);
+    expect(r.headers.location).toContain(`/store/${slug}/order/${placed.body.data.orderNumber}`);
+    expect(r.headers.location).toContain("phone=");
+
+    // the payment still landed
+    const row = await pool.query(
+      "SELECT payment_status FROM storefront_orders WHERE id = $1",
+      [placed.body.data.orderId]
+    );
+    expect(row.rows[0].payment_status).toBe("paid");
+  });
+
+  it("302s a browser return with a bad signature is still rejected (no redirect)", async () => {
+    const placed = await placeOnline();
+    const bad = signedWebhook(placed.body.data.payment.ref, "000");
+    bad.pp_SecureHash = "DEADBEEF";
+    const r = await request(app)
+      .post("/api/public/storefront/payment/webhook/jazzcash")
+      .type("form")
+      .send(bad);
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe("BAD_SIGNATURE");
+  });
+
   it("writes a payment event row on the order", async () => {
     const placed = await placeOnline();
     await request(app)

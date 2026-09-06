@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,11 +21,11 @@ export default function OrderStatusPage({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const lookup = async () => {
+  const lookup = async (p = phone) => {
     setBusy(true);
     setError(null);
     try {
-      setData(await getOrderStatus(slug, number, phone));
+      setData(await getOrderStatus(slug, number, p));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Not found');
       setData(null);
@@ -33,6 +33,16 @@ export default function OrderStatusPage({
       setBusy(false);
     }
   };
+
+  // coming back from the payment gateway: ?phone=... is filled in for us
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get('phone');
+    if (p) {
+      setPhone(p);
+      lookup(p);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const idx = data ? STEPS.indexOf(data.status) : -1;
 
@@ -51,7 +61,7 @@ export default function OrderStatusPage({
             onChange={(e) => setPhone(e.target.value)}
           />
           {error && <p className="text-sm text-destructive">{error}</p>}
-          <Button className="w-full" onClick={lookup} disabled={busy || !phone}>
+          <Button className="w-full" onClick={() => lookup()} disabled={busy || !phone}>
             {busy ? 'Checking…' : 'Check status'}
           </Button>
         </div>
@@ -59,6 +69,11 @@ export default function OrderStatusPage({
 
       {data && (
         <div className="mt-6 space-y-4">
+          {data.payment_status === 'paid' && (
+            <p className="rounded bg-green-50 px-3 py-2 text-sm text-green-700">
+              Payment received — thank you!
+            </p>
+          )}
           {data.status === 'cancelled' ? (
             <p className="text-destructive">This order was cancelled.</p>
           ) : (

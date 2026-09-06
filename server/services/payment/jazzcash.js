@@ -15,11 +15,16 @@ const BASE =
   "https://sandbox.jazzcash.com.pk/CustomerPortal/transactionmanagement/merchantform/";
 
 function cfg() {
+  const apiBase = process.env.STOREFRONT_API_URL || "http://localhost:4001";
   const c = {
     merchantId: process.env.JAZZCASH_MERCHANT_ID,
     password: process.env.JAZZCASH_PASSWORD,
     salt: process.env.JAZZCASH_INTEGRITY_SALT,
-    returnUrl: process.env.JAZZCASH_RETURN_URL,
+    // gateway posts the result back here; our webhook verifies then 302s the
+    // browser to the consumer order page. Operators can override.
+    returnUrl:
+      process.env.JAZZCASH_RETURN_URL ||
+      `${apiBase}/api/public/storefront/payment/webhook/jazzcash`,
   };
   if (!c.merchantId || !c.password || !c.salt) {
     const e = new Error("JazzCash is not configured (JAZZCASH_MERCHANT_ID/PASSWORD/INTEGRITY_SALT missing)");

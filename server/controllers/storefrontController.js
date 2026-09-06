@@ -632,11 +632,30 @@ const courierWebhook = async (req, res) => {
   }
 };
 
+const STOREFRONT_PUBLIC_URL =
+  process.env.STOREFRONT_PUBLIC_URL || "http://localhost:3007";
+
+// consumer-facing order page for a browser coming back from the gateway
+async function consumerOrderUrl(order) {
+  const s = await query(
+    "SELECT slug FROM storefront_settings WHERE organization_id = $1",
+    [order.organization_id]
+  );
+  const slug = s.rows[0]?.slug;
+  return slug
+    ? `${STOREFRONT_PUBLIC_URL}/store/${slug}/order/${order.order_number}` +
+        `?phone=${encodeURIComponent(order.customer_phone)}`
+    : `${STOREFRONT_PUBLIC_URL}/`;
+}
+
 // POST /api/public/storefront/payment/webhook/:provider
-// The provider's return/IPN callback. Only a signature-valid payload is trusted;
-// it flips payment_status to paid/failed. Idempotent — a repeat 'paid' is a no-op.
-// The order stays 'placed'; the pharmacy still confirms it (but now can).
+// Doubles as the gateway return URL (browser, form-encoded) and the IPN (JSON).
+// Only a signature-valid payload is trusted; it flips payment_status to
+// paid/failed. Idempotent — a repeat 'paid' is a no-op. The order stays 'placed';
+// the pharmacy still confirms it (but now can). A browser hit is 302'd to the
+// consumer order page; an API hit gets JSON.
 const paymentWebhook = async (req, res) => {
+  const isBrowser = Boolean(req.is("urlencoded"));
   try {
     let provider;
     try {
@@ -655,17 +674,22 @@ const paymentWebhook = async (req, res) => {
       "SELECT * FROM storefront_orders WHERE payment_provider = $1 AND payment_ref = $2",
       [provider.name, ref]
     );
-    if (!cur.rows.length) return fail(res, 404, "Order not found for that reference");
+    if (!cur.rows.length) {
+      if (isBrowser) return res.redirect(302, `${STOREFRONT_PUBLIC_URL}/`);
+      return fail(res, 404, "Order not found for that reference");
+    }
     const order = cur.rows[0];
 
+    const finish = async (paymentStatus, message) => {
+      if (isBrowser) return res.redirect(302, await consumerOrderUrl(order));
+      return ok(res, { orderNumber: order.order_number, paymentStatus }, message);
+    };
+
     const next = paid ? "paid" : "failed";
-    if (order.payment_status === next) {
-      return ok(res, { orderNumber: order.order_number, paymentStatus: next }, "No change");
-    }
+    if (order.payment_status === next) return finish(next, "No change");
     // never downgrade a paid order on a late 'failed'
-    if (order.payment_status === "paid" && next === "failed") {
-      return ok(res, { orderNumber: order.order_number, paymentStatus: "paid" }, "Already paid");
-    }
+    if (order.payment_status === "paid" && next === "failed")
+      return finish("paid", "Already paid");
 
     await withTransaction(async (client) => {
       await client.query(
@@ -679,9 +703,10 @@ const paymentWebhook = async (req, res) => {
       );
     });
 
-    ok(res, { orderNumber: order.order_number, paymentStatus: next }, "Payment updated");
+    return finish(next, "Payment updated");
   } catch (e) {
     console.error("storefront paymentWebhook:", e);
+    if (isBrowser) return res.redirect(302, `${STOREFRONT_PUBLIC_URL}/`);
     fail(res, 500, "Failed to process payment update");
   }
 };
