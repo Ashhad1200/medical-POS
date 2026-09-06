@@ -2,6 +2,7 @@ const express = require("express");
 const { auth, checkRole } = require("../middleware/auth");
 const { requireFeature } = require("../middleware/planLimits");
 const c = require("../controllers/storefrontController");
+const cc = require("../controllers/storefrontCustomizationController");
 
 // ---- public (no auth) : /api/public/storefront ----------------------------
 const publicRouter = express.Router();
@@ -18,6 +19,8 @@ authedRouter.use(requireFeature("storefront"));
 
 authedRouter.get("/settings", checkRole(["admin", "manager"]), c.getSettings);
 authedRouter.put("/settings", checkRole(["admin", "manager"]), c.upsertSettings);
+authedRouter.get("/customization", checkRole(["admin", "manager"]), cc.getCustomization);
+authedRouter.put("/customization", checkRole(["admin", "manager"]), cc.putCustomization);
 authedRouter.get("/orders", checkRole(["admin", "manager", "counter"]), c.listOrders);
 authedRouter.patch(
   "/orders/:id",

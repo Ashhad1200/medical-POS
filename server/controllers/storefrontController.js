@@ -2,6 +2,11 @@ const crypto = require("crypto");
 const { query, withTransaction } = require("../config/database");
 const { getCourier } = require("../services/courier");
 const { getProvider } = require("../services/payment");
+const {
+  activeDealsMap,
+  applyDeals,
+  publicCustomization,
+} = require("./storefrontCustomizationController");
 
 // ---------------------------------------------------------------------------
 const ok = (res, data, message = "OK", extra = {}) =>
@@ -32,6 +37,17 @@ const catalogueRows = (organizationId, { productIds, includeOutOfStock } = {}) =
      ORDER BY p.name`,
     productIds ? [organizationId, productIds] : [organizationId]
   );
+
+// catalogueRows + any active storefront deal folded into `price`
+// (attaches originalPrice/discountPct). This is the authoritative priced
+// catalogue — both getStore and placeOrder use it so a deal can't be spoofed.
+async function pricedCatalogue(organizationId, opts) {
+  const [cat, deals] = await Promise.all([
+    catalogueRows(organizationId, opts),
+    activeDealsMap(organizationId),
+  ]);
+  return applyDeals(cat.rows, deals);
+}
 
 // Allocate `qty` of a product across its active batches, oldest expiry first.
 // Returns the batch deductions; throws if stock is insufficient.
@@ -83,13 +99,18 @@ const getStore = async (req, res) => {
       return fail(res, 404, "Store not found");
     }
     const s = settings.rows[0];
-    const items = await catalogueRows(s.organization_id);
+    const [items, custom] = await Promise.all([
+      pricedCatalogue(s.organization_id),
+      publicCustomization(s.organization_id),
+    ]);
+    const inCatalogue = new Set(items.map((r) => r.id));
 
     ok(res, {
       store: {
         slug: s.slug,
         displayName: s.display_name,
         logoUrl: s.logo_url,
+        accentColor: s.accent_color,
         theme: s.theme,
         deliveryFee: Number(s.delivery_fee),
         minOrder: Number(s.min_order),
@@ -97,7 +118,9 @@ const getStore = async (req, res) => {
         payInStoreEnabled: s.pay_in_store_enabled,
         onlineEnabled: s.online_enabled,
       },
-      products: items.rows.map((r) => ({
+      banners: custom.banners,
+      featured: custom.featured.filter((id) => inCatalogue.has(id)),
+      products: items.map((r) => ({
         id: r.id,
         name: r.name,
         genericName: r.generic_name,
@@ -105,6 +128,9 @@ const getStore = async (req, res) => {
         category: r.category,
         packSize: r.pack_size,
         price: Number(r.price || 0),
+        ...(r.discountPct
+          ? { originalPrice: Number(r.originalPrice), discountPct: r.discountPct }
+          : {}),
         available: r.available,
       })),
     });
@@ -148,12 +174,12 @@ const placeOrder = async (req, res) => {
       return fail(res, 400, "Online payment is not available for this store");
 
     const wantIds = [...new Set(items.map((i) => i.productId))];
-    // catalogue with prices — includeOutOfStock so we can give a precise error
-    const cat = await catalogueRows(s.organization_id, {
+    // priced catalogue (deals folded in) — includeOutOfStock for a precise error
+    const cat = await pricedCatalogue(s.organization_id, {
       productIds: wantIds,
       includeOutOfStock: true,
     });
-    const byId = new Map(cat.rows.map((r) => [r.id, r]));
+    const byId = new Map(cat.map((r) => [r.id, r]));
 
     // any requested id that isn't in the OTC catalogue (unknown, inactive, or Rx)
     for (const id of wantIds) {
@@ -307,8 +333,11 @@ const SETTINGS_FIELDS = [
   "cod_enabled",
   "pay_in_store_enabled",
   "online_enabled",
+  "accent_color",
   "is_live",
 ];
+
+const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
 const slugify = (s) =>
   String(s || "")
@@ -336,6 +365,9 @@ const upsertSettings = async (req, res) => {
   try {
     const orgId = req.user.organization_id;
     const b = req.body || {};
+
+    if (b.accent_color != null && b.accent_color !== "" && !HEX_COLOR.test(b.accent_color))
+      return fail(res, 400, "accent_color must be a hex colour like #0ea5e9", "VALIDATION_ERROR");
 
     const existing = await query(
       "SELECT id, slug FROM storefront_settings WHERE organization_id = $1",

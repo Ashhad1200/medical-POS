@@ -153,6 +153,71 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done (code + tests) · `
 
 ---
 
+## Phase 1e — Storefront self-serve customization  (v1 gap)
+
+**Why:** `PRODUCT_ROADMAP.md` §7 Phase 1 bullet 3 + §4a + §5 (2026-09-06 row) require self-serve merchandising — banners, deals, featured products, per-tenant branding — so a pharmacy owner can run its own "Wellness Week" without a developer. `Plans.md` Phase 1 shipped the store/cart/checkout but not this. It is core v1 scope, not gated. White-label per tenant (own logo/color/banners) — never a named competitor's identity (§5).
+
+**Done when:** a pharmacy admin can, from the `pos/` "Storefront" section, upload a logo, pick an accent colour, add/schedule/reorder homepage banners, mark products as on-deal (%) with a date window, and curate a featured list — and a logged-out consumer sees all of it live on `/store/<slug>`, with **deal prices enforced server-side** at checkout.
+
+### 1e-a. Schema  (`server/db/migrations/009_storefront_customization.sql`, idempotent)
+| # | Task | Tests required |
+|---|---|---|
+| 1e-a.1 | `[ ]` `storefront_settings` += `accent_color varchar` (hex, nullable), `logo_url` already exists. | migration applies; PUT round-trips `accent_color`; invalid hex → 400 |
+| 1e-a.2 | `[ ]` `storefront_banners` (`id`, `organization_id` FK cascade, `headline`, `subheadline`, `cta_label`, `cta_href`, `image_url`, `bg_style` (`color`\|`gradient`\|`image`), `bg_value`, `sort_order int`, `is_active bool`, `starts_at timestamptz null`, `ends_at timestamptz null`, timestamps). | insert + org-scoped list ordered by `sort_order`; **cross-org**: A can't read/edit B's banners |
+| 1e-a.3 | `[ ]` `storefront_deals` (`id`, `organization_id` FK, `product_id`, `discount_pct numeric` 1–90, `starts_at`, `ends_at`, `is_active bool`, timestamps; unique `(organization_id, product_id)` while active — enforce in controller). | insert; `discount_pct` out of range → 400; **cross-org** |
+| 1e-a.4 | `[ ]` `storefront_featured_products` (`id`, `organization_id` FK, `product_id`, `sort_order int`, timestamps; unique `(organization_id, product_id)`). | insert + ordered list; **cross-org** |
+
+### 1e-b. Backend
+| # | Task | Tests required |
+|---|---|---|
+| 1e-b.1 | `[ ]` `GET/PUT /api/storefront/banners` (authed admin/manager) — replace-all list upsert (send the whole ordered array), validates `bg_style`, URL fields. | CRUD; validation; **cross-org** denial |
+| 1e-b.2 | `[ ]` `GET/PUT /api/storefront/deals` — list upsert; rejects a `product_id` not in the caller's org; `discount_pct` bounds. | CRUD; foreign product → 400; **cross-org** |
+| 1e-b.3 | `[ ]` `GET/PUT /api/storefront/featured` — list upsert; product-in-org check. | CRUD; **cross-org** |
+| 1e-b.4 | `[ ]` `pricedCatalogue(orgId, opts)` — wraps `catalogueRows` and applies any **active, in-window** deal: `price = round(fefoPrice * (1 - pct/100), 2)`, attaches `originalPrice` + `discountPct`. Replace both call sites in `getStore` + `placeOrder`. | a deal row discounts the listed price; an out-of-window deal does not; `placeOrder` charges the discounted price (client can't send full/other price) |
+| 1e-b.5 | `[ ]` `GET /api/public/storefront/:slug` payload += `accentColor`, `logoUrl`, `banners` (active + in-window, ordered), `deals` already folded into prices, `featured` (ordered product ids present in the catalogue). | banners outside their window are absent; featured ids all resolve to catalogue items |
+
+### 1e-c. Frontend — pharmacy (`pos/`)
+| # | Task | Tests required |
+|---|---|---|
+| 1e-c.1 | `[ ]` `storefront-settings.jsx` gains a "Branding" group: logo URL + accent colour picker. | `pos/`: renders + PUT body carries `accent_color` |
+| 1e-c.2 | `[ ]` `pages/storefront-customize.jsx` (new, nav item under Storefront, admin/manager) — three managed lists: banners (add/edit/remove/reorder + date window + active), deals (pick product, %, window), featured (pick + reorder). Saves via the list-upsert endpoints. | `pos/`: banner add calls PUT with the new array; deal % out of range is blocked client-side |
+| 1e-c.3 | `[ ]` Feature-gate the new page on `hasFeature('storefront')`; add the sidebar item. | `pos/`: nav item hidden without the flag |
+
+### 1e-d. Frontend — consumer (`landing/`)
+| # | Task | Tests required |
+|---|---|---|
+| 1e-d.1 | `[ ]` `lib/storefront.ts` types += `accentColor`, `logoUrl`, `banners[]`, `featured[]`; `StoreProduct` += `originalPrice?`, `discountPct?`. | `landing/`: `getStore` maps the new fields |
+| 1e-d.2 | `[ ]` Store page renders: logo in the header, accent colour as the CTA/prices accent (CSS var), a banner carousel, a "Today's Deals" row (products with `discountPct`, showing struck original price), a "Featured" row. Graceful when all empty (current layout). | `landing/`: view-model test — deals row = products with `discountPct`; empty customization → plain layout |
+
+**Dependencies:** Phase 1 shipped. 1e-a → 1e-b → (1e-c ∥ 1e-d). 1e-b.4 (server-side deal pricing) is the correctness-critical unit — do it before any UI.
+
+---
+
+## Phase 0 leftovers  (from 0.7)
+| # | Task | Tests required |
+|---|---|---|
+| 0.7a | `[ ]` Order receipt / print view in `pos/` (create-order + order-detail). | `pos/`: receipt component renders line items + totals from a mocked order |
+| 0.7b | `[ ]` Bulk medicine import UI in `pos/` (CSV → `POST /api/medicines` batched, with a dry-run preview + per-row errors). | `server/`: batch import endpoint — valid rows inserted, bad rows reported, partial success; `pos/`: parse+preview helper |
+| 0.6 | `[-]` Cutover — still deferred (no deploy target). Revisit when there's somewhere to deploy. |
+| 1d.2 | `[ ]` `store/[slug]/page.tsx` SSR view-model + `notFound()` test (leftover from Phase 1). | `landing/`: payload→view-model helper; 404 path |
+
+---
+
+## Deferred / gated — tracked, DO NOT START
+
+Listed so nothing is lost; each is blocked by the roadmap itself, not by effort.
+
+| Item | Gate (from `PRODUCT_ROADMAP.md`) |
+|---|---|
+| **§6a Custom domains** for the storefront — DNS TXT verify, CNAME + A/ALIAS, ACME/host-Domains-API TLS, DB uniqueness constraint, `requireFeature` plan gate, daily health re-check, de-provision on suspend/churn. | Phase 1 **add-on** — only once the subdomain store is proven *and* a real pharmacy asks for their own domain. Don't hand-roll ACME (§6a build note). |
+| **Phase 2 forward-compat** — store `organizations.org_type` as a role **array** (`["pharmacy"]` / `["supplier"]`) not a scalar. | Was meant to land during Phase 2; cheap now, real rework if left to Phase 5. Safe to do as an isolated migration + read-path shim whenever — **not** the dual-role feature itself. |
+| **4.3 Marketplace opening** — supplier discovery directory, DRAP license capture, ratings, fill-rate guarantees, connection requests from search. | Real two-sided volume on the private network first (§8). |
+| **Phase 5 — Dual-role accounts** (one login = supplier + retail). | "Do not start before Phase 4 complete." Mostly UI if the forward-compat note above is honoured. |
+| **§7a Cross-supplier network** ("supplier group chat", out-of-stock referral to another supplier, shared logistics). | Only after Phase 3 is live with a handful of real connected supplier tenants. |
+| **§8 Assumption validation** — confirm "phone/WhatsApp ordering is painful" with the 2 real pharmacy clients + ≥1 prospective supplier before Phase 2 goes to real users. | BD/research task, not code. |
+
+---
+
 ## Cross-cutting (every phase)
 
 - **Tests are the definition of done** (§9). No phase task above is checked `[x]` without its test row passing.
