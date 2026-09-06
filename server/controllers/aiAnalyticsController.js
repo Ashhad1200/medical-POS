@@ -15,19 +15,42 @@ const getAIInsights = async (req, res) => {
         const insights = [];
 
         // 1. Low Stock Velocity Analysis
+        //    Each low row carries `reorder` — the cheapest connected supplier
+        //    that stocks the same SKU (by name / generic), or null (2b.7).
         const lowStockResult = await query(`
-      SELECT p.id, p.name, p.low_stock_threshold,
+      SELECT p.id, p.name, p.generic_name, p.low_stock_threshold,
              COALESCE(SUM(ib.quantity), 0) as total_stock,
              COALESCE(
-               (SELECT SUM(oi.quantity) FROM order_items oi 
-                JOIN orders o ON oi.order_id = o.id 
-                WHERE oi.medicine_id = p.id 
+               (SELECT SUM(oi.quantity) FROM order_items oi
+                JOIN orders o ON oi.order_id = o.id
+                WHERE oi.medicine_id = p.id
                 AND o.created_at >= NOW() - INTERVAL '7 days'), 0
-             ) as week_sales
+             ) as week_sales,
+             (
+               SELECT to_jsonb(t) FROM (
+                 SELECT sc.supplier_org_id AS "supplierOrgId",
+                        so.name            AS "supplierName",
+                        sp.id              AS "supplierProductId",
+                        sp.unit_price      AS "unitPrice",
+                        sp.moq             AS "moq"
+                 FROM supplier_connections sc
+                 JOIN supplier_products sp
+                   ON sp.supplier_org_id = sc.supplier_org_id
+                  AND sp.is_active = true
+                  AND (lower(sp.name) = lower(p.name)
+                       OR (p.generic_name IS NOT NULL
+                           AND sp.generic_name IS NOT NULL
+                           AND lower(sp.generic_name) = lower(p.generic_name)))
+                 JOIN organizations so ON so.id = sc.supplier_org_id
+                 WHERE sc.pharmacy_org_id = $1 AND sc.status = 'active'
+                 ORDER BY sp.unit_price ASC
+                 LIMIT 1
+               ) t
+             ) as reorder
       FROM products p
       LEFT JOIN inventory_batches ib ON p.id = ib.product_id
       WHERE p.organization_id = $1 AND p.is_active = true
-      GROUP BY p.id, p.name, p.low_stock_threshold
+      GROUP BY p.id, p.name, p.generic_name, p.low_stock_threshold
       HAVING COALESCE(SUM(ib.quantity), 0) < COALESCE(p.low_stock_threshold, 10)
       ORDER BY total_stock ASC
       LIMIT 5
@@ -35,6 +58,7 @@ const getAIInsights = async (req, res) => {
 
         if (lowStockResult.rows.length > 0) {
             const items = lowStockResult.rows.map(r => r.name).join(', ');
+            const reorderable = lowStockResult.rows.filter(r => r.reorder).length;
             insights.push({
                 type: 'alert',
                 title: 'Low Stock Alert',
@@ -42,6 +66,7 @@ const getAIInsights = async (req, res) => {
                 confidence: 95,
                 action: 'Reorder Now',
                 priority: 'high',
+                reorderableCount: reorderable,
                 data: lowStockResult.rows
             });
         }

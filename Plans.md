@@ -79,7 +79,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done (code + tests) · `
 
 ---
 
-## Phase 2 — B2B reorder, private network  (Category A, part 1)   `[x]` done (2b.7 alert-link deferred)
+## Phase 2 — B2B reorder, private network  (Category A, part 1)   `[x]` done
 
 **Objective:** digitize one real supplier↔pharmacy relationship end-to-end — supplier gets a login + catalogue + incoming-order queue; the pharmacy reorders from that supplier's live catalogue into its existing `purchase_orders`.
 
@@ -102,7 +102,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done (code + tests) · `
 | 2b.4 | `[x]` `server/routes/connections.js` — pharmacy requests a connection (by supplier code/invite), supplier approves/pauses/revokes; both sides list their connections. | full lifecycle; only counterpart can approve; revoked connection blocks ordering |
 | 2b.5 | `[x]` `GET /api/pharmacy/suppliers/:supplierOrgId/catalogue` — pharmacy reads a *connected* supplier's live catalogue (403 if not `active`-connected). | connected → 200; not connected → 403; paused → 403 |
 | 2b.6 | `[x]` `POST /api/pharmacy/suppliers/:supplierOrgId/order` — cart → creates a `refactored_purchase_orders` (+ items) with `source='b2b'`, `supplier_org_id`, status `pending`; writes an `organization_ledger` debit against the credit line. | creates the PO; ledger row balances; over-credit-limit → 400; not connected → 403 |
-| 2b.7 | `[ ]` Wire the existing low-stock alert to a "reorder from <connected supplier>" action target. | alert payload includes a reorder link when a connected supplier stocks the SKU |
+| 2b.7 | `[x]` Wire the existing low-stock alert to a "reorder from <connected supplier>" action target. `GET /api/ai-analytics/insights` — each Low Stock row carries `reorder` = cheapest **active-connected** supplier stocking the SKU (matched by name / generic_name) `{supplierOrgId, supplierName, supplierProductId, unitPrice, moq}` or `null`; the alert gets `reorderableCount`. | `tests/ai-analytics.test.js` ×2 — connected supplier attaches (and an unconnected cheaper one is ignored → org-scoping); a paused connection drops the link |
 
 ### 2c. Frontend  (`pos/`, role-gated by `org_type`)
 | # | Task | Tests required |
