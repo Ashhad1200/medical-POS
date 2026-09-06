@@ -231,7 +231,7 @@ app.use("/api/", limiter);
 // Stricter rate limiting for auth routes
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // Temporarily increased for testing
+  max: Number(process.env.AUTH_RATE_LIMIT_MAX || 10), // per IP per window
   skip: skipRateLimit,
   message: {
     success: false,
@@ -239,6 +239,8 @@ const authLimiter = rateLimit({
   },
 });
 app.use("/api/auth/login", authLimiter);
+app.use("/api/auth/forgot-password", authLimiter);
+app.use("/api/auth/reset-password", authLimiter);
 
 // Signup: strict, IP-based
 const signupLimiter = rateLimit({
