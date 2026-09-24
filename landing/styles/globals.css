@@ -224,12 +224,17 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
 }
 
-/** Smooth scroll **/
+/** Smooth scroll (anchor links only; reduced motion turns it off) **/
 html {
   scroll-behavior: smooth;
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }
 
 @layer base {
@@ -239,4 +244,306 @@ html {
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* -------------------------------------------------------------------------
+   PharmaFlow marketing system ("foil & ink"). See DESIGN.md.
+   Scoped to .pf so the white-label storefront never inherits it.
+   ------------------------------------------------------------------------- */
+@theme inline {
+  --color-paper: #f3f5f2;
+  --color-paper-bright: #fbfcfa;
+  --color-foil: #e2e6e3;
+  --color-foil-deep: #bcc4bf;
+  --color-ink: #0e2b22;
+  --color-ink-2: #173b30;
+  --color-ink-soft: #4a5e56;
+  --color-ink-mute: #9fb3aa;
+  --color-cross: #0a7a4d;
+  --color-cross-deep: #075c3a;
+  --color-cross-tint: #d9ede3;
+  --color-amber: #e4a11b;
+  --color-amber-ink: #8a6200;
+  --color-amber-tint: #fbebc7;
+
+  --font-display: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-dot: var(--font-doto), ui-monospace, monospace;
+
+  --ease-pf-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-pf-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+@layer components {
+.pf {
+  --pf-gutter: 20px;
+  --pf-max: 1320px;
+  --pf-header-h: 68px;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  color-scheme: light;
+  font-family: var(--font-display);
+  font-size: 17px;
+  line-height: 1.55;
+  font-feature-settings: 'ss01' on;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+@media (min-width: 768px) {
+  .pf {
+    --pf-gutter: 32px;
+    font-size: 18px;
+  }
+}
+@media (min-width: 1280px) {
+  .pf {
+    --pf-gutter: 48px;
+  }
+}
+
+.pf ::selection {
+  background: var(--color-cross-tint);
+  color: var(--color-ink);
+}
+
+.pf :focus-visible {
+  outline: 2px solid var(--color-cross);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+.pf .on-ink :focus-visible,
+.pf.on-ink :focus-visible {
+  outline-color: var(--color-paper);
+}
+
+.pf-wrap {
+  width: 100%;
+  max-width: var(--pf-max);
+  margin-inline: auto;
+  padding-inline: var(--pf-gutter);
+}
+
+/* Display type: condensed like printed packaging */
+.pf-display {
+  font-family: var(--font-display);
+  font-stretch: 74%;
+  font-weight: 800;
+  letter-spacing: -0.012em;
+  line-height: 0.93;
+  text-wrap: balance;
+}
+.pf-h1 {
+  font-size: clamp(2.55rem, 1.1rem + 4.7vw, 5.1rem);
+}
+.pf-h2 {
+  font-size: clamp(2.1rem, 1.1rem + 3.6vw, 4rem);
+  font-stretch: 78%;
+  font-weight: 780;
+  line-height: 0.96;
+}
+.pf-h3 {
+  font-size: clamp(1.3rem, 1.1rem + 0.6vw, 1.6rem);
+  font-weight: 680;
+  font-stretch: 92%;
+  line-height: 1.15;
+  letter-spacing: -0.005em;
+}
+.pf-lede {
+  font-size: clamp(1.06rem, 1rem + 0.35vw, 1.28rem);
+  line-height: 1.5;
+  max-width: 34em;
+  text-wrap: pretty;
+}
+.pf-body {
+  max-width: 62ch;
+  text-wrap: pretty;
+}
+.pf-small {
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+.pf-num {
+  font-variant-numeric: tabular-nums;
+}
+.pf-dot {
+  font-family: var(--font-dot);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+/* Capsule buttons */
+.pf-btn {
+  --btn-bg: var(--color-cross);
+  --btn-fg: #fff;
+  --btn-bg-hover: var(--color-cross-deep);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55em;
+  min-height: 48px;
+  padding: 0 1.5em;
+  border-radius: 999px;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  font-weight: 640;
+  font-size: 1rem;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  isolation: isolate;
+  overflow: hidden;
+  transition:
+    transform 140ms var(--ease-pf-out),
+    background-color 260ms var(--ease-pf-out),
+    color 260ms var(--ease-pf-out);
+}
+/* the other half of the capsule slides in on hover */
+.pf-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  left: 50%;
+  z-index: -1;
+  background: var(--btn-bg-hover);
+  transform: translateX(101%);
+  transition: transform 320ms var(--ease-pf-out);
+}
+.pf-btn:hover::before {
+  transform: translateX(0);
+}
+.pf-btn:active {
+  transform: scale(0.97);
+}
+.pf-btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.pf-btn--ghost {
+  --btn-bg: transparent;
+  --btn-fg: var(--color-ink);
+  --btn-bg-hover: var(--color-foil);
+  box-shadow: inset 0 0 0 1.5px var(--color-foil-deep);
+}
+.pf-btn--ghost::before {
+  left: 0;
+  transform: scaleX(0);
+  transform-origin: right;
+}
+.pf-btn--ghost:hover::before {
+  transform: scaleX(1);
+}
+.pf-btn--paper {
+  --btn-bg: var(--color-paper);
+  --btn-fg: var(--color-ink);
+  --btn-bg-hover: #fff;
+}
+.pf-btn--sm {
+  min-height: 40px;
+  padding: 0 1.1em;
+  font-size: 0.94rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pf-btn,
+  .pf-btn::before {
+    transition: none;
+  }
+}
+
+/* Text link with a drawn underline */
+.pf-link {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-size: 100% 1.5px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  padding-bottom: 2px;
+  transition: background-size 260ms var(--ease-pf-out);
+}
+.pf-link:hover {
+  background-size: 0% 1.5px;
+  background-position: 100% 100%;
+}
+
+/* Paper objects: receipt tape with a torn, perforated edge */
+.pf-paper-edge {
+  --tooth: 7px;
+  -webkit-mask:
+    conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg)
+      50% / calc(2 * var(--tooth)) 100%;
+  mask:
+    conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg)
+      50% / calc(2 * var(--tooth)) 100%;
+}
+
+.pf-shadow-paper {
+  box-shadow:
+    0 1px 0 rgb(14 43 34 / 0.06),
+    0 2px 3px -1px rgb(14 43 34 / 0.12),
+    0 18px 30px -18px rgb(14 43 34 / 0.35);
+}
+.pf-shadow-ui {
+  box-shadow:
+    0 0 0 1px rgb(14 43 34 / 0.09),
+    0 30px 60px -30px rgb(14 43 34 / 0.28);
+}
+
+/* FAQ disclosure: animate the native <details> where the browser can */
+.pf {
+  interpolate-size: allow-keywords;
+}
+.pf-faq::details-content {
+  block-size: 0;
+  overflow: clip;
+  transition:
+    block-size 320ms var(--ease-pf-out),
+    content-visibility 320ms allow-discrete;
+}
+.pf-faq[open]::details-content {
+  block-size: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pf-faq::details-content {
+    transition: none;
+  }
+}
+
+/* The page-load rise: CSS, so it starts at first paint (good for LCP) */
+@keyframes pf-rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.35em);
+  }
+}
+.pf-rise {
+  animation: pf-rise 900ms var(--ease-pf-out) var(--d, 0ms) both;
+}
+/* The headline is the LCP element, so it never starts invisible: it only
+   settles into place. (Chrome ignores opacity:0 text as an LCP candidate.) */
+@keyframes pf-settle {
+  from {
+    transform: translateY(0.22em);
+  }
+}
+.pf-settle {
+  animation: pf-settle 900ms var(--ease-pf-out) var(--d, 0ms) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pf-rise,
+  .pf-settle {
+    animation: none;
+  }
+}
+
+/* Long page: let the browser skip layout and paint for the sections at the
+   very end. Only used below the last in-page anchor (#faq's own content and
+   after): anything above an anchor would make deep links land short while
+   estimated heights are swapped for real ones. */
+.pf-defer {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 1100px;
+}
+
+/* Anchored sections clear the sticky header */
+.pf [id] {
+  scroll-margin-top: calc(var(--pf-header-h) + 16px);
+}
 }

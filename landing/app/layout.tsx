@@ -1,50 +1,71 @@
 import { ReactNode } from 'react';
-import { Inter } from 'next/font/google';
+import type { Metadata, Viewport } from 'next';
+import { Archivo, Doto } from 'next/font/google';
 import { cn } from '@/lib/utils';
-import { Metadata } from 'next';
-import { ThemeProvider } from 'next-themes';
-import { TooltipProvider } from '@radix-ui/react-tooltip';
-
-const inter = Inter({ subsets: ['latin'] });
+import { siteConfig } from '@/config/site';
 
 import '@/styles/globals.css';
 
-import { siteConfig } from '@/config/site';
+// One variable family carries the whole marketing site: condensed widths for
+// display type (like printed medicine packaging), normal width for reading.
+const archivo = Archivo({
+  subsets: ['latin'],
+  axes: ['wdth'],
+  variable: '--font-archivo',
+  display: 'swap',
+});
+
+// Dot-matrix, only for batch numbers and expiry dates printed on objects.
+const doto = Doto({
+  subsets: ['latin'],
+  weight: ['700', '900'],
+  variable: '--font-doto',
+  display: 'swap',
+  preload: false,
+});
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteConfig.url),
   title: {
     template: `%s | ${siteConfig.name}`,
-    default: `${siteConfig.name} — POS for pharmacies & medical stores`,
+    default: `${siteConfig.name}: pharmacy POS, online store and supplier ordering on one stock record`,
   },
   description: siteConfig.description,
+  applicationName: siteConfig.name,
+  keywords: [
+    'pharmacy POS',
+    'medical store software',
+    'pharmacy inventory',
+    'batch and expiry tracking',
+    'FEFO',
+    'pharmacy online store',
+    'supplier ordering',
+    'Pakistan pharmacy software',
+  ],
+  alternates: { canonical: '/' },
+  openGraph: {
+    type: 'website',
+    siteName: siteConfig.name,
+    url: '/',
+    title: `${siteConfig.name}: sell it at the counter, your online store already knows`,
+    description: siteConfig.description,
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: `${siteConfig.name}: one stock record for your counter, online store and suppliers`,
+    description: siteConfig.description,
+  },
 };
 
-export default async function RootLayout({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export const viewport: Viewport = {
+  themeColor: '#f3f5f2',
+  colorScheme: 'light',
+};
+
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html className="h-full" suppressHydrationWarning>
-      <body
-        className={cn(
-          'antialiased text-base text-foreground bg-background',
-          inter.className,
-        )}
-      >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          storageKey="saas-theme"
-          enableSystem
-          disableTransitionOnChange
-          enableColorScheme
-        >
-          <TooltipProvider>
-            {children}
-          </TooltipProvider>
-        </ThemeProvider>
-      </body>
+    <html lang="en" className={cn('h-full', archivo.variable, doto.variable)}>
+      <body className="antialiased text-base">{children}</body>
     </html>
   );
 }

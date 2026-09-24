@@ -13,11 +13,28 @@ export type PublicPlan = {
   features: Record<string, boolean>;
 };
 
-export async function getPublicPlans(): Promise<PublicPlan[]> {
-  const res = await fetch(`${apiUrl}/public/plans`, { cache: 'no-store' });
+type FetchInit = RequestInit & { next?: { revalidate?: number | false } };
+
+export async function getPublicPlans(
+  init: FetchInit = { cache: 'no-store' },
+): Promise<PublicPlan[]> {
+  const res = await fetch(`${apiUrl}/public/plans`, init);
   if (!res.ok) throw new Error('Failed to load plans');
   const json = await res.json();
   return json.data as PublicPlan[];
+}
+
+/**
+ * For server rendering the marketing page: cached for 10 minutes, and never
+ * throws. An empty list means the pricing section fetches on the client.
+ */
+export async function getPublicPlansSafe(): Promise<PublicPlan[]> {
+  try {
+    const plans = await getPublicPlans({ next: { revalidate: 600 } });
+    return Array.isArray(plans) ? plans : [];
+  } catch {
+    return [];
+  }
 }
 
 export type SignupInput = {
@@ -32,7 +49,11 @@ export type SignupInput = {
 export type SignupResult = {
   token: string;
   user: { id: string; email: string; fullName: string };
-  organization: { code: string; plan_status: string; access_valid_till: string | null };
+  organization: {
+    code: string;
+    plan_status: string;
+    access_valid_till: string | null;
+  };
   plan: string;
 };
 

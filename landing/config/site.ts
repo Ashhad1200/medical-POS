@@ -1,13 +1,12 @@
 export const siteConfig = {
 	name: "PharmaFlow",
-	url: "https://pharmaflow.example.com",
-	ogImage: "https://pharmaflow.example.com/og.jpg",
+	// Set NEXT_PUBLIC_SITE_URL in production: canonical URLs, Open Graph and the
+	// sitemap are all built from it.
+	url: process.env.NEXT_PUBLIC_SITE_URL || "https://pharmaflow.example.com",
 	description:
-		"PharmaFlow — point of sale, batch-aware inventory, supplier ordering and a per-pharmacy online storefront, on one shared data layer.",
-	links: {
-		twitter: "#",
-		github: "#",
-	},
+		"Pharmacy and medical store software where the counter, your own online store and your supplier orders all run off the same batch-by-batch stock, sold earliest expiry first.",
+	// Placeholder until the real support inbox exists; used by every contact link.
+	email: process.env.NEXT_PUBLIC_CONTACT_EMAIL || "support@pharmaflow.example.com",
 };
 
 export type SiteConfig = typeof siteConfig;

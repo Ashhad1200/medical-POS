@@ -1,16 +1,21 @@
 import Link from 'next/link';
+import { Mark } from '@/components/site/mark';
 
 export default function NotFound() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background px-6 text-center">
-      <div className="text-3xl font-bold text-foreground">404</div>
-      <p className="text-muted-foreground">This page doesn&apos;t exist.</p>
-      <Link
-        href="/"
-        className="mt-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-      >
-        Back to PharmaFlow
-      </Link>
-    </div>
+    <main className="pf flex min-h-screen flex-col items-start justify-center">
+      <div className="pf-wrap">
+        <Mark className="size-12 text-cross" />
+        <h1 className="pf-display pf-h2 mt-8 max-w-[16ch]">
+          This page isn’t on the shelf.
+        </h1>
+        <p className="pf-body mt-4 text-ink-soft">
+          The link may be old, or the address may have a typo.
+        </p>
+        <Link href="/" className="pf-btn mt-8">
+          Back to PharmaFlow
+        </Link>
+      </div>
+    </main>
   );
 }
