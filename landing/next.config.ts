@@ -1,10 +1,8 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+import type { NextConfig } from 'next';
+
+const nextConfig: NextConfig = {
 	// For local development, basePath is '/'
 	// This file will be overwritten during deployment with the appropriate basePath
-	images: {
-		domains: ["images.unsplash.com"],
-	},
 };
 
 export default nextConfig;
