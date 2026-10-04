@@ -90,7 +90,7 @@ export function StorefrontSettingsPage() {
     );
 
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
-  const storeUrl = f.slug ? `/store/${f.slug}` : null;
+  const storeUrl = f.slug ? `${import.meta.env.VITE_STOREFRONT_URL || ''}/store/${f.slug}` : null;
 
   return (
     <>
