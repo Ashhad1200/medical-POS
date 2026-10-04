@@ -127,6 +127,20 @@ async function seed() {
       `INSERT INTO users (email, username, full_name, phone, role, role_in_pos, organization_id,
          is_active, is_email_verified, is_trial_user, subscription_status, access_valid_till, password_hash)
        VALUES ($1,$2,$3,$4,'admin','admin',$5,TRUE,TRUE,FALSE,'active',$6,$7)
+       ON CONFLICT (email) DO UPDATE
+         SET username = EXCLUDED.username,
+             full_name = EXCLUDED.full_name,
+             phone = EXCLUDED.phone,
+             role = EXCLUDED.role,
+             role_in_pos = EXCLUDED.role_in_pos,
+             organization_id = EXCLUDED.organization_id,
+             is_active = TRUE,
+             is_email_verified = TRUE,
+             subscription_status = 'active',
+             access_valid_till = EXCLUDED.access_valid_till,
+             password_hash = EXCLUDED.password_hash,
+             session_token = NULL,
+             updated_at = NOW()
        RETURNING id`,
       [DEMO.email, DEMO.username, DEMO.fullName, "+923001234567", orgId, accessTill, passwordHash]
     );
