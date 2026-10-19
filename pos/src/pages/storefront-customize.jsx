@@ -55,7 +55,7 @@ export function StorefrontCustomizePage() {
 
   const products = useQuery({
     queryKey: ['medicines', 'all-for-customize'],
-    queryFn: async () => (await medicineServices.getAll({ limit: 500 })).data.data,
+    queryFn: async () => (await medicineServices.getAll({ limit: 500 })).data.data.medicines,
     enabled: hasFeature('storefront'),
     retry: false,
   });
