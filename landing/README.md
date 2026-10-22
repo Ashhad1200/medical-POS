@@ -22,5 +22,5 @@ npm run build
 |---|---|---|
 | `NEXT_PUBLIC_API_URL` | API base | `http://localhost:4001/api` |
 | `NEXT_PUBLIC_POS_URL` | "Sign in" / post-signup link | `http://localhost:5175` |
-| `NEXT_PUBLIC_SITE_URL` | canonical URL, Open Graph, sitemap | `https://pharmaflow.example.com` |
-| `NEXT_PUBLIC_CONTACT_EMAIL` | every contact link | `support@pharmaflow.example.com` |
+| `NEXT_PUBLIC_SITE_URL` | canonical URL, Open Graph, sitemap | `https://pharmaflow.treevoxa.com` |
+| `NEXT_PUBLIC_CONTACT_EMAIL` | every contact link | `support@treevoxa.com` |
