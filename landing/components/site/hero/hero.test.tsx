@@ -95,7 +95,7 @@ describe('Hero', () => {
 
     // the full slip and the phone version both offer the order; either works
     await user.click(
-      screen.getAllByRole('button', { name: 'Order 10 from Indus' })[0],
+      screen.getAllByRole('button', { name: 'Order 10 from Northside' })[0],
     );
     expect(live()).toBe('Order sent to the supplier.');
 

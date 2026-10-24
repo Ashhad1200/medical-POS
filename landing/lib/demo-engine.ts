@@ -89,7 +89,7 @@ export function addMonths(expiry: string, months: number): string {
 
 export function createInitialState(): DemoState {
   return {
-    product: { name: 'Paracetamol 500 mg', price: 42 },
+    product: { name: 'Paracetamol 500 mg', price: 0.42 },
     batches: [
       { code: 'B-2407', expiry: '03/27', qty: 4, capacity: 10 },
       { code: 'B-2411', expiry: '11/27', qty: 10, capacity: 10 },
@@ -97,9 +97,9 @@ export function createInitialState(): DemoState {
     reorderLevel: 6,
     reorderQty: 10,
     suppliers: [
-      { name: 'Indus Medical Supply', unitPrice: 33.5, fillRate: 0.98 },
-      { name: 'Ravi Pharma Distribution', unitPrice: 34.2, fillRate: 0.94 },
-      { name: 'Margalla Traders', unitPrice: 35, fillRate: 0.91 },
+      { name: 'Northside Medical Supply', unitPrice: 0.33, fillRate: 0.98 },
+      { name: 'Riverside Pharma Distribution', unitPrice: 0.34, fillRate: 0.94 },
+      { name: 'Hilltop Traders', unitPrice: 0.35, fillRate: 0.91 },
     ],
     reorder: 'idle',
     sales: [],

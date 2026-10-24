@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import { useHasMounted } from '../use-in-view';
 
 const rs = (n: number) =>
-  `Rs ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const spring = { type: 'spring', stiffness: 380, damping: 30 } as const;
 
@@ -159,7 +159,7 @@ export function StoreCard({ state, stock, reduced, pulse }: OutputProps) {
               {state.product.name}
             </div>
             <div className="text-[0.8rem] text-ink-soft">
-              Strip of 10, Rs {state.product.price}
+              Strip of 10, {rs(state.product.price)}
             </div>
           </div>
         </div>
@@ -274,7 +274,7 @@ export function ReorderSlip({
                   >
                     <span className="truncate">{s.name}</span>
                     <span className="pf-num shrink-0">
-                      Rs {s.unitPrice.toFixed(2)}
+                      {rs(s.unitPrice)}
                       <span className="ml-2 text-[0.72rem] text-ink-soft">
                         {Math.round(s.fillRate * 100)}% filled
                       </span>
@@ -403,7 +403,7 @@ export function CompactOutputs({
           <div className="mt-1 pf-num">
             {stock === 0
               ? 'Out of stock, hidden from the store'
-              : `${stock} in stock, Rs ${state.product.price} a strip`}
+              : `${stock} in stock, ${rs(state.product.price)} a strip`}
           </div>
         </div>
       </li>
@@ -421,8 +421,8 @@ export function CompactOutputs({
           {state.reorder === 'suggested' && best && (
             <>
               <div className="mt-1">
-                At reorder level. Cheapest: {best.name}, Rs{' '}
-                {best.unitPrice.toFixed(2)}
+                At reorder level. Cheapest: {best.name},{' '}
+                {rs(best.unitPrice)}
               </div>
               <button
                 type="button"

@@ -23,7 +23,7 @@ const STEPS: Step[] = [
   {
     title: 'It arrives',
     body: 'Your supplier delivers. Mark the purchase order received, all of it or only what turned up, and the batch goes into stock with its number, expiry date and cost.',
-    entry: 'Received from Indus Medical Supply',
+    entry: 'Received from Northside Medical Supply',
     delta: 20,
     qty: 20,
   },
