@@ -60,7 +60,7 @@ Request flow: `routes/*.js` → `controllers/*.js` → optionally `models/*.js` 
 - `middleware/platformAuth.js` gates `/api/platform/*` and `/api/admin/*` — requires a JWT whose user has `users.is_platform_admin = true`. Not org-scoped. A tenant `role_in_pos='admin'` is **not** a platform admin.
 - `controllers/platformController.js` + `routes/platform.js`: overview, health, `plans` CRUD, cross-tenant organization management (provision org+admin in a txn, change plan, set access window, suspend/reactivate — suspend nulls every member's `session_token`), cross-tenant user list / status / session revoke, audit-log reader.
 - `plans` table (migration `002`) + `organizations.plan_id / plan_status / plan_current_period_end`. `middleware/planLimits.js`: `enforceUserLimit` (on `routes/users.js` POST) and `requireFeature("<flag>")` read `plans.features` jsonb.
-- Seed the operator with `npm run seed:platform` (`owner@medicalpos.local` / `owner123`, lives in a hidden `__platform__` org). `npm run setup:local` = migrate + seed:pg + seed:platform.
+- Seed the operator with `npm run seed:platform` (set `PLATFORM_ADMIN_PASSWORD`; the account lives in a hidden `__platform__` org, and the script refuses to run in production without that variable). `npm run setup:local` = migrate + seed:pg + seed:platform.
 
 **Public onboarding** — `controllers/publicController.js` + `routes/public.js` at `/api/public` (no auth): `GET /plans` (public plans for the marketing site) and `POST /signup` (self-serve — creates org + admin + trial from a `planCode`, auto-slugs the org code, returns a JWT, writes a `subscription_events` 'created' row). `POST /api/public/signup` is rate-limited to 10/hour/IP in `server.js`.
 

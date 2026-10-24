@@ -21,7 +21,13 @@ if (process.env.DATABASE_URL) {
     ),
   });
 } else {
-  // Local development configuration
+  // Discrete POSTGRES_* settings. The password fallback below is for local development only: this
+  // repository is public, so production must never run on it.
+  if (process.env.NODE_ENV === "production" && !process.env.POSTGRES_PASSWORD) {
+    throw new Error(
+      "Database not configured: set DATABASE_URL or POSTGRES_PASSWORD. Refusing to use the development default in production."
+    );
+  }
   pool = new Pool({
     host: process.env.POSTGRES_HOST || "localhost",
     port: Number(process.env.POSTGRES_PORT || 5432),

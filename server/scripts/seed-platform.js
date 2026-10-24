@@ -5,13 +5,19 @@
  *
  *   npm run seed:platform
  *
- * Credentials: owner@medicalpos.local / owner123   (override with env vars below)
+ * Set PLATFORM_ADMIN_PASSWORD (and optionally PLATFORM_ADMIN_EMAIL / PLATFORM_ADMIN_USERNAME).
+ * The fallback password is for local development only and is refused in production:
+ * this repository is public, and re-running the seed resets the operator's password.
  */
 const bcrypt = require("bcryptjs");
 const { pool } = require("../config/database");
 
 const EMAIL = process.env.PLATFORM_ADMIN_EMAIL || "owner@medicalpos.local";
 const USERNAME = process.env.PLATFORM_ADMIN_USERNAME || "owner";
+if (process.env.NODE_ENV === "production" && !process.env.PLATFORM_ADMIN_PASSWORD) {
+  console.error("❌ seed:platform: set PLATFORM_ADMIN_PASSWORD. Refusing to seed the operator with the public development default in production.");
+  process.exit(1);
+}
 const PASSWORD = process.env.PLATFORM_ADMIN_PASSWORD || "owner123";
 
 async function seed() {
