@@ -127,7 +127,7 @@ describe('reorder loop', () => {
 
   it('picks the cheapest connected supplier', () => {
     expect(cheapestSupplier(createInitialState().suppliers)?.name).toBe(
-      'Indus Medical Supply',
+      'Northside Medical Supply',
     );
     expect(cheapestSupplier([])).toBeUndefined();
   });

@@ -15,7 +15,7 @@ function CounterFragment() {
       batch: 'B-2407',
       exp: '03/27',
       left: 4,
-      price: 42,
+      price: 0.42,
       first: true,
     },
     {
@@ -23,14 +23,14 @@ function CounterFragment() {
       batch: 'B-2411',
       exp: '11/27',
       left: 10,
-      price: 42,
+      price: 0.42,
     },
     {
       name: 'Paracetamol syrup 120 ml',
       batch: 'B-2390',
       exp: '01/27',
       left: 6,
-      price: 95,
+      price: 0.95,
     },
   ];
   return (
@@ -79,7 +79,7 @@ function CounterFragment() {
             >
               <div className="flex items-baseline justify-between gap-3">
                 <span className="font-semibold">{r.name}</span>
-                <span className="pf-num font-semibold">Rs {r.price}</span>
+                <span className="pf-num font-semibold">${r.price.toFixed(2)}</span>
               </div>
               <div className="mt-1 flex flex-wrap gap-x-4 text-[0.78rem] text-ink-soft">
                 <span>Batch {r.batch}</span>
@@ -99,16 +99,16 @@ function CounterFragment() {
           <div className="mt-2 space-y-1.5">
             <div className="flex justify-between">
               <span>Paracetamol 500 mg × 2</span>
-              <span className="pf-num">84</span>
+              <span className="pf-num">0.84</span>
             </div>
             <div className="flex justify-between">
               <span>ORS sachets × 1</span>
-              <span className="pf-num">90</span>
+              <span className="pf-num">0.90</span>
             </div>
           </div>
           <div className="mt-3 flex justify-between border-t border-foil pt-3 font-bold">
             <span>Total</span>
-            <span className="pf-num">Rs 174</span>
+            <span className="pf-num">$1.74</span>
           </div>
           <div className="mt-4 grid grid-cols-4 gap-1 text-center text-[0.72rem] font-semibold">
             {['Cash', 'Card', 'Bank', 'Credit'].map((p, i) => (
@@ -139,21 +139,21 @@ function CounterFragment() {
 function SupplierFragment() {
   const rows = [
     {
-      name: 'Indus Medical Supply',
-      price: '335',
+      name: 'Northside Medical Supply',
+      price: '3.35',
       fill: 98,
       time: 96,
       moq: 2,
       best: true,
     },
     {
-      name: 'Ravi Pharma Distribution',
-      price: '342',
+      name: 'Riverside Pharma Distribution',
+      price: '3.42',
       fill: 94,
       time: 91,
       moq: 1,
     },
-    { name: 'Margalla Traders', price: '350', fill: 91, time: 88, moq: 5 },
+    { name: 'Hilltop Traders', price: '3.50', fill: 91, time: 88, moq: 5 },
   ];
   return (
     <div className="pf-shadow-ui overflow-hidden rounded-[14px] bg-white text-[0.86rem]">
@@ -203,7 +203,7 @@ function SupplierFragment() {
                     </span>
                   )}
                 </th>
-                <td className="px-3 py-3 text-right">Rs {r.price}</td>
+                <td className="px-3 py-3 text-right">${r.price}</td>
                 <td className="px-3 py-3">
                   <span className="flex items-center gap-2">
                     <span className="h-1.5 w-14 overflow-hidden rounded-full bg-foil">
@@ -225,8 +225,8 @@ function SupplierFragment() {
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-foil bg-paper-bright px-5 py-4">
         <div className="min-w-[220px] flex-1">
           <div className="flex justify-between text-[0.76rem] text-ink-soft">
-            <span>Credit used with Indus</span>
-            <span className="pf-num">Rs 42,000 of 60,000</span>
+            <span>Credit used with Northside</span>
+            <span className="pf-num">$420 of $600</span>
           </div>
           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-foil">
             <span className="block h-full w-[70%] bg-amber" />
@@ -291,11 +291,12 @@ export default function Product() {
             <ul className="mt-6 border-b border-foil-deep/60">
               <Point>Run your own banners, deals and featured products</Point>
               <Point>
-                Cash on delivery, pay in store, or JazzCash where it’s switched
-                on
+                Cash on delivery, pay in store, or online payment where it’s
+                switched on (JazzCash today)
               </Point>
               <Point>
-                Deliver with your own rider or book PostEx from the order
+                Deliver with your own rider or book a courier from the order
+                (PostEx today)
               </Point>
               <Point>Customers track their order with their phone number</Point>
               <Point>Use your own domain on Pro and Enterprise</Point>

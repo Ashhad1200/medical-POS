@@ -25,7 +25,7 @@ export function faqItems(plans: PublicPlan[]): QA[] {
     },
     {
       q: 'How do my customers pay, and how do orders reach them?',
-      a: 'Customers can pay cash on delivery or in the shop, or online through JazzCash where it has been switched on. You deliver with your own rider or book a PostEx pickup from the order, and customers follow their order with their phone number.',
+      a: 'Customers can pay cash on delivery or in the shop, or online where online payment has been switched on (JazzCash today). You deliver with your own rider or book a courier pickup from the order (PostEx today), and customers follow their order with their phone number.',
     },
     {
       q: 'Can my supplier use PharmaFlow too?',

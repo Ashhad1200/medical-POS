@@ -541,3 +541,5 @@ chromatic.log
 !*.sql
 !schema.sql
 !migrations/*.sql 
+# Claude Code session state (memory, logs, locks): local only, can contain prompts, paths or secrets
+.claude/

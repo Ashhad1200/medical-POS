@@ -28,20 +28,10 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
   title: {
     template: `%s | ${siteConfig.name}`,
-    default: `${siteConfig.name}: pharmacy POS, online store and supplier ordering on one stock record`,
+    default: `Pharmacy POS Software: Batch & Expiry, FEFO | ${siteConfig.name}`,
   },
   description: siteConfig.description,
   applicationName: siteConfig.name,
-  keywords: [
-    'pharmacy POS',
-    'medical store software',
-    'pharmacy inventory',
-    'batch and expiry tracking',
-    'FEFO',
-    'pharmacy online store',
-    'supplier ordering',
-    'Pakistan pharmacy software',
-  ],
   alternates: { canonical: '/' },
   openGraph: {
     type: 'website',

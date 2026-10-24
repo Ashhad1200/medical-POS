@@ -12,10 +12,10 @@ const SWATCHES = [
 ];
 
 const PRODUCTS = [
-  { name: 'Paracetamol 500 mg', unit: 'Strip of 10', price: 42 },
-  { name: 'ORS sachets', unit: 'Pack of 5', price: 90 },
-  { name: 'Vitamin C 500 mg', unit: 'Bottle of 30', price: 480, deal: true },
-  { name: 'Digital thermometer', unit: '1 piece', price: 650 },
+  { name: 'Paracetamol 500 mg', unit: 'Strip of 10', price: 0.42 },
+  { name: 'ORS sachets', unit: 'Pack of 5', price: 0.9 },
+  { name: 'Vitamin C 500 mg', unit: 'Bottle of 30', price: 4.8, deal: true },
+  { name: 'Digital thermometer', unit: '1 piece', price: 6.5 },
 ];
 
 /** A pharmacy's own store. Pick a colour to see it change, like the owner would. */
@@ -84,7 +84,7 @@ export default function StorePreview() {
                 <div className="text-[0.66rem] text-ink-soft">{p.unit}</div>
                 <div className="mt-1 flex items-center justify-between">
                   <span className="pf-num text-[0.74rem] font-bold">
-                    Rs {p.price}
+                    ${p.price.toFixed(2)}
                   </span>
                   {p.deal && (
                     <span className="rounded bg-amber-tint px-1 text-[0.6rem] font-bold text-amber-ink">

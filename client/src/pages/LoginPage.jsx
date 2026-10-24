@@ -55,16 +55,6 @@ const LoginPage = () => {
     }
   };
 
-  const handleDemoLogin = (role) => {
-    const credentials = {
-      admin: { email: "admin@moizmedical.com", password: "admin123" },
-      counter: { email: "counter@moizmedical.com", password: "counter123" },
-      warehouse: { email: "warehouse@moizmedical.com", password: "warehouse123" },
-    };
-
-    setFormData(credentials[role]);
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
@@ -90,35 +80,6 @@ const LoginPage = () => {
           <p className="mt-2 text-center text-sm text-gray-600">
             Sign in to access the counter dashboard
           </p>
-        </div>
-
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h3 className="text-sm font-medium text-blue-800 mb-3">
-            Demo Credentials
-          </h3>
-          <div className="space-y-2">
-            <button
-              type="button"
-              onClick={() => handleDemoLogin("counter")}
-              className="w-full text-left text-xs bg-white p-2 rounded border hover:bg-blue-50 transition-colors"
-            >
-              <strong>Counter Staff:</strong> counter / counter123
-            </button>
-            <button
-              type="button"
-              onClick={() => handleDemoLogin("admin")}
-              className="w-full text-left text-xs bg-white p-2 rounded border hover:bg-blue-50 transition-colors"
-            >
-              <strong>Admin:</strong> admin / admin123
-            </button>
-            <button
-              type="button"
-              onClick={() => handleDemoLogin("warehouse")}
-              className="w-full text-left text-xs bg-white p-2 rounded border hover:bg-blue-50 transition-colors"
-            >
-              <strong>Warehouse:</strong> warehouse / warehouse123
-            </button>
-          </div>
         </div>
 
         <form
@@ -230,11 +191,6 @@ const LoginPage = () => {
           </div>
         </form>
 
-        <div className="text-center">
-          <p className="text-xs text-gray-500">
-            Click on demo credentials above to auto-fill login form
-          </p>
-        </div>
       </div>
     </div>
   );
