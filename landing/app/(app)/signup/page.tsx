@@ -60,7 +60,7 @@ function SignupForm() {
     try {
       const res = await signup(form);
       setDone({ email: res.user.email, plan: res.plan });
-      track('sign_up', { product: 'pharmaflow', plan: res.plan });
+      void track('sign_up', { product: 'pharmaflow', plan: res.plan });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign-up failed');
     } finally {

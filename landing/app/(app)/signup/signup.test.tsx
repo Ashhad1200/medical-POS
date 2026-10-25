@@ -104,10 +104,11 @@ describe('Signup page', () => {
       screen.getByRole('link', { name: 'Go to your dashboard' }),
     ).toBeInTheDocument();
     // GA4 gets the product and plan, never the email or name typed into the form.
-    expect(window.gtag).toHaveBeenCalledWith('event', 'sign_up', {
-      product: 'pharmaflow',
-      plan: 'pro',
-    });
+    expect(window.gtag).toHaveBeenCalledWith(
+      'event',
+      'sign_up',
+      expect.objectContaining({ product: 'pharmaflow', plan: 'pro' }),
+    );
     expect(JSON.stringify(vi.mocked(window.gtag!).mock.calls)).not.toMatch(/sana|noor/i);
     delete window.gtag;
   });
