@@ -85,6 +85,7 @@ describe('Signup page', () => {
         access_valid_till: null,
       },
     });
+    window.gtag = vi.fn();
     const user = await fill();
     await user.click(
       screen.getByRole('button', { name: 'Create my pharmacy' }),
@@ -102,6 +103,13 @@ describe('Signup page', () => {
     expect(
       screen.getByRole('link', { name: 'Go to your dashboard' }),
     ).toBeInTheDocument();
+    // GA4 gets the product and plan, never the email or name typed into the form.
+    expect(window.gtag).toHaveBeenCalledWith('event', 'sign_up', {
+      product: 'pharmaflow',
+      plan: 'pro',
+    });
+    expect(JSON.stringify(vi.mocked(window.gtag!).mock.calls)).not.toMatch(/sana|noor/i);
+    delete window.gtag;
   });
 
   it('shows the server’s reason when signup fails', async () => {

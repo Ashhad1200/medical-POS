@@ -9,6 +9,7 @@ import { appUrls } from '@/config/site';
 import { getPublicPlans, signup, type PublicPlan } from '@/lib/api';
 import { enabledFeatures, formatPrice, isFree, limitLabel } from '@/lib/plans';
 import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics';
 
 const input =
   'block h-12 w-full rounded-[10px] border border-foil-deep bg-white px-4 text-[1rem] text-ink placeholder:text-ink-soft/60 transition-colors focus:border-cross focus:outline-none focus:ring-2 focus:ring-cross/25';
@@ -59,6 +60,7 @@ function SignupForm() {
     try {
       const res = await signup(form);
       setDone({ email: res.user.email, plan: res.plan });
+      track('sign_up', { product: 'pharmaflow', plan: res.plan });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign-up failed');
     } finally {

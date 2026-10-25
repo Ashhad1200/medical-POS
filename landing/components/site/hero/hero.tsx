@@ -161,7 +161,7 @@ export default function Hero() {
               </p>
               <div className="flex flex-col gap-3 md:col-span-5 md:items-end lg:col-span-6">
                 <div className="flex flex-wrap gap-3">
-                  <Link href="/signup" className="pf-btn">
+                  <Link href="/signup" className="pf-btn" data-cta="hero">
                     Start free trial
                   </Link>
                   <a href="#how" className="pf-btn pf-btn--ghost">

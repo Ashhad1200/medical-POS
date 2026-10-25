@@ -21,10 +21,11 @@ export function FinalCta() {
           product list, add your staff and make your first sale today.
         </p>
         <div className="mt-10 flex flex-wrap gap-3">
-          <Link href="/signup" className="pf-btn pf-btn--paper">
+          <Link href="/signup" className="pf-btn pf-btn--paper" data-cta="final-cta">
             Start free trial
           </Link>
           <a
+            data-cta="book-demo"
             href={`mailto:${siteConfig.email}?subject=Walkthrough%20for%20my%20pharmacy`}
             className="pf-btn pf-btn--ghost text-paper [--btn-bg-hover:rgb(255_255_255/0.08)] shadow-[inset_0_0_0_1.5px_rgb(255_255_255/0.25)]"
             style={{ ['--btn-fg' as string]: 'var(--color-paper)' }}
@@ -77,7 +78,7 @@ export function Footer() {
             <p className="font-semibold">Account</p>
             <ul className="mt-3 space-y-2 text-ink-soft">
               <li>
-                <Link className="hover:text-ink" href="/signup">
+                <Link className="hover:text-ink" href="/signup" data-cta="footer">
                   Start free trial
                 </Link>
               </li>

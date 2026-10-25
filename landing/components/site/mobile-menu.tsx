@@ -53,7 +53,7 @@ export default function MobileMenu({
               </a>
             ))}
             <div className="mt-auto flex flex-col gap-3 pb-10 pt-8">
-              <Link href="/signup" className="pf-btn w-full" onClick={close}>
+              <Link href="/signup" className="pf-btn w-full" onClick={close} data-cta="mobile-menu">
                 Start free trial
               </Link>
               <a href={appUrls.pos} className="pf-btn pf-btn--paper w-full">

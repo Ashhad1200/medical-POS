@@ -67,7 +67,7 @@ export default function Header() {
           >
             Sign in
           </a>
-          <Link href="/signup" className="pf-btn pf-btn--sm">
+          <Link href="/signup" className="pf-btn pf-btn--sm" data-cta="header">
             Start free trial
           </Link>
         </div>

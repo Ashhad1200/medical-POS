@@ -221,6 +221,7 @@ export default function Pricing({
                     <div className="mt-auto pt-8">
                       <Link
                         href={`/signup?plan=${plan.code}`}
+                        data-cta="pricing"
                         className={cn(
                           'pf-btn w-full',
                           !fits && 'pf-btn--ghost',
@@ -423,6 +424,7 @@ function PlanFinder({
             </div>
             <Link
               href={`/signup?plan=${rec.plan.code}`}
+              data-cta="plan-finder"
               className="pf-btn pf-btn--paper shrink-0"
             >
               {isFree(rec.plan)
