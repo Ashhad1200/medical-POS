@@ -114,6 +114,21 @@ export function Footer() {
           <span>© {year} PharmaFlow</span>
           <span>Made for pharmacies and medical stores.</span>
         </div>
+        <p className="pb-6 text-[0.85rem] text-ink-soft">
+          PharmaFlow is built by{" "}
+          <a className="underline underline-offset-2 hover:text-ink" href="https://treevoxa.com/products/pharmaflow/">
+            Treevoxa
+          </a>
+          , a custom software company. Read our guide to{" "}
+          <a className="underline underline-offset-2 hover:text-ink" href="https://treevoxa.com/guides/pharmacy-expiry-loss/">
+            cutting pharmacy expiry loss
+          </a>
+          , or see{" "}
+          <a className="underline underline-offset-2 hover:text-ink" href="https://treevoxa.com/services/pos-software-development/">
+            custom POS software development
+          </a>
+          .
+        </p>
       </div>
     </footer>
   );
